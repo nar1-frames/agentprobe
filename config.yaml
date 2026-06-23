@@ -46,7 +46,7 @@ scan:
 output:
   # txt = plain text report (current)
   # html = visual dashboard (v1.0)
-  report_format: txt
+  report_format: html
   report_dir: reports
 
 
