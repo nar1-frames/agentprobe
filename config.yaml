@@ -1,0 +1,77 @@
+# ============================================================
+# AGENTPROBE CONFIGURATION
+# ============================================================
+# This file controls which AI models AgentProbe tests.
+# Change the values here to target any supported AI provider.
+#
+# NEVER put API keys directly in this file.
+# Use api_key_env to name the environment variable in your .env
+# ============================================================
+
+# --- TARGET: the AI being tested for vulnerabilities ---------
+target:
+  provider: groq                    # groq | openai | ollama | custom
+  model: llama-3.1-8b-instant       # any model name your provider supports
+  api_key_env: GROQ_API_KEY         # name of the env var holding your API key
+  base_url: null                    # null = use provider default
+                                    # ollama example: http://localhost:11434/v1
+                                    # custom example: https://your-api.com/v1
+
+# --- JUDGE: the AI evaluating whether the target complied ----
+# Should be a stronger model than the target.
+# Can be a different provider than the target.
+judge:
+  provider: groq
+  model: llama-3.3-70b-versatile
+  api_key_env: GROQ_API_KEY
+  base_url: null
+
+# --- SCAN SETTINGS -------------------------------------------
+scan:
+  # Which attack categories to run.
+  # Use "all" or list specific ones:
+  #   [jailbreak, data_extraction, privilege_escalation,
+  #    social_engineering, role_confusion, indirect_injection,
+  #    context_manipulation, tool_misuse]
+  categories: all
+
+  # Only test attacks at or above this severity level.
+  # Options: null (run all), CRITICAL, HIGH, MEDIUM, LOW
+  severity_filter: null
+
+  # Seconds to wait between API calls (avoid rate limiting)
+  rate_limit_seconds: 1
+
+# --- OUTPUT --------------------------------------------------
+output:
+  # txt = plain text report (current)
+  # html = visual dashboard (v1.0)
+  report_format: txt
+  report_dir: reports
+
+
+# ============================================================
+# PROVIDER EXAMPLES
+# ============================================================
+#
+# --- OpenAI ---
+# target:
+#   provider: openai
+#   model: gpt-4o-mini
+#   api_key_env: OPENAI_API_KEY
+#   base_url: null
+#
+# --- Ollama (local, no API key needed) ---
+# target:
+#   provider: ollama
+#   model: llama3.2
+#   api_key_env: null
+#   base_url: http://localhost:11434/v1
+#
+# --- Custom OpenAI-compatible endpoint ---
+# target:
+#   provider: custom
+#   model: your-model-name
+#   api_key_env: YOUR_API_KEY_ENV_VAR
+#   base_url: https://your-endpoint.com/v1
+# ============================================================
