@@ -1,0 +1,51 @@
+# ============================================================
+# AGENTPROBE v1.2 — AUTHORIZATION RECORD (TEMPLATE)
+# ============================================================
+# Copy this into disclosure/authorizations/<target>.yaml and fill
+# it in for the program you intend to test. AgentProbe will NOT
+# scan a target unless a matching record exists AND a human has
+# set authorization.confirmed: true.
+#
+# The values below are pre-filled for OpenAI's Safety Bug Bounty
+# as of 2026-03, grounded in the program's public rules. VERIFY
+# them against the live program before relying on them — bounty
+# rules change, and you are the one accountable for staying in
+# scope.
+# ============================================================
+
+target_id: openai-safety-bounty          # unique key you pass to require_authorization()
+program_name: OpenAI Safety Bug Bounty
+program_url: https://openai.com/index/safety-bug-bounty/
+platform: bugcrowd                        # where reports are submitted
+
+scope:
+  in_scope:
+    - Third-party (indirect) prompt injection where attacker-controlled text
+      reliably hijacks a victim's agent into a harmful action or into disclosing
+      sensitive information
+    - Data exfiltration through manipulated agent / tool workflows
+    - Autonomous agent actions that cause real-world harm
+  out_of_scope:
+    - Generic / simple jailbreaks
+    - Low-harm content-policy bypasses
+    - Model returning rude language or information easily found via a search engine
+
+rules:
+  # CRITICAL: OpenAI's Terms of Use prohibit automated/programmatic extraction of
+  # output and circumventing rate limits. AgentProbe is an automated scanner, so
+  # automated testing against production is NOT permitted here. Keep this false
+  # unless the program explicitly authorizes a scanner against a test harness.
+  automated_testing_permitted: false
+  min_reproducibility: 0.50               # must reproduce >= 50% of the time
+  test_account_required: true
+  safe_harbor: true
+
+authorization:
+  # The gate stays closed until a human fills these in and sets confirmed: true.
+  confirmed: false
+  authorized_by: ""                       # your name / handle
+  authorized_date: ""                     # YYYY-MM-DD
+  notes: >
+    Discover candidates on a model you control, then reproduce manually within
+    the program's rules before disclosing. Do not point the automated scanner at
+    api.openai.com or chatgpt.com.

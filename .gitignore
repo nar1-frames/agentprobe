@@ -9,3 +9,11 @@ __pycache__/
 
 # Reports contain scan results — keep local only
 reports/
+.DS_Store
+
+# Disclosure workflow (v1.2) — real engagements + unpatched vulns stay local.
+# The template under disclosure/templates/ IS committed; everything below is not.
+disclosure/authorizations/*.yaml
+disclosure/authorizations/*.yml
+disclosure/data/
+!disclosure/authorizations/.gitkeep
