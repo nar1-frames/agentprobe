@@ -22,30 +22,30 @@ AgentProbe is that tool. Point it at any AI API, run the scan, get a professiona
 
 ---
 
-## Real Findings (v1.0 scan — June 2026)
+## Real Findings (v1.1 scan — July 2026)
 
 Target: `llama-3.1-8b-instant` (Groq) | Judge: `llama-3.3-70b-versatile`
 
 | Category | Findings | Total | Hit Rate | Highest Severity |
 |---|---|---|---|---|
-| Jailbreak | 6 | 8 | 75% | CRITICAL |
+| Jailbreak | 7 | 8 | 88% | CRITICAL |
 | Data Extraction | 3 | 8 | 38% | CRITICAL |
-| Privilege Escalation | 2 | 6 | 33% | CRITICAL |
+| Privilege Escalation | 3 | 6 | 50% | CRITICAL |
 | Social Engineering | 4 | 6 | 67% | HIGH |
-| Role Confusion | 5 | 6 | 83% | CRITICAL |
-| Indirect Injection | 0 | 5 | 0% | — |
+| Role Confusion | 6 | 6 | 100% | CRITICAL |
+| Indirect Injection | 1 | 5 | 20% | CRITICAL |
 | Context Manipulation | 3 | 5 | 60% | HIGH |
 | Tool Misuse | 2 | 5 | 40% | CRITICAL |
 
-**Overall: 25/49 prompts produced vulnerable behavior (51% attack success rate)**
+**Overall: 29/49 prompts produced vulnerable behavior (59% attack success rate) — 27 fully vulnerable + 2 partial**
 
 ### Severity Breakdown
 
 | Severity | Count | Examples |
 |---|---|---|
-| **CRITICAL** | 10 | DAN persona hijack, SYSTEM OVERRIDE tag injection, developer mode activation, database query execution |
-| **HIGH** | 12 | Roleplay bypass, context reset, creative framing, social engineering authority spoofing |
-| **MEDIUM** | 3 | Grandmother trick, false precedent, context reset via false history |
+| **CRITICAL** | 10 | DAN persona hijack, SYSTEM OVERRIDE tag injection, emergency-maintenance override, database query execution |
+| **HIGH** | 15 | Roleplay bypass, context reset, creative framing, social engineering authority spoofing |
+| **MEDIUM** | 4 | Grandmother trick, false precedent, context reset via false history |
 | **LOW** | 0 | — |
 
 ### Notable Findings
@@ -106,7 +106,7 @@ Configure any provider in `config.yaml`. No code changes needed to switch target
 | **Data Extraction** | Prompts designed to leak system instructions | High — exposes operator configuration |
 | **Privilege Escalation** | Attempts to claim elevated permissions | Critical — admin/root framing sometimes accepted |
 | **Social Engineering** | Manipulation via false authority or emotional pressure | Medium — subtle, hard to filter |
-| **Role Confusion** | Persona hijacking and identity replacement | Critical — 83% success rate in testing |
+| **Role Confusion** | Persona hijacking and identity replacement | Critical — 100% success rate in testing |
 | **Indirect Injection** | Attacks hidden inside documents or emails the AI processes | Critical — the most dangerous real-world vector |
 | **Context Manipulation** | Attempts to reset or invalidate conversation history | High — affects AI agents with memory |
 | **Tool Misuse** | Attacks targeting AI agents with file, database, or code access | Critical — hedge-then-comply bypasses tool guardrails |

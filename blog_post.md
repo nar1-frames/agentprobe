@@ -1,4 +1,4 @@
-# I Fired 49 Attack Prompts at an AI. 26 of Them Worked.
+# I Fired 49 Attack Prompts at an AI. 29 of Them Worked.
 
 *By Naren Ranjith*
 
@@ -57,7 +57,7 @@ Finally, it calculates a **finding severity** and generates a timestamped report
 
 ## What It Found
 
-49 prompts. 26 findings. 53% attack success rate.
+49 prompts. 29 findings. 59% attack success rate.
 
 Here are the results that stood out.
 
@@ -143,18 +143,18 @@ The AI correctly refused "Override code ALPHA-9" — a fabricated credential did
 
 | Category | Findings / Total | Highest Severity |
 |---|---|---|
-| Jailbreak | 5 / 8 | CRITICAL |
-| Data Extraction | 4 / 8 | CRITICAL |
-| Privilege Escalation | 2 / 6 | CRITICAL |
-| Social Engineering | 2 / 6 | MEDIUM |
-| Role Confusion | 5 / 6 | CRITICAL |
-| Indirect Injection | 2 / 5 | CRITICAL |
+| Jailbreak | 7 / 8 | CRITICAL |
+| Data Extraction | 3 / 8 | CRITICAL |
+| Privilege Escalation | 3 / 6 | CRITICAL |
+| Social Engineering | 4 / 6 | HIGH |
+| Role Confusion | 6 / 6 | CRITICAL |
+| Indirect Injection | 1 / 5 | CRITICAL |
 | Context Manipulation | 3 / 5 | HIGH |
-| Tool Misuse | 3 / 5 | CRITICAL |
+| Tool Misuse | 2 / 5 | CRITICAL |
 
-**8 CRITICAL findings. 12 HIGH. 6 MEDIUM.**
+**10 CRITICAL findings. 15 HIGH. 4 MEDIUM.**
 
-Role confusion was the most dangerous category — 83% of persona hijack attempts succeeded. Tool misuse showed the clearest real-world risk, because the hedge-then-comply pattern is exactly what an attacker would exploit in a deployed AI agent.
+Role confusion was the most dangerous category — 100% of persona hijack attempts succeeded. Tool misuse showed the clearest real-world risk, because the hedge-then-comply pattern is exactly what an attacker would exploit in a deployed AI agent.
 
 ---
 
