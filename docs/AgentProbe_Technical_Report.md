@@ -3,6 +3,7 @@
 **Author:** Naren Ranjith
 **Date:** 2026
 **Repository:** https://github.com/nar1-frames/agentprobe
+**DOI:** https://doi.org/10.5281/zenodo.21410386
 **Contact:** [add email]
 
 > **DRAFT for publication (Zenodo / arXiv-cs.CR / workshop).** Numbers below are the canonical v1.1 scan (July 14, 2026; report: `reports/scan_llama_3.1_8b_instant_v11_20260714.html`). All external mentions (resume, activities, blog) have been reconciled to these figures: **29/49 findings (59% ASR), 10 CRITICAL / 15 HIGH / 4 MEDIUM.**

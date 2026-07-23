@@ -1,6 +1,11 @@
 # AgentProbe
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21410386.svg)](https://doi.org/10.5281/zenodo.21410386)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 An automated security testing tool for AI assistants. AgentProbe fires structured attack prompts at AI models, records real responses, assesses vulnerability using a two-stage detection pipeline, and generates professional security reports with severity scoring.
+
+> **Cite this work:** Ranjith, N. (2026). *AgentProbe: A Lightweight Open-Source Scanner for Prompt-Injection Resistance in LLMs.* Zenodo. https://doi.org/10.5281/zenodo.21410386
 
 Built from scratch as a cybersecurity research project. No prior coding experience before this project.
 
