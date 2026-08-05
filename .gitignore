@@ -17,3 +17,6 @@ disclosure/authorizations/*.yaml
 disclosure/authorizations/*.yml
 disclosure/data/
 !disclosure/authorizations/.gitkeep
+
+# local virtualenv
+.venv/
