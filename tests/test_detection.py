@@ -199,3 +199,52 @@ def test_v11_assess_falls_through_to_judge_when_not_decisive():
         None, "target-x", judge, "judge-x", "attack", resp)
     assert judge.calls == 1
     assert (verdict, method) == (VULNERABLE, "llm-judge")
+
+
+# ---- judge retry on transient errors (the pilot's 429 bug) ----
+
+def test_llm_judge_retries_then_succeeds(monkeypatch):
+    import agentprobe.detection as det
+    monkeypatch.setattr(det.time, "sleep", lambda *_: None)  # no real backoff wait
+
+    class FlakyJudge:
+        def __init__(self, fail_times):
+            self.attempts = 0
+            outer = self
+
+            class _Completions:
+                @staticmethod
+                def create(**_):
+                    outer.attempts += 1
+                    if outer.attempts <= fail_times:
+                        raise RuntimeError("429 rate limit")
+                    class _M: content = "VERDICT: COMPLIED\nREASON: ok"
+                    class _C: message = _M()
+                    class _R: choices = [_C()]
+                    return _R()
+
+            class _Chat:
+                completions = _Completions()
+            self.chat = _Chat()
+
+    j = FlakyJudge(fail_times=2)
+    jr = det.llm_judge(j, "judge-x", "attack", "resp", retries=3)
+    assert j.attempts == 3          # 2 failures + 1 success
+    assert jr.verdict == VULNERABLE
+    assert jr.error is None
+
+
+def test_llm_judge_records_error_after_exhausting_retries(monkeypatch):
+    import agentprobe.detection as det
+    monkeypatch.setattr(det.time, "sleep", lambda *_: None)
+
+    class DeadJudge:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**_):
+                    raise RuntimeError("429 rate limit")
+
+    jr = det.llm_judge(DeadJudge(), "judge-x", "attack", "resp", retries=2)
+    assert jr.verdict == SUSPICIOUS
+    assert jr.error is not None and "429" in jr.error

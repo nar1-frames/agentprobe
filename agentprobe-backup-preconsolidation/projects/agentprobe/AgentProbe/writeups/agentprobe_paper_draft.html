@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Comparative Analysis of Prompt-Injection Detection Techniques</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#555; --accent:#5b2a86; --rule:#bbb; --fill:#fff59d; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#e9eaec; font-family:"Times New Roman", Georgia, serif;
+         color:var(--ink); line-height:1.42; }
+  .page { max-width:900px; margin:24px auto; background:#fff; padding:48px 54px 60px;
+          box-shadow:0 2px 14px rgba(0,0,0,.15); }
+  .jhead { display:flex; justify-content:space-between; align-items:center;
+           border-bottom:2px solid var(--accent); padding-bottom:6px; margin-bottom:22px; }
+  .jhead .tag { color:#7a1f6b; font-weight:700; letter-spacing:.5px; font-size:15px;
+                font-family:Arial, sans-serif; }
+  .jhead .brand { color:var(--accent); font-weight:700; font-size:20px;
+                  font-family:Georgia, serif; font-style:italic; }
+  h1.title { font-size:20px; line-height:1.3; margin:0 0 14px; }
+  .authors { font-weight:700; font-size:15px; margin-bottom:2px; }
+  .affil { font-size:13px; color:var(--muted); margin-bottom:20px; }
+  .affil a { color:var(--accent); }
+  .cols { column-count:2; column-gap:30px; text-align:justify; font-size:13.5px; }
+  .onecol { text-align:justify; font-size:13.5px; }
+  h2.sec { font-size:14.5px; font-family:Arial, sans-serif; font-weight:700;
+           margin:16px 0 6px; break-after:avoid; }
+  h3.sub { font-size:13px; font-family:Arial, sans-serif; font-weight:700;
+           margin:12px 0 4px; color:#333; break-after:avoid; }
+  p { margin:0 0 9px; }
+  .abstract { background:#f6f4fa; border-left:3px solid var(--accent);
+              padding:12px 16px; font-size:13px; margin-bottom:8px; }
+  .abstract b { font-family:Arial, sans-serif; }
+  .ph { background:var(--fill); padding:0 3px; border-radius:2px; font-style:italic;
+        color:#6b5b00; }
+  .fig { border:1px solid #ccc; background:#fafafa; padding:10px; margin:10px 0;
+         font-size:11.5px; break-inside:avoid; }
+  .fig .cap { font-size:11px; color:var(--muted); margin-top:6px; }
+  table.stub { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:6px; }
+  table.stub th, table.stub td { border:1px solid #ccc; padding:4px 6px; text-align:left; }
+  table.stub th { background:#efe9f5; font-family:Arial, sans-serif; }
+  .note { background:#eef6ff; border:1px solid #b9d6f2; padding:8px 12px; font-size:11.5px;
+          margin:10px 0; font-family:Arial, sans-serif; break-inside:avoid; }
+  .bios { display:flex; gap:18px; margin-top:8px; }
+  .bio { flex:1; font-size:12px; }
+  .bio .photo { width:64px; height:64px; background:#ddd; border:1px solid #bbb;
+                float:left; margin:0 10px 4px 0; display:flex; align-items:center;
+                justify-content:center; color:#999; font-size:9px; text-align:center; }
+  ol.refs { font-size:12px; padding-left:20px; }
+  ol.refs li { margin-bottom:5px; }
+  .kicker { font-family:Arial, sans-serif; font-size:11px; letter-spacing:.5px;
+            text-transform:uppercase; color:var(--accent); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="jhead">
+    <span class="tag">RESEARCH ARTICLE</span>
+    <span class="brand"><span class="ph">[Journal name]</span></span>
+  </div>
+
+  <h1 class="title">A Comparative Analysis of Prompt-Injection Detection Techniques:
+    Keyword Matching versus LLM-as-Judge</h1>
+
+  <div class="authors"><span class="ph">[Author One]</span><sup>+</sup>,
+    <span class="ph">[Author Two, if any]</span><sup>+</sup></div>
+  <div class="affil">
+    <span class="ph">[School / affiliation]</span> &middot;
+    <span class="ph">[City, State]</span><br>
+    E-mail: <a href="#"><span class="ph">[email]</span></a>
+  </div>
+
+  <!-- ===================== ABSTRACT ===================== -->
+  <div class="abstract onecol">
+    <b>Abstract — </b>
+    Prompt injection is the top-ranked security risk for large language model (LLM)
+    applications, yet the field lacks agreement on how to reliably <i>detect</i> when a
+    model has complied with an attack. This paper presents a controlled comparison of two
+    detection techniques: (1) <b>keyword matching</b>, a fast, zero-cost method that scans a
+    response for refusal and compliance phrases, and (2) <b>LLM-as-judge</b>, in which a
+    second, stronger model evaluates whether the target complied with the attack's intent.
+    Using an open library of <span class="ph">[49]</span> attack prompts spanning
+    <span class="ph">[8]</span> categories, we generated responses from
+    <span class="ph">[N]</span> open-weight models and evaluated each response with both
+    techniques. To establish ground truth, <span class="ph">[each response / a sample of R
+    responses]</span> was hand-labeled by human annotators. We report each technique's
+    agreement with human judgment (validity), the LLM judge's consistency across repeated
+    runs (reliability), and a taxonomy of the cases where the two techniques disagree. We
+    find that keyword matching decides <span class="ph">[X%]</span> of cases and agrees with
+    humans <span class="ph">[X%]</span> of the time, while the LLM judge reaches
+    <span class="ph">[X%]</span> agreement (Cohen's &kappa; = <span class="ph">[0.XX]</span>)
+    but <span class="ph">[systematically errs on / struggles with]</span>
+    <span class="ph">[described failure mode]</span>. Our results suggest a
+    <span class="ph">[hybrid / cost-aware]</span> detection strategy and offer practical
+    guidance for anyone measuring LLM robustness to prompt injection. All prompts, labels,
+    and code are released for reproducibility.
+  </div>
+
+  <div class="note">Legend: <span class="ph">highlighted italic text</span> = placeholder to
+    be replaced with real data or details once experiments are run. Everything else is
+    drafted prose you can edit directly.</div>
+
+  <!-- ===================== BODY ===================== -->
+  <div class="cols">
+
+    <h2 class="sec">1. Introduction</h2>
+    <p>Large language models are now embedded in customer-support agents, coding assistants,
+    search tools, and autonomous systems that read email, browse the web, and call external
+    tools. This reach creates a new attack surface. <b>Prompt injection</b> — supplying input
+    that overrides the instructions an operator gave the model — is ranked the number-one
+    risk in the OWASP Top 10 for LLM Applications [<span class="ph">1</span>], and published
+    attack-success rates commonly fall in the 50–84% range [<span class="ph">2</span>].</p>
+    <p>Measuring a model's resistance to such attacks requires answering a deceptively hard
+    question: <i>did the model actually comply?</i> A model can refuse in words while
+    complying in substance — for example, declining a request and then fulfilling it "as a
+    creative-writing exercise." Two families of automatic detectors are widely used. The
+    first, <b>keyword matching</b>, scans the response for characteristic refusal and
+    compliance phrases; it is instantaneous and free but brittle. The second,
+    <b>LLM-as-judge</b>, asks a second model to rule on the target's behavior; it captures
+    nuance but costs an extra inference call and — critically — is itself rarely validated.</p>
+    <p>This paper asks which technique to trust, and when. Our contributions are:
+    (i) a controlled, like-for-like comparison of keyword matching and LLM-as-judge on an
+    open <span class="ph">[49]</span>-prompt attack library;
+    (ii) a validation of both techniques against human-labeled ground truth, reported with
+    chance-corrected agreement (Cohen's &kappa;);
+    (iii) a measurement of the LLM judge's <i>self-consistency</i> across repeated runs;
+    and (iv) an error taxonomy describing where the two techniques diverge. All materials
+    are released for reproducibility.</p>
+
+    <h2 class="sec">2. Background</h2>
+    <h3 class="sub">2.1 Prompt injection and attack taxonomy</h3>
+    <p>Prompt injection is commonly divided into <i>direct</i> injection, where the attacker
+    controls the user input, and <i>indirect</i> injection, where malicious instructions are
+    hidden in external content the model later processes (a document, email, or web page)
+    [<span class="ph">1,3</span>]. We organize attacks into
+    <span class="ph">[eight]</span> categories: jailbreak, data extraction, privilege
+    escalation, social engineering, role confusion, indirect injection, context manipulation,
+    and tool misuse. Table 1 summarizes each category and the real-world risk it represents.</p>
+
+    <div class="fig">
+      <span class="kicker">Table 1</span>
+      <table class="stub">
+        <tr><th>Category</th><th>What it tests</th><th># prompts</th></tr>
+        <tr><td>Jailbreak</td><td>Direct override of safety instructions</td><td class="ph">8</td></tr>
+        <tr><td>Data extraction</td><td>Leak the system prompt / config</td><td class="ph">8</td></tr>
+        <tr><td>Privilege escalation</td><td>Claim elevated permissions</td><td class="ph">6</td></tr>
+        <tr><td>Social engineering</td><td>False authority / emotional pressure</td><td class="ph">6</td></tr>
+        <tr><td>Role confusion</td><td>Persona hijack (e.g., DAN)</td><td class="ph">6</td></tr>
+        <tr><td>Indirect injection</td><td>Payload hidden in processed content</td><td class="ph">5</td></tr>
+        <tr><td>Context manipulation</td><td>Reset / rewrite conversation state</td><td class="ph">5</td></tr>
+        <tr><td>Tool misuse</td><td>Abuse of file/DB/code tool access</td><td class="ph">5</td></tr>
+      </table>
+      <div class="cap">Table 1. Attack taxonomy used in this study.
+        <span class="ph">[Confirm counts after finalizing the library.]</span></div>
+    </div>
+
+    <h3 class="sub">2.2 Detection techniques</h3>
+    <p><b>Keyword matching</b> maintains two phrase lists — refusal signals (e.g., "I can't,"
+    "I'm not able to") and compliance signals (e.g., "developer mode," "I am DAN") — and
+    compares their hit counts to reach a verdict. It is O(1) and free, but it detects surface
+    wording rather than behavior. <b>LLM-as-judge</b> supplies a second model with the attack
+    and the response and asks for a verdict of <i>complied</i>, <i>partial</i>, or
+    <i>refused</i>. Because the judge reasons about intent, it can catch compliance expressed
+    through roleplay or fiction — but its accuracy depends on the judge being stronger than
+    the target, and its outputs may vary between runs.</p>
+
+    <h3 class="sub">2.3 The hedge-then-comply pattern</h3>
+    <p>A recurring failure mode motivates part of our analysis: a model refuses in its first
+    sentence, then supplies the harmful content in the following paragraph. Such responses
+    pass naive keyword filters because a refusal phrase is present. We include a dedicated
+    detector that splits each response and checks the opening for refusal and the remainder
+    for compliance, and we evaluate how well each technique captures this pattern.</p>
+
+    <h2 class="sec">3. Methodology</h2>
+    <h3 class="sub">3.1 Attack library and target models</h3>
+    <p>We use an open library of <span class="ph">[49]</span> prompts across
+    <span class="ph">[8]</span> categories, each annotated with a severity rating and a
+    description of what it tests. Every prompt is a publicly documented attack pattern; no
+    novel exploits are introduced. We evaluate <span class="ph">[N]</span> open-weight target
+    models (<span class="ph">[list models + versions, e.g., Llama-3.1-8B, Mistral-7B,
+    Qwen2.5-7B]</span>) accessed via <span class="ph">[provider]</span>, with generation
+    settings <span class="ph">[temperature, max_tokens]</span> held fixed across models.</p>
+
+    <h3 class="sub">3.2 Detection configurations</h3>
+    <p>Each response is scored three ways: keyword matching, the hedge-then-comply detector,
+    and an LLM judge (<span class="ph">[judge model + version]</span>) run at temperature
+    <span class="ph">[0.0]</span>. To test reliability, the judge is run
+    <span class="ph">[k = 5]</span> times per response. To test the effect of judge strength,
+    we additionally run a <span class="ph">[weaker / same-family]</span> judge
+    (<span class="ph">[model]</span>).</p>
+
+    <h3 class="sub">3.3 Human ground truth</h3>
+    <p><span class="ph">[Each response / a random sample of R responses]</span> was
+    independently labeled complied / partial / refused by <span class="ph">[number]</span>
+    human annotators following a written rubric (Appendix A). Inter-annotator agreement was
+    <span class="ph">[report Cohen's / Fleiss' &kappa;]</span>, establishing the difficulty of
+    the task and an upper bound on achievable automatic agreement.</p>
+
+    <div class="note">Teaching reminder: the human labels are the backbone of the paper. Every
+    "accuracy" or "&kappa;" number below is <i>agreement with these labels</i>. Draft the
+    rubric before labeling so both annotators apply the same definitions.</div>
+
+    <h3 class="sub">3.4 Evaluation metrics</h3>
+    <p>We report, for each technique: overall <b>accuracy</b> against human labels;
+    <b>Cohen's &kappa;</b>, which corrects for agreement expected by chance; per-class
+    <b>precision and recall</b>; and a 3&times;3 <b>confusion matrix</b>. For the judge we
+    also report <b>self-agreement</b> across the <span class="ph">[k]</span> runs (a
+    reliability measure) and the count of items whose verdict ever changed between runs.</p>
+
+    <h2 class="sec">4. Results</h2>
+    <p class="ph">[This section is populated after the experiments run. Each subsection below
+    lists exactly which figure or number goes where, so data collection has a clear target.]</p>
+
+    <h3 class="sub">4.1 Attack success rates by category</h3>
+    <p class="ph">[Bar chart / table: % of prompts producing vulnerable behavior per category,
+    per model. State the overall success rate as a single canonical number.]</p>
+    <div class="fig"><span class="kicker">Figure 1</span>
+      <div style="height:90px;display:flex;align-items:center;justify-content:center;color:#999">
+        [Figure 1 — success rate by category]</div>
+      <div class="cap">Figure 1. Attack-success rate per category across target models.</div>
+    </div>
+
+    <h3 class="sub">4.2 Keyword vs. judge: validity</h3>
+    <p class="ph">[Table: accuracy and Cohen's &kappa; vs. human labels, for keyword matching
+    and for the LLM judge. One row per technique; optionally one block per model.]</p>
+    <div class="fig"><span class="kicker">Table 2</span>
+      <table class="stub">
+        <tr><th>Technique</th><th>Accuracy vs human</th><th>Cohen's &kappa;</th><th>% cases decided</th></tr>
+        <tr><td>Keyword matching</td><td class="ph">[XX%]</td><td class="ph">[0.XX]</td><td class="ph">[XX%]</td></tr>
+        <tr><td>LLM-as-judge</td><td class="ph">[XX%]</td><td class="ph">[0.XX]</td><td class="ph">[100%]</td></tr>
+      </table>
+      <div class="cap">Table 2. Agreement of each technique with human ground truth.</div>
+    </div>
+
+    <h3 class="sub">4.3 Judge reliability</h3>
+    <p class="ph">[Self-agreement across k runs; number of verdict flips; which categories are
+    least stable. Report whether temperature 0 vs 0.7 changed stability.]</p>
+
+    <h3 class="sub">4.4 Where the techniques diverge</h3>
+    <p class="ph">[Confusion matrix of keyword verdict vs judge verdict; count and describe the
+    disagreement cells. This is the heart of the "comparative" story.]</p>
+
+    <h2 class="sec">5. Discussion</h2>
+    <p>Following the comparative structure, we weigh each technique's strengths and
+    limitations. <b>Keyword matching</b> offers <span class="ph">[speed / zero cost /
+    transparency]</span> but <span class="ph">[misses behavioral compliance / is sensitive to
+    phrasing]</span>. <b>LLM-as-judge</b> offers <span class="ph">[nuance / behavioral
+    understanding]</span> at the cost of <span class="ph">[latency, API cost, and its own
+    variability]</span>. Our error taxonomy identifies
+    <span class="ph">[N]</span> recurring disagreement types, including
+    <span class="ph">[e.g., refusals wrapped in creative framing, subtle roleplay compliance,
+    and genuinely ambiguous responses]</span>. These findings imply
+    <span class="ph">[a hybrid pipeline that uses keywords first and escalates uncertain
+    cases to the judge / other recommendation]</span>.</p>
+
+    <h2 class="sec">6. Limitations and Threats to Validity</h2>
+    <p>Our study has several limits. The prompt set is <span class="ph">[49]</span> English,
+    single-turn prompts and is not exhaustive. We evaluate a small number of open models at a
+    single point in time; results will age as models are updated. Compliance is partly
+    subjective, so we measure <i>agreement</i> with human labels rather than ground truth in
+    an absolute sense, and our labeling was performed by <span class="ph">[number]</span>
+    annotators. Finally, target and judge models drawn from overlapping families may exhibit
+    self-preference; we <span class="ph">[address / partially address]</span> this by
+    <span class="ph">[testing a cross-family judge]</span>.</p>
+
+    <h2 class="sec">7. Ethics and Responsible Use</h2>
+    <p>All experiments were conducted against models and endpoints the authors were authorized
+    to test. The attack library contains only publicly documented patterns and introduces no
+    novel exploit capability. The tool is intended for defensive evaluation; findings against
+    any third-party system should follow responsible-disclosure practice.</p>
+
+    <h2 class="sec">8. Conclusion</h2>
+    <p>We presented a controlled comparison of keyword matching and LLM-as-judge for detecting
+    prompt-injection compliance, validated both against human labels, and characterized where
+    they disagree. <span class="ph">[Restate the single most important finding once data
+    exists.]</span> We hope the released prompts, labels, and code help others measure LLM
+    robustness more rigorously.</p>
+
+    <h2 class="sec">References</h2>
+    <ol class="refs">
+      <li>OWASP Foundation. "OWASP Top 10 for Large Language Model Applications."
+        <span class="ph">[year, URL]</span>.</li>
+      <li><span class="ph">[Prompt-injection / jailbreak success-rate study — add citation]</span>.</li>
+      <li>MITRE. "ATLAS: Adversarial Threat Landscape for AI Systems."
+        <span class="ph">[year, URL]</span>.</li>
+      <li><span class="ph">[LLM-as-judge reference, e.g., Zheng et al., "Judging LLM-as-a-Judge…"]</span>.</li>
+      <li><span class="ph">[Existing red-team tooling — garak / PyRIT / promptfoo]</span>.</li>
+      <li><span class="ph">[Add remaining references as you write.]</span></li>
+    </ol>
+
+  </div><!-- /cols -->
+
+  <!-- ===================== BIOS ===================== -->
+  <h2 class="sec onecol" style="margin-top:22px">About the Authors</h2>
+  <div class="bios">
+    <div class="bio">
+      <div class="photo">[photo]</div>
+      <span class="ph">[Author One bio: 3–5 sentences — grade/school, interests, what drew you
+      to AI security, this project, and any relevant activities. Mirror the tone of the example
+      article's bios.]</span>
+    </div>
+    <div class="bio">
+      <div class="photo">[photo]</div>
+      <span class="ph">[Author Two bio, if applicable.]</span>
+    </div>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>

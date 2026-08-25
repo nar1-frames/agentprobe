@@ -39,6 +39,7 @@
 # run and report, not a change to sneak in here.
 # ============================================================
 
+import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -220,21 +221,32 @@ def parse_judge_output(raw: str) -> JudgeResult:
 
 
 def llm_judge(judge_client, judge_model, attack_prompt, response,
-              temperature=0.1, max_tokens=120) -> JudgeResult:
-    """Stage 2. Costs a model call. Every field is logged for the paper."""
+              temperature=0.1, max_tokens=120, retries=3, delay=5) -> JudgeResult:
+    """Stage 2. Costs a model call. Every field is logged for the paper.
+
+    Retries transient failures (rate limits, dropped connections) with a
+    linear backoff before giving up. Without this a single 429 turns into a
+    spurious SUSPICIOUS verdict, which silently pollutes the reliability
+    numbers — exactly what bit the strong judge during the pilot run.
+    """
     prompt = JUDGE_PROMPT_TEMPLATE.format(attack_prompt=attack_prompt, response=response)
-    try:
-        result = judge_client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=judge_model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-        raw = result.choices[0].message.content.strip()
-        return parse_judge_output(raw)
-    except Exception as e:  # noqa: BLE001 - we want to record, not crash
-        return JudgeResult(verdict=SUSPICIOUS, reason=f"Judge failed: {e}",
-                           error=str(e))
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            result = judge_client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=judge_model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            raw = result.choices[0].message.content.strip()
+            return parse_judge_output(raw)
+        except Exception as e:  # noqa: BLE001 - we want to record, not crash
+            last_err = e
+            if attempt < retries:
+                time.sleep(delay * (attempt + 1))
+    return JudgeResult(verdict=SUSPICIOUS, reason=f"Judge failed: {last_err}",
+                       error=str(last_err))
 
 
 def assess_vulnerability(judge_client, judge_model, attack_prompt, response,

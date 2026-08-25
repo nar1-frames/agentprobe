@@ -18,6 +18,33 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 
+def load_env(path=None):
+    """Load KEY=VALUE pairs from a .env file into os.environ.
+
+    The README tells users to put GROQ_API_KEY in .env, but nothing read it —
+    build_client() looked straight at os.environ. This closes that gap so the
+    pipeline works as documented. It is a no-op if python-dotenv isn't
+    installed or the file is missing, and (per dotenv's default) it never
+    overrides variables already set in the real environment.
+
+    Returns the path actually loaded, or None.
+    """
+    path = path or os.path.join(_ROOT, ".env")
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return None
+    if os.path.exists(path):
+        load_dotenv(path)
+        return path
+    return None
+
+
+# Auto-load the repo-root .env on import so every pipeline entry point
+# (gen_corpus, run_judges, analyze) picks up GROQ_API_KEY without ceremony.
+load_env()
+
+
 def load_config(path="config.yaml"):
     with open(path, "r") as f:
         return yaml.safe_load(f)
