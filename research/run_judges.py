@@ -124,7 +124,8 @@ def already_done(existing, rid, model, temp, run_idx):
 def load_done_keys(path, corpus_sha256=None, expected_judge_prompt_version=None,
                    expected_judge_prompt_sha256=None,
                    expected_protocol_manifest_sha256=None,
-                   expected_judge_max_tokens=None):
+                   expected_judge_max_tokens=None,
+                   expected_judge_config_sha256=None):
     """Return existing evidence keys when bound to the frozen corpus.
 
     Failed rows are existing evidence too.  They remain in the active file
@@ -179,6 +180,14 @@ def load_done_keys(path, corpus_sha256=None, expected_judge_prompt_version=None,
             seen.add(key)
         except TypeError as exc:
             raise ValueError("existing judge evidence contains an unhashable key") from exc
+        if expected_judge_config_sha256 is not None:
+            config_key = (key[1], key[2])
+            expected_digest = expected_judge_config_sha256.get(config_key)
+            if expected_digest is None or r.get("judge_config_sha256") != expected_digest:
+                raise ValueError(
+                    "existing judge evidence has a different or missing provider "
+                    "configuration digest; use --overwrite to collect fresh evidence"
+                )
         keys.add(key)
     return keys
 
@@ -291,6 +300,17 @@ def main():
             or not 1 <= judge_max_tokens <= 131072):
         raise SystemExit("judge max token budget must be an integer between 1 and 131072")
     protocol_manifest_sha256 = manifest_digest(manifest) if manifest else None
+    expected_judge_config_sha256 = None
+    if manifest:
+        expected_judge_config_sha256 = {
+            (model, float(temp)): provider_config_digest({
+                **base_judge,
+                "model": model,
+                "temperature": temp,
+                "max_tokens": judge_max_tokens,
+            })
+            for base_judge, model, temp in configs
+        }
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     if os.path.exists(args.out) and not args.resume and not args.overwrite:
@@ -314,6 +334,7 @@ def main():
                 expected_judge_prompt_sha256=(manifest or {}).get("judge_prompt_sha256"),
                 expected_protocol_manifest_sha256=protocol_manifest_sha256,
                 expected_judge_max_tokens=judge_max_tokens if manifest else None,
+                expected_judge_config_sha256=expected_judge_config_sha256,
             )
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise SystemExit(f"Cannot resume judge evidence safely: {exc}")

@@ -61,6 +61,10 @@ corpus. Human-label rows additionally carry the SHA-256 of the labeling guide;
 the manifest binds that guide digest to the preregistered rubric. Validation
 and the publication gate reject a row from another corpus or rubric; legacy
 rows without the fields remain visible but cannot pass the gate.
+Corpus and judge rows also carry a digest of the non-secret provider settings
+used for that call. Manifest-backed resume and publication checks compare those
+digests to the current validated config, so changing an endpoint, model budget,
+or other recorded provider setting cannot silently reuse old evidence.
 
 When driven by the checked-in manifest, the publication gate also reruns the
 row-level dataset validator: stable response IDs, attack prompts, severities,

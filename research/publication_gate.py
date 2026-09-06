@@ -9,7 +9,9 @@ import re
 from collections import defaultdict
 
 from attacks.library import ATTACK_LIBRARY
-from research._common import canonical_digest, read_jsonl
+from research._common import (
+    canonical_digest, load_config, provider_config_digest, read_jsonl,
+)
 from research.protocol import (
     DEFAULT_MANIFEST_PATH,
     attack_library_digest,
@@ -69,7 +71,9 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                     expected_judge_provider=None,
                     expected_judge_max_tokens=None,
                     expected_protocol_manifest_sha256=None,
-                    expected_labeling_guide_sha256=None):
+                    expected_labeling_guide_sha256=None,
+                    expected_target_config_sha256=None,
+                    expected_judge_config_sha256=None):
     """Return explicit blocking reasons; do not silently grade incomplete data."""
 
     if not isinstance(expected_k, int) or isinstance(expected_k, bool) or expected_k < 1:
@@ -161,15 +165,29 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
             row.get("target_config_sha256") if isinstance(row, dict) else None
             for row in corpus
         ]
-        if (len(target_config_digests) != len(corpus)
-                or not all(
-                    isinstance(digest, str)
-                    and re.fullmatch(r"[0-9a-f]{64}", digest)
-                    for digest in target_config_digests
-                )):
+        valid_target_config_digests = (
+            len(target_config_digests) == len(corpus)
+            and all(
+                isinstance(digest, str)
+                and re.fullmatch(r"[0-9a-f]{64}", digest)
+                for digest in target_config_digests
+            )
+        )
+        if not valid_target_config_digests:
             blocking.append(
                 "corpus target provider configuration provenance is missing or invalid"
             )
+        if expected_target_config_sha256 is not None and valid_target_config_digests:
+            expected_target_configs = (
+                {expected_target_config_sha256}
+                if isinstance(expected_target_config_sha256, str)
+                else set(expected_target_config_sha256)
+            )
+            if set(target_config_digests) != expected_target_configs:
+                blocking.append(
+                    "corpus target provider configuration provenance does not match "
+                    "the configured study target"
+                )
     if expected_attack_library_sha256 is not None:
         actual_attack_digest = attack_library_digest(ATTACK_LIBRARY)
         if actual_attack_digest != expected_attack_library_sha256:
@@ -247,6 +265,27 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                     for digest in judge_config_digests
                 )):
             blocking.append("judge configuration provenance is missing or invalid")
+
+    if expected_judge_config_sha256 is not None:
+        mismatched_judge_configs = []
+        for row in judgements:
+            if not isinstance(row, dict):
+                continue
+            model = row.get("judge_model")
+            if not isinstance(model, str):
+                continue
+            try:
+                key = (model, float(row.get("temperature")))
+            except (TypeError, ValueError):
+                continue
+            expected_digest = expected_judge_config_sha256.get(key)
+            if expected_digest is not None and row.get("judge_config_sha256") != expected_digest:
+                mismatched_judge_configs.append(key)
+        if mismatched_judge_configs:
+            blocking.append(
+                "judge provider configuration provenance does not match the configured "
+                "study judge"
+            )
 
     if judgements:
         judge_digests = [
@@ -454,6 +493,8 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         "expected_judge_max_tokens": expected_judge_max_tokens,
         "expected_protocol_manifest_sha256": expected_protocol_manifest_sha256,
         "expected_labeling_guide_sha256": expected_labeling_guide_sha256,
+        "expected_target_config_sha256": expected_target_config_sha256,
+        "expected_judge_config_sha256": expected_judge_config_sha256,
         "corpus_sha256": corpus_sha256,
     }
 
@@ -476,6 +517,10 @@ def main():
     ap.add_argument(
         "--manifest", default=DEFAULT_MANIFEST_PATH,
         help="machine-readable study protocol used for default gate requirements",
+    )
+    ap.add_argument(
+        "--config", default="config.yaml",
+        help="validated provider config used to verify exact evidence provenance",
     )
     ap.add_argument(
         "--expected-config",
@@ -518,6 +563,33 @@ def main():
     expected_judge_max_tokens = (manifest or {}).get("judge_max_tokens")
     expected_protocol_manifest_sha256 = manifest_digest(manifest) if manifest else None
     expected_labeling_guide_sha256 = (manifest or {}).get("labeling_guide_sha256")
+    expected_target_config_sha256 = None
+    expected_judge_config_sha256 = None
+    if manifest:
+        try:
+            config = load_config(args.config)
+            target_config = config["target"]
+            expected_target_config_sha256 = {
+                provider_config_digest({
+                    **target_config,
+                    "model": model,
+                    "max_tokens": manifest["corpus"]["target_max_tokens"],
+                    "temperature": manifest["corpus"]["target_temperature"],
+                })
+                for model in manifest["corpus"]["target_models"]
+            }
+            judge_config = config["judge"]
+            expected_judge_config_sha256 = {
+                (judge["model"], float(judge["temperature"])): provider_config_digest({
+                    **judge_config,
+                    "model": judge["model"],
+                    "temperature": judge["temperature"],
+                    "max_tokens": manifest["judge_max_tokens"],
+                })
+                for judge in manifest["judges"]
+            }
+        except (OSError, KeyError, TypeError, ValueError) as exc:
+            ap.error(f"invalid provider config: {exc}")
     try:
         report = check_readiness(
             corpus, judgements, _read_labels(args.labels), primary, second,
@@ -532,6 +604,8 @@ def main():
             expected_judge_max_tokens,
             expected_protocol_manifest_sha256,
             expected_labeling_guide_sha256,
+            expected_target_config_sha256,
+            expected_judge_config_sha256,
         )
     except ValueError as exc:
         ap.error(str(exc))

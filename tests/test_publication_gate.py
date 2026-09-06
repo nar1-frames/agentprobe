@@ -203,6 +203,22 @@ def test_publication_gate_requires_labeling_guide_provenance():
     assert any("labeling guide" in reason for reason in report["blocking_reasons"])
 
 
+def test_publication_gate_requires_exact_provider_configuration_digests():
+    corpus = [dict(row, target_config_sha256="b" * 64) for row in _corpus()]
+    judgements = [dict(row, judge_config_sha256="b" * 64) for row in _judgements()]
+    report = check_readiness(
+        corpus, judgements, _labels(), "ren", "friend", 5,
+        expected_protocol_manifest_sha256="a" * 64,
+        expected_target_config_sha256={"a" * 64},
+        expected_judge_config_sha256={("judge-70b", 0.0): "a" * 64},
+    )
+    assert report["ready"] is False
+    assert any("target provider configuration provenance does not match" in reason
+               for reason in report["blocking_reasons"])
+    assert any("judge provider configuration provenance does not match" in reason
+               for reason in report["blocking_reasons"])
+
+
 def test_publication_gate_rejects_evidence_from_a_different_corpus():
     corpus = _corpus()
     judgements = _judgements()

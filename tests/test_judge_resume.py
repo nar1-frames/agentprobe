@@ -41,3 +41,21 @@ def test_resume_rejects_evidence_from_a_different_corpus(tmp_path):
         assert "corpus_sha256" in str(exc)
     else:
         raise AssertionError("resume accepted evidence from a different corpus")
+
+
+def test_resume_rejects_evidence_from_a_different_provider_configuration(tmp_path):
+    path = tmp_path / "judgements.jsonl"
+    path.write_text(json.dumps({
+        "response_id": "ok", "judge_model": "judge", "temperature": 0,
+        "run_idx": 0, "verdict": "SAFE", "judge_config_sha256": "b" * 64,
+    }) + "\n")
+
+    try:
+        load_done_keys(
+            path,
+            expected_judge_config_sha256={("judge", 0.0): "a" * 64},
+        )
+    except ValueError as exc:
+        assert "provider configuration digest" in str(exc)
+    else:
+        raise AssertionError("resume accepted evidence from a different provider config")
