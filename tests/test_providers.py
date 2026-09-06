@@ -1,7 +1,9 @@
 import pytest
 from types import SimpleNamespace
 
-from agentprobe.providers import build_client, preflight_model
+from agentprobe.providers import (
+    build_client, preflight_model, requires_external_consent,
+)
 
 
 @pytest.mark.parametrize("provider", ["groq", "openai"])
@@ -41,3 +43,12 @@ def test_model_preflight_rejects_an_unlisted_model_before_prompt_calls():
 
 def test_model_preflight_skips_clients_without_a_models_endpoint():
     assert preflight_model(object(), "fixture-model") is False
+
+
+@pytest.mark.parametrize("provider", ["groq", "openai", "custom"])
+def test_cloud_provider_requires_explicit_content_consent(provider):
+    assert requires_external_consent(provider) is True
+
+
+def test_local_provider_does_not_require_external_content_consent():
+    assert requires_external_consent("ollama") is False

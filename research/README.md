@@ -78,16 +78,20 @@ the frozen protocol. Analysis JSON converts undefined statistics to strict JSON
 
 ```bash
 # 0. one-time: pip install pyyaml groq openai python-dotenv ; set GROQ_API_KEY in .env
+# Cloud commands require explicit consent flags because model responses may
+# contain sensitive content. Omit the flags for a local Ollama workflow.
 
 # STEP A — freeze the preregistered 49-response corpus
 python -m research.gen_corpus \
     --models openai/gpt-oss-20b \
+    --allow-external-target \
     --target-temperature 0.0 --max-tokens 512 \
     --out data/corpus.jsonl --overwrite
 
 # STEP C — judge the frozen corpus: strong + weak judge, two temps, k=5 each
 python -m research.run_judges \
     --judges openai/gpt-oss-120b,openai/gpt-oss-20b \
+    --allow-external-corpus \
     --temps 0.0,0.7 --k 5
 
 # STEP B — human ground truth (the keystone). You label everything:

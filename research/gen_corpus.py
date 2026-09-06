@@ -47,7 +47,7 @@ from research._common import (
     load_config, build_client, provider_config_digest, response_id, read_jsonl,
     write_jsonl,
 )
-from agentprobe.providers import preflight_model
+from agentprobe.providers import preflight_model, requires_external_consent
 from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest, manifest_digest
 from attacks.library import ATTACK_LIBRARY
 from agentprobe.detection import keyword_check, sanitize_error
@@ -261,6 +261,10 @@ def main():
         "--fail-on-error", action="store_true",
         help="exit 3 after writing the corpus if any target call failed",
     )
+    ap.add_argument(
+        "--allow-external-target", action="store_true",
+        help="explicitly authorize sending target prompts to a cloud provider",
+    )
     args = ap.parse_args()
 
     if args.append and args.overwrite:
@@ -275,6 +279,12 @@ def main():
 
     config = load_config(args.config)
     target_cfg = config["target"]
+    if (requires_external_consent(target_cfg.get("provider", "groq"))
+            and not args.allow_external_target):
+        raise SystemExit(
+            "target provider may receive study prompts and responses; pass "
+            "--allow-external-target to authorize cloud collection"
+        )
     try:
         models, max_tokens, target_temperature = resolve_generation_plan(
             target_cfg, args.models, args.max_tokens, args.target_temperature, manifest,

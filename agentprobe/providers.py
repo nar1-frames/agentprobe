@@ -9,6 +9,15 @@ from urllib.parse import urlparse
 from agentprobe.detection import sanitize_error
 
 
+EXTERNAL_PROVIDERS = frozenset({"groq", "openai", "custom"})
+
+
+def requires_external_consent(provider: str) -> bool:
+    """Return whether a provider may transmit study content off-host."""
+
+    return provider in EXTERNAL_PROVIDERS
+
+
 try:
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover - dependency is declared

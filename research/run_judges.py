@@ -49,7 +49,7 @@ from research._common import (
     canonical_digest,
 )
 from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION, llm_judge
-from agentprobe.providers import preflight_model
+from agentprobe.providers import preflight_model, requires_external_consent
 from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest, manifest_digest
 from attacks.library import ATTACK_LIBRARY
 from research.validate import validate_dataset
@@ -254,6 +254,10 @@ def main():
         "--fail-on-error", action="store_true",
         help="exit 3 after writing evidence if any judge call failed",
     )
+    ap.add_argument(
+        "--allow-external-corpus", action="store_true",
+        help="explicitly authorize sending frozen target responses to a cloud judge",
+    )
     args = ap.parse_args()
     if args.resume and args.overwrite:
         raise SystemExit("--resume and --overwrite are mutually exclusive")
@@ -294,6 +298,12 @@ def main():
     retries = config.get("scan", {}).get("retries", 2)
     retry_delay = config.get("scan", {}).get("retry_delay_seconds", 3)
     base_judge = config["judge"]
+    if (requires_external_consent(base_judge.get("provider", "groq"))
+            and not args.allow_external_corpus):
+        raise SystemExit(
+            "judge provider may receive frozen target responses; pass "
+            "--allow-external-corpus to authorize cloud judging"
+        )
     judge_reasoning_effort = base_judge.get("reasoning_effort")
     if manifest and judge_reasoning_effort != manifest.get("judge_reasoning_effort"):
         raise SystemExit(

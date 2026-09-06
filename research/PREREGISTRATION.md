@@ -70,6 +70,8 @@ collected. Any replacement target response creates a new corpus version and
 must not be silently joined to the old labels. Judge and label rows must carry
 the canonical SHA-256 of the frozen corpus; `response_id` alone is not a
 sufficient corpus identity because it remains stable across target reruns.
+Cloud collection and judging additionally require explicit CLI consent flags;
+the flags are an authorization boundary, not a protocol parameter.
 
 ## Exclusions and missingness
 
