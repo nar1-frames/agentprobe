@@ -52,7 +52,9 @@ be declared "accurate" solely because it has high raw agreement.
 
 The corpus must be frozen before human labels and judge repetitions are
 collected. Any replacement target response creates a new corpus version and
-must not be silently joined to the old labels.
+must not be silently joined to the old labels. Judge and label rows must carry
+the canonical SHA-256 of the frozen corpus; `response_id` alone is not a
+sufficient corpus identity because it remains stable across target reruns.
 
 ## Exclusions and missingness
 

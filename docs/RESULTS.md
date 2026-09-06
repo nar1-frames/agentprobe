@@ -34,8 +34,9 @@ The manifest now pins target generation at temperature `0.0` and
 `max_tokens=512`; the checked-in historical corpus predates that explicit
 metadata and therefore cannot pass the publication gate without a controlled
 corpus regeneration. It also pins the version and digest of the judge prompt;
-the historical judge rows predate that provenance field and must be regenerated
-before publication.
+the historical judge rows predate that provenance field and the corpus digest
+field; they must be regenerated before publication. The 17 historical label
+rows likewise lack corpus binding and cannot be reused after regeneration.
 
 The current analysis uses complete modal repeat groups for Fleiss' κ:
 

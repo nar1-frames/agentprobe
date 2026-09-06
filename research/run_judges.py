@@ -33,7 +33,7 @@
 #   {
 #     "response_id", "category", "attack_index", "target_model",
 #     "judge_provider", "judge_model", "temperature", "run_idx",
-#     "judge_verdict_raw", "verdict", "reason", "raw", "error"
+#     "corpus_sha256", "judge_verdict_raw", "verdict", "reason", "raw", "error"
 #   }
 # ============================================================
 
@@ -45,7 +45,7 @@ import tempfile
 import time
 
 from research._common import (
-    load_config, build_client, read_jsonl, append_jsonl,
+    load_config, build_client, read_jsonl, append_jsonl, canonical_digest,
 )
 from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION, llm_judge
 from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest
@@ -81,16 +81,34 @@ def already_done(existing, rid, model, temp, run_idx):
     return (rid, model, temp, run_idx) in existing
 
 
-def load_done_keys(path):
-    """Resume support: which (response, judge, temp, run) tuples already exist."""
+def load_done_keys(path, corpus_sha256=None):
+    """Return completed keys only when evidence matches the frozen corpus."""
     if not os.path.exists(path):
         return set()
     keys = set()
+    seen = set()
     for r in read_jsonl(path):
+        if not isinstance(r, dict):
+            raise ValueError("existing judge evidence contains a non-object row")
+        if corpus_sha256 is not None and r.get("corpus_sha256") != corpus_sha256:
+            raise ValueError(
+                "existing judge evidence is missing or has a different corpus_sha256"
+            )
+        try:
+            key = (r["response_id"], r["judge_model"],
+                   float(r["temperature"]), r["run_idx"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("existing judge evidence contains a malformed key") from exc
+        try:
+            duplicate = key in seen
+            if duplicate:
+                raise ValueError(f"existing judge evidence contains duplicate key {key}")
+            seen.add(key)
+        except TypeError as exc:
+            raise ValueError("existing judge evidence contains an unhashable key") from exc
         if r.get("error"):
             continue
-        keys.add((r["response_id"], r["judge_model"],
-                  float(r["temperature"]), r["run_idx"]))
+        keys.add(key)
     return keys
 
 
@@ -170,6 +188,7 @@ def main():
     corpus = read_jsonl(args.corpus)
     if not corpus:
         raise SystemExit(f"No corpus at {args.corpus}. Run gen_corpus first.")
+    corpus_sha256 = canonical_digest(corpus)
 
     try:
         configs = judge_configs_from_args(config, args, manifest)
@@ -192,12 +211,19 @@ def main():
             raise SystemExit(f"Could not repair judge evidence: {exc}")
         if repaired:
             print(f"[judges] archived {repaired} failed rows to {archive}")
-    done = load_done_keys(args.out) if args.resume else set()
+    if args.resume:
+        try:
+            done = load_done_keys(args.out, corpus_sha256)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Cannot resume judge evidence safely: {exc}")
+    else:
+        done = set()
     if args.overwrite and os.path.exists(args.out):
         os.remove(args.out)
 
     total_calls = len(corpus) * len(configs) * k
     print(f"[judges] corpus={len(corpus)}  configs={len(configs)}  k={k}")
+    print(f"[judges] corpus_sha256={corpus_sha256}")
     print(f"[judges] planned judge calls: {total_calls}")
 
     # Build one client per distinct judge model (reused across temps/runs).
@@ -234,6 +260,7 @@ def main():
                     "judge_model": model,
                     "judge_prompt_version": JUDGE_PROMPT_VERSION,
                     "judge_prompt_sha256": JUDGE_PROMPT_SHA256,
+                    "corpus_sha256": corpus_sha256,
                     "temperature": temp,
                     "run_idx": run_idx,
                     "judge_verdict_raw": jr.judge_verdict,

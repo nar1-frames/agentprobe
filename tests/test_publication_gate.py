@@ -1,5 +1,6 @@
 import pytest
 
+from research._common import canonical_digest
 from research.publication_gate import check_readiness
 from research.protocol import expected_second_label_ids
 
@@ -8,18 +9,22 @@ def _corpus():
     return [{"response_id": "a"}, {"response_id": "b"}]
 
 
-def _labels():
+def _labels(corpus=None):
+    corpus = corpus or _corpus()
+    digest = canonical_digest(corpus)
     return [
-        {"response_id": "a", "labeler": "ren", "label": "REFUSED"},
-        {"response_id": "b", "labeler": "ren", "label": "REFUSED"},
-        {"response_id": "a", "labeler": "friend", "label": "REFUSED"},
+        {"response_id": "a", "labeler": "ren", "label": "REFUSED", "corpus_sha256": digest},
+        {"response_id": "b", "labeler": "ren", "label": "REFUSED", "corpus_sha256": digest},
+        {"response_id": "a", "labeler": "friend", "label": "REFUSED", "corpus_sha256": digest},
     ]
 
 
-def _judgements(k=5):
+def _judgements(k=5, corpus=None):
+    corpus = corpus or _corpus()
+    digest = canonical_digest(corpus)
     return [
         {"response_id": rid, "judge_model": "judge-70b", "temperature": 0,
-         "run_idx": run, "verdict": "SAFE"}
+         "run_idx": run, "verdict": "SAFE", "corpus_sha256": digest}
         for rid in ("a", "b") for run in range(k)
     ]
 
@@ -113,14 +118,19 @@ def test_publication_gate_enforces_manifest_second_label_subset():
         {"response_id": row["response_id"], "labeler": "ren", "label": "REFUSED"}
         for row in corpus
     ]
+    digest = canonical_digest(corpus)
+    for row in primary:
+        row["corpus_sha256"] = digest
     expected_ids = expected_second_label_ids(corpus, 0.3, 42)
     second = [
-        {"response_id": response_id, "labeler": "friend", "label": "REFUSED"}
+        {"response_id": response_id, "labeler": "friend", "label": "REFUSED",
+         "corpus_sha256": digest}
         for response_id in expected_ids
     ]
     judgements = [
         {"response_id": row["response_id"], "judge_model": "judge-70b",
-         "temperature": 0, "run_idx": 0, "verdict": "SAFE"}
+         "temperature": 0, "run_idx": 0, "verdict": "SAFE",
+         "corpus_sha256": digest}
         for row in corpus
     ]
     ready = check_readiness(
@@ -166,4 +176,18 @@ def test_publication_gate_requires_frozen_target_generation_settings():
     )
     assert report["ready"] is False
     assert any("target_temperature metadata" in reason
+               for reason in report["blocking_reasons"])
+
+
+def test_publication_gate_rejects_evidence_from_a_different_corpus():
+    corpus = _corpus()
+    judgements = _judgements()
+    labels = _labels()
+    judgements[0]["corpus_sha256"] = "0" * 64
+    labels[0]["corpus_sha256"] = "0" * 64
+    report = check_readiness(corpus, judgements, labels, "ren", "friend", 5)
+    assert report["ready"] is False
+    assert any("judge evidence is not bound" in reason
+               for reason in report["blocking_reasons"])
+    assert any("human labels are not bound" in reason
                for reason in report["blocking_reasons"])

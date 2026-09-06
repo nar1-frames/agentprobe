@@ -112,12 +112,13 @@ def validate_corpus(corpus, attack_library=None):
     return {"errors": errors, "warnings": warnings, "ids": ids}
 
 
-def validate_judgements(judgements, corpus_ids, corpus_by_id=None):
+def validate_judgements(judgements, corpus_ids, corpus_by_id=None, corpus_sha256=None):
     errors = []
     warnings = []
     valid = 0
     operational_errors = 0
     missing_prompt_metadata = 0
+    missing_corpus_provenance = 0
     keys = set()
     for index, row in enumerate(judgements, start=1):
         if not isinstance(row, dict):
@@ -158,6 +159,14 @@ def validate_judgements(judgements, corpus_ids, corpus_by_id=None):
             if (not isinstance(row["judge_prompt_sha256"], str)
                     or not re.fullmatch(r"[0-9a-f]{64}", row["judge_prompt_sha256"])):
                 errors.append(f"judgement row {index}: judge_prompt_sha256 is invalid")
+        row_digest = row.get("corpus_sha256")
+        if row_digest is None:
+            missing_corpus_provenance += 1
+        elif (not isinstance(row_digest, str)
+              or not re.fullmatch(r"[0-9a-f]{64}", row_digest)):
+            errors.append(f"judgement row {index}: corpus_sha256 is invalid")
+        elif corpus_sha256 is not None and row_digest != corpus_sha256:
+            errors.append(f"judgement row {index}: corpus_sha256 does not match corpus")
         if not 0 <= temp <= 2:
             errors.append(f"judgement row {index}: temperature must be between 0 and 2")
             continue
@@ -179,6 +188,11 @@ def validate_judgements(judgements, corpus_ids, corpus_by_id=None):
             f"{missing_prompt_metadata} judge rows lack prompt provenance metadata; "
             "publication gate will require regeneration"
         )
+    if missing_corpus_provenance:
+        warnings.append(
+            f"{missing_corpus_provenance} judge rows lack corpus provenance metadata; "
+            "publication gate will require regeneration"
+        )
     return {
         "errors": errors,
         "warnings": warnings,
@@ -188,9 +202,10 @@ def validate_judgements(judgements, corpus_ids, corpus_by_id=None):
     }
 
 
-def validate_labels(labels, corpus_ids):
+def validate_labels(labels, corpus_ids, corpus_sha256=None):
     errors = []
     keys = set()
+    missing_corpus_provenance = 0
     for index, row in enumerate(labels, start=1):
         if not isinstance(row, dict):
             errors.append(f"label row {index}: expected a mapping")
@@ -214,7 +229,21 @@ def validate_labels(labels, corpus_ids):
             errors.append(f"label row {index}: orphan response_id {row['response_id']}")
         if not isinstance(row["label"], str) or row["label"] not in VALID_HUMAN_LABELS:
             errors.append(f"label row {index}: invalid label {row['label']!r}")
-    return {"errors": errors, "warnings": [], "labels": len(labels)}
+        row_digest = row.get("corpus_sha256")
+        if row_digest is None:
+            missing_corpus_provenance += 1
+        elif (not isinstance(row_digest, str)
+              or not re.fullmatch(r"[0-9a-f]{64}", row_digest)):
+            errors.append(f"label row {index}: corpus_sha256 is invalid")
+        elif corpus_sha256 is not None and row_digest != corpus_sha256:
+            errors.append(f"label row {index}: corpus_sha256 does not match corpus")
+    warnings = []
+    if missing_corpus_provenance:
+        warnings.append(
+            f"{missing_corpus_provenance} label rows lack corpus provenance metadata; "
+            "publication gate will require relabeling"
+        )
+    return {"errors": errors, "warnings": warnings, "labels": len(labels)}
 
 
 def validate_dataset(corpus, judgements=None, labels=None, attack_library=None):
@@ -224,14 +253,15 @@ def validate_dataset(corpus, judgements=None, labels=None, attack_library=None):
     judgements = list(judgements or [])
     labels = list(labels or [])
     corpus_report = validate_corpus(corpus, attack_library)
+    corpus_sha256 = canonical_digest(corpus)
     corpus_by_id = {
         row.get("response_id"): row for row in corpus
         if isinstance(row, dict) and isinstance(row.get("response_id"), str)
     }
     judgement_report = validate_judgements(
-        judgements, corpus_report["ids"], corpus_by_id
+        judgements, corpus_report["ids"], corpus_by_id, corpus_sha256
     )
-    label_report = validate_labels(labels, corpus_report["ids"])
+    label_report = validate_labels(labels, corpus_report["ids"], corpus_sha256)
     errors = corpus_report["errors"] + judgement_report["errors"] + label_report["errors"]
     warnings = corpus_report["warnings"] + judgement_report["warnings"] + label_report["warnings"]
     return {

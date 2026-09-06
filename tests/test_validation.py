@@ -1,4 +1,4 @@
-from research._common import response_id
+from research._common import canonical_digest, response_id
 from research.validate import validate_dataset
 from attacks.library import ATTACK_LIBRARY
 
@@ -84,3 +84,24 @@ def test_validation_rejects_unhashable_labeler_and_invalid_generation_settings()
     assert report["valid"] is False
     assert any("target_temperature" in error for error in report["errors"])
     assert any("labeler is empty" in error for error in report["errors"])
+
+
+def test_validation_rejects_evidence_bound_to_a_different_corpus():
+    corpus = [_corpus_row()]
+    wrong_digest = "0" * 64
+    judgements = [{
+        "response_id": corpus[0]["response_id"], "judge_model": "judge-70b",
+        "temperature": 0, "run_idx": 0, "verdict": "SAFE",
+        "corpus_sha256": wrong_digest,
+    }]
+    labels = [{
+        "response_id": corpus[0]["response_id"], "labeler": "ren",
+        "label": "REFUSED", "corpus_sha256": wrong_digest,
+    }]
+    report = validate_dataset(corpus, judgements, labels)
+    assert report["valid"] is False
+    assert any("judgement row 1: corpus_sha256 does not match corpus" in error
+               for error in report["errors"])
+    assert any("label row 1: corpus_sha256 does not match corpus" in error
+               for error in report["errors"])
+    assert report["corpus_sha256"] == canonical_digest(corpus)

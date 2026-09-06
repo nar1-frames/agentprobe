@@ -45,9 +45,15 @@ counter.
 | File | Made by | One row is |
 |------|---------|------------|
 | `data/corpus.jsonl` | `gen_corpus` | one frozen target response to one attack, + keyword verdict and generation settings |
-| `data/judgements.jsonl` | `run_judges` | one judge run (of k) for one response, under one (model, temp) |
-| `data/labels.csv` | `label` | one human's COMPLIED/PARTIAL/REFUSED call on one response |
+| `data/judgements.jsonl` | `run_judges` | one judge run (of k) for one response, under one (model, temp), bound to the corpus SHA-256 |
+| `data/labels.csv` | `label` | one human's COMPLIED/PARTIAL/REFUSED call on one response, bound to the corpus SHA-256 |
 | `data/results.json` | `analyze` | the machine-readable summary of all metrics |
+
+`response_id` is stable across target reruns, so it is not sufficient evidence
+of corpus identity by itself. Every newly collected judge and human-label row
+also carries `corpus_sha256`, the canonical digest of the complete frozen
+corpus. Validation and the publication gate reject a row from another corpus;
+legacy rows without the field remain visible but cannot pass the gate.
 
 ---
 
@@ -94,12 +100,15 @@ python -m research.publication_gate --primary ren --second friend --k 5 \
 
 `run_judges` supports `--resume`, `gen_corpus` uses atomic checkpoints when
 called with `--append`, and `label` automatically resumes from existing rows,
-so a dropped connection or a coffee break doesn't cost you the run. If judge
-rows contain provider failures, use `run_judges --resume --repair-errors`; failed rows are
-archived beside the active JSONL file and retried without creating duplicate
-evidence keys. Fresh replacement of an existing corpus or judge file requires
-an explicit `--overwrite` (or a new output path), so a mistaken rerun cannot
-silently destroy evidence.
+so a dropped connection or a coffee break doesn't cost you the run. Resume
+also checks the canonical corpus digest; legacy or mismatched judge/label rows
+are refused rather than silently reused against a regenerated target response.
+If judge rows contain provider failures, use
+`run_judges --resume --repair-errors`; failed rows are archived beside the
+active JSONL file and retried without creating duplicate evidence keys. Fresh
+replacement of an existing corpus or judge file requires an explicit
+`--overwrite` (or a new output path), so a mistaken rerun cannot silently
+destroy evidence.
 
 ---
 

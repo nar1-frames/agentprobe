@@ -35,30 +35,45 @@
 #   python -m research.label --show-hits              # reveal keyword hits (bias risk!)
 #
 # labels.csv columns:
-#   response_id, labeler, label, note, category, target_model
+#   response_id, labeler, label, note, category, target_model, corpus_sha256
 # ============================================================
 
 import argparse
 import csv
 import json
 import os
-import random
 import textwrap
 
-from research._common import read_jsonl
-from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest
+from research._common import canonical_digest, read_jsonl
+from research.protocol import (
+    DEFAULT_MANIFEST_PATH,
+    expected_second_label_ids,
+    load_manifest,
+)
 
 LABEL_KEYS = {"c": "COMPLIED", "p": "PARTIAL", "r": "REFUSED"}
-CSV_FIELDS = ["response_id", "labeler", "label", "note", "category", "target_model"]
+CSV_FIELDS = [
+    "response_id", "labeler", "label", "note", "category", "target_model",
+    "corpus_sha256",
+]
 
 
-def load_existing(path, labeler):
-    """Which response_ids this labeler has already done (resume support)."""
+def load_existing(path, labeler, corpus_sha256=None):
+    """Return completed IDs only when existing labels match this corpus."""
     if not os.path.exists(path):
         return set()
     done = set()
+    seen = set()
     with open(path, newline="") as f:
         for row in csv.DictReader(f):
+            key = (row.get("response_id"), row.get("labeler"))
+            if key in seen:
+                raise ValueError(f"existing human labels contain duplicate key {key}")
+            seen.add(key)
+            if corpus_sha256 is not None and row.get("corpus_sha256") != corpus_sha256:
+                raise ValueError(
+                    "existing human labels are missing or have a different corpus_sha256"
+                )
             if row.get("labeler") == labeler and row.get("response_id"):
                 done.add(row["response_id"])
     return done
@@ -76,9 +91,11 @@ def append_label(path, row):
 def pick_subset(corpus, subset, seed):
     if not subset:
         return corpus
-    rng = random.Random(seed)
-    n = max(1, int(round(len(corpus) * subset)))
-    return rng.sample(corpus, n)
+    # The protocol assigns the second-label subset by stable response ID, not
+    # by JSONL row order.  This keeps the human-label task identical after a
+    # checkpoint rewrite, a sort, or a provider-specific corpus export.
+    selected_ids = expected_second_label_ids(corpus, subset, seed)
+    return [row for row in corpus if row.get("response_id") in selected_ids]
 
 
 def render(row, idx, n, show_hits):
@@ -147,16 +164,21 @@ def main():
     corpus = read_jsonl(args.corpus)
     if not corpus:
         raise SystemExit(f"No corpus at {args.corpus}. Run gen_corpus first.")
+    corpus_sha256 = canonical_digest(corpus)
 
     target_errors = sum(1 for row in corpus if row.get("error"))
     corpus = [row for row in corpus if not row.get("error")]
     corpus = pick_subset(corpus, subset, seed)
-    done = load_existing(args.out, labeler)
+    try:
+        done = load_existing(args.out, labeler, corpus_sha256)
+    except (OSError, ValueError, csv.Error) as exc:
+        raise SystemExit(f"Cannot resume labels safely: {exc}")
     todo = [r for r in corpus if r["response_id"] not in done]
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     print(f"Labeler '{labeler}': {len(done)} done, {len(todo)} to go "
           f"(of {len(corpus)} in scope).\n")
+    print(f"Corpus SHA-256: {corpus_sha256}\n")
     if target_errors:
         print(f"Excluded {target_errors} target API failures; repair the corpus before labeling.\n")
 
@@ -181,6 +203,7 @@ def main():
                     "note": note,
                     "category": row["category"],
                     "target_model": row["target_model"],
+                    "corpus_sha256": corpus_sha256,
                 })
                 break
             print("  (use c / p / r / s / q)")

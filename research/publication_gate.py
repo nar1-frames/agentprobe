@@ -8,7 +8,7 @@ import os
 from collections import defaultdict
 
 from attacks.library import ATTACK_LIBRARY
-from research._common import read_jsonl
+from research._common import canonical_digest, read_jsonl
 from research.protocol import (
     DEFAULT_MANIFEST_PATH,
     attack_library_digest,
@@ -69,6 +69,7 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
     corpus = list(corpus or [])
     judgements = list(judgements or [])
     labels = list(labels or [])
+    corpus_sha256 = canonical_digest(corpus)
     corpus_ids = set()
     for index, row in enumerate(corpus, start=1):
         if not isinstance(row, dict) or not isinstance(row.get("response_id"), str) or not row["response_id"].strip():
@@ -147,6 +148,27 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                      or set(prompt_digests) != {expected_judge_prompt_sha256})):
             blocking.append(
                 "judge prompt digest metadata does not match the study manifest"
+            )
+
+    if judgements:
+        judge_digests = [
+            row.get("corpus_sha256") for row in judgements
+            if isinstance(row, dict)
+        ]
+        if (len(judge_digests) != len(judgements)
+                or not all(digest == corpus_sha256 for digest in judge_digests)):
+            blocking.append(
+                "judge evidence is not bound to the current corpus digest"
+            )
+    if labels:
+        label_digests = [
+            row.get("corpus_sha256") for row in labels
+            if isinstance(row, dict)
+        ]
+        if (len(label_digests) != len(labels)
+                or not all(digest == corpus_sha256 for digest in label_digests)):
+            blocking.append(
+                "human labels are not bound to the current corpus digest"
             )
 
     primary_rows = [row for row in labels
@@ -316,6 +338,7 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         "expected_judge_prompt_sha256": expected_judge_prompt_sha256,
         "expected_target_temperature": expected_target_temperature,
         "expected_target_max_tokens": expected_target_max_tokens,
+        "corpus_sha256": corpus_sha256,
     }
 
 

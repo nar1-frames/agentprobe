@@ -53,6 +53,8 @@ Controls: `s` skip, `q` save & quit. Add a free-text note after a space, e.g.
    With the default study manifest, the second labeler's 30% subset and seed
    are filled in automatically; explicit overrides remain possible but are
    checked by `research.publication_gate`.
+   The assignment is based on sorted `response_id` values, so reordering the
+   corpus file does not change which responses the second labeler sees.
 
 3. When labels exist, analysis joins them by `response_id`:
    ```
@@ -67,4 +69,4 @@ Controls: `s` skip, `q` save & quit. Add a free-text note after a space, e.g.
   note it and (ideally) re-label the earlier ones the same way. Consistency is
   what κ rewards.
 - Output goes to `data/labels.csv` with columns
-  `response_id, labeler, label, note, category, target_model`.
+  `response_id, labeler, label, note, category, target_model, corpus_sha256`.
