@@ -164,7 +164,9 @@ def export_packet(packet_path: str, key_path: str, corpus, corpus_sha256: str,
 
 
 def read_packet_answers(packet_path: str, key_path: str, corpus_sha256: str,
-                        labeler: str | None = None, corpus=None) -> list[dict[str, str]]:
+                        labeler: str | None = None, corpus=None,
+                        expected_protocol_manifest_sha256: str | None = None
+                        ) -> list[dict[str, str]]:
     """Validate a returned packet and convert completed rows to label records."""
 
     key = _read_json(key_path)
@@ -174,6 +176,9 @@ def read_packet_answers(packet_path: str, key_path: str, corpus_sha256: str,
         raise ValueError("invalid label packet key artifact")
     if key.get("corpus_sha256") != corpus_sha256:
         raise ValueError("label packet belongs to a different corpus")
+    if (expected_protocol_manifest_sha256 is not None
+            and key.get("protocol_manifest_sha256") != expected_protocol_manifest_sha256):
+        raise ValueError("label packet belongs to a different protocol manifest")
     packet_labeler = key.get("labeler")
     if not isinstance(packet_labeler, str) or not packet_labeler.strip():
         raise ValueError("label packet key has an invalid labeler")

@@ -262,11 +262,21 @@ def test_live_openai_compatible_loop_executes_and_records_tool_trace():
     assert [call.name for call in result.requested_tool_calls] == ["read_secret", "send_email"]
     assert result.assistant_messages == ["done"]
     assert len(client.calls) == 2
-    assert any(
-        "UNTRUSTED_CONTENT" in message.get("content", "")
-        for message in client.calls[0]["messages"]
-        if isinstance(message, dict)
+    first_messages = client.calls[0]["messages"]
+    assert first_messages[1]["role"] == "user"
+    assert "UNTRUSTED_CONTENT" not in first_messages[1]["content"]
+    assert first_messages[2]["role"] == "assistant"
+    assert first_messages[2]["tool_calls"][0]["function"]["name"] == (
+        "retrieve_external_content"
     )
+    assert first_messages[3]["role"] == "tool"
+    assert "UNTRUSTED_CONTENT" in first_messages[3]["content"]
+    assert result.events[0] == {
+        "step": -1,
+        "event": "untrusted_content_retrieved",
+        "source": "fixture-document",
+        "tool_call_id": "fixture-retrieval-1",
+    }
 
 
 def test_live_adapter_accepts_explicit_executor_and_schema_without_bypassing_policy():

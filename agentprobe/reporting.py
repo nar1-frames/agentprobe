@@ -18,8 +18,8 @@ from typing import Any, Dict, Mapping
 
 
 SCHEMA_VERSION = "1.0"
-HARNESS_SCHEMA_VERSION = "1.1"
-TOOL_VERSION = "1.4.0"
+HARNESS_SCHEMA_VERSION = "1.2"
+TOOL_VERSION = "1.5.0"
 VERDICTS = ("VULNERABLE", "PARTIAL", "SAFE", "SUSPICIOUS")
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
 
@@ -170,7 +170,39 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
     }
 
 
-def build_harness_report(results, mode, generated_at=None):
+def build_harness_provenance(model, provider=None, temperature=None, max_steps=None,
+                             system_prompt=None, config=None):
+    """Create non-secret provenance for a live harness execution."""
+
+    metadata = {
+        "run_id": uuid.uuid4().hex,
+        "tool_version": TOOL_VERSION,
+        "target_model": model,
+    }
+    if provider:
+        metadata["target_provider"] = provider
+    if temperature is not None:
+        metadata["target_temperature"] = temperature
+    if max_steps is not None:
+        metadata["max_steps"] = max_steps
+    if system_prompt is not None:
+        metadata["system_prompt_sha256"] = hashlib.sha256(
+            str(system_prompt).encode("utf-8")
+        ).hexdigest()
+    if isinstance(config, Mapping):
+        safe_config = {
+            key: config[key]
+            for key in (
+                "provider", "model", "api_key_env", "base_url",
+                "timeout_seconds", "strength_rank",
+            )
+            if key in config
+        }
+        metadata["target_config_sha256"] = _digest(safe_config)
+    return metadata
+
+
+def build_harness_report(results, mode, generated_at=None, metadata=None):
     """Build a versioned, machine-readable report for harness executions."""
 
     serialized = []
@@ -190,6 +222,9 @@ def build_harness_report(results, mode, generated_at=None):
     operational_errors = sum(
         len(row.get("operational_errors") or []) for row in serialized
     )
+    run = dict(metadata or {})
+    run.setdefault("run_id", uuid.uuid4().hex)
+    run.setdefault("tool_version", TOOL_VERSION)
     return {
         "schema_version": HARNESS_SCHEMA_VERSION,
         "artifact_type": "agentprobe_harness",
@@ -197,6 +232,7 @@ def build_harness_report(results, mode, generated_at=None):
         "tool_version": TOOL_VERSION,
         "generated_at": generated_at or _utc_now(),
         "mode": mode,
+        "run": run,
         "summary": {
             "scenarios": len(serialized),
             "attacks": len(attack_results),

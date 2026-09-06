@@ -3,11 +3,12 @@ from types import SimpleNamespace
 import pytest
 
 from agentprobe.reporting import (
-    build_harness_report, build_json_report, build_run_metadata,
+    build_harness_provenance, build_harness_report, build_json_report, build_run_metadata,
     safe_filename_component, save_harness_report, save_json_report,
 )
 from report_html_v11 import build_summary, generate_html_report
 import agentprobe_v11 as v11
+import agentprobe_v12 as v12
 from agentprobe.models import parse_model_size_b, validate_judge_strength
 
 
@@ -51,7 +52,7 @@ def test_harness_report_is_versioned_summarized_and_private(tmp_path):
         "controls": 1, "controls_passed": 1, "operational_errors": 1,
     }
     path = save_harness_report(report, str(tmp_path / "harness.json"))
-    assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.1"
+    assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.2"
     assert __import__("pathlib").Path(path).stat().st_mode & 0o077 == 0
 
 
@@ -132,6 +133,43 @@ def test_run_metadata_pins_judge_prompt_provenance():
     )
     assert metadata["judge_prompt_version"] == "2.0"
     assert metadata["judge_prompt_sha256"] == "a" * 64
+
+
+def test_harness_provenance_identifies_live_run_without_system_prompt():
+    metadata = build_harness_provenance(
+        "target-3b", provider="ollama", temperature=0.0, max_steps=4,
+        system_prompt="private prompt", config={
+            "provider": "ollama", "model": "target-3b", "api_key_env": None,
+        },
+    )
+    assert metadata["target_model"] == "target-3b"
+    assert metadata["target_provider"] == "ollama"
+    assert metadata["max_steps"] == 4
+    assert len(metadata["target_config_sha256"]) == 64
+    assert len(metadata["system_prompt_sha256"]) == 64
+    assert "private prompt" not in metadata
+
+
+def test_interactive_picker_binds_selected_models_into_provenance_config():
+    config = {
+        "target": {"provider": "ollama", "model": "old-target",
+                    "api_key_env": None, "temperature": 0.0},
+        "judge": {"provider": "ollama", "model": "old-judge",
+                   "api_key_env": None, "temperature": 0.1},
+        "scan": {"categories": "all"},
+    }
+    selected = v12._selected_run_config(
+        config,
+        {"provider": "groq", "model": "picked-target",
+         "api_key_env": "GROQ_API_KEY", "base_url": None},
+        {"provider": "openai", "model": "picked-judge",
+         "api_key_env": "OPENAI_API_KEY", "base_url": None},
+    )
+    assert selected["target"]["model"] == "picked-target"
+    assert selected["target"]["provider"] == "groq"
+    assert selected["judge"]["model"] == "picked-judge"
+    assert selected["judge"]["provider"] == "openai"
+    assert config["target"]["model"] == "old-target"
 
 
 def test_report_filenames_sanitize_supplied_run_ids(tmp_path):

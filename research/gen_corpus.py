@@ -44,9 +44,10 @@ import os
 import time
 
 from research._common import (
-    load_config, build_client, response_id, read_jsonl, write_jsonl,
+    load_config, build_client, provider_config_digest, response_id, read_jsonl,
+    write_jsonl,
 )
-from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest
+from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest, manifest_digest
 from attacks.library import ATTACK_LIBRARY
 from agentprobe.detection import keyword_check, sanitize_error
 from agentprobe.reliability import is_retryable_error
@@ -105,6 +106,13 @@ def resolve_generation_plan(target_cfg, models_arg=None, max_tokens_arg=None,
     )
 
     if manifest:
+        expected_provider = manifest_corpus["target_provider"]
+        actual_provider = target_cfg.get("provider", "groq")
+        if actual_provider != expected_provider:
+            raise ValueError(
+                "target provider must match the manifest; use --manifest \"\" "
+                "for an exploratory deviation"
+            )
         expected_models = set(manifest_corpus["target_models"])
         if set(models) != expected_models or len(models) != len(expected_models):
             raise ValueError(
@@ -133,13 +141,21 @@ def resolve_generation_plan(target_cfg, models_arg=None, max_tokens_arg=None,
 
 
 def generate(target_cfg, model, out_path, max_tokens, target_temperature,
-             rate_limit, retries=2, retry_delay=3, records_by_id=None):
-    client = build_client({**target_cfg, "model": model})
+             rate_limit, retries=2, retry_delay=3, records_by_id=None,
+             protocol_manifest_sha256=None):
     provider = target_cfg.get("provider", "groq")
+    target_config_sha256 = provider_config_digest({
+        **target_cfg,
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": target_temperature,
+    })
+    collected_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     total = sum(len(v) for v in ATTACK_LIBRARY.values())
     print(f"[corpus] target={provider}/{model}  prompts={total}  -> {out_path}")
 
     done = 0
+    client = None
     for category, idx, attack in iter_attacks():
         rid = response_id(category, idx, model)
         existing = (records_by_id or {}).get(rid)
@@ -149,7 +165,9 @@ def generate(target_cfg, model, out_path, max_tokens, target_temperature,
                 and existing.get("max_tokens") == max_tokens
                 and existing.get("target_temperature") == target_temperature
                 and existing.get("attack_prompt") == attack["prompt"]
-            )
+                and existing.get("target_config_sha256") == target_config_sha256
+                and existing.get("protocol_manifest_sha256") == protocol_manifest_sha256
+                )
             if not same_settings:
                 raise ValueError(
                     f"existing corpus row {rid} does not match the requested "
@@ -158,6 +176,8 @@ def generate(target_cfg, model, out_path, max_tokens, target_temperature,
             if not existing.get("error"):
                 print(f"  [resume] {category}/{idx} already complete")
                 continue
+        if client is None:
+            client = build_client({**target_cfg, "model": model})
         prompt = attack["prompt"]
         text, err = send_prompt(
             client, model, prompt, max_tokens=max_tokens,
@@ -176,6 +196,9 @@ def generate(target_cfg, model, out_path, max_tokens, target_temperature,
             "attack_description": attack.get("description", ""),
             "target_provider": provider,
             "target_model": model,
+            "target_config_sha256": target_config_sha256,
+            "protocol_manifest_sha256": protocol_manifest_sha256,
+            "collected_at": collected_at,
             "max_tokens": max_tokens,
             "target_temperature": target_temperature,
             "response": response,
@@ -220,6 +243,10 @@ def main():
                     help="append to an existing corpus instead of overwriting")
     ap.add_argument("--overwrite", action="store_true",
                     help="explicitly replace an existing corpus (destructive)")
+    ap.add_argument(
+        "--fail-on-error", action="store_true",
+        help="exit 3 after writing the corpus if any target call failed",
+    )
     args = ap.parse_args()
 
     if args.append and args.overwrite:
@@ -271,8 +298,16 @@ def main():
         generate(
             target_cfg, model, args.out, max_tokens, target_temperature,
             rate_limit, retries, retry_delay, records_by_id,
+            protocol_manifest_sha256=(manifest_digest(manifest) if manifest else None),
         )
 
+    operational_errors = sum(
+        bool(row.get("error")) for row in records_by_id.values()
+        if isinstance(row, dict)
+    )
+    if args.fail_on_error and operational_errors:
+        print(f"ERROR: {operational_errors} target call(s) recorded an operational error")
+        raise SystemExit(3)
     print(f"\nDone. Corpus at {args.out}. Next: python -m research.run_judges")
 
 

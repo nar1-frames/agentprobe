@@ -34,6 +34,9 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
     if (not isinstance(corpus, dict) or not isinstance(judges, list)
             or not isinstance(labels, dict) or not isinstance(analysis, dict)):
         raise ValueError("study manifest requires corpus, judges, analysis, and labels objects")
+    protocol_version = manifest.get("protocol_version")
+    if not isinstance(protocol_version, str) or not protocol_version.strip():
+        raise ValueError("manifest protocol_version must be a non-empty string")
     attack_digest = manifest.get("attack_library_sha256")
     if not isinstance(attack_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", attack_digest):
         raise ValueError("manifest attack_library_sha256 must be a 64-character SHA-256 hex digest")
@@ -46,7 +49,17 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
         raise ValueError(
             "manifest judge_prompt_sha256 must be a 64-character SHA-256 hex digest"
         )
+    judge_provider = manifest.get("judge_provider")
+    if not isinstance(judge_provider, str) or not judge_provider.strip():
+        raise ValueError("manifest judge_provider must be a non-empty string")
+    judge_max_tokens = manifest.get("judge_max_tokens")
+    if (isinstance(judge_max_tokens, bool) or not isinstance(judge_max_tokens, int)
+            or not 1 <= judge_max_tokens <= 131072):
+        raise ValueError(
+            "manifest judge_max_tokens must be an integer between 1 and 131072"
+        )
     targets = corpus.get("target_models")
+    target_provider = corpus.get("target_provider")
     responses_per_target = corpus.get("responses_per_target")
     if not isinstance(targets, list) or not targets or not all(
         isinstance(model, str) and model.strip() for model in targets
@@ -54,6 +67,8 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
         raise ValueError("manifest corpus.target_models must be a non-empty string list")
     if len(set(targets)) != len(targets):
         raise ValueError("manifest corpus.target_models must be unique")
+    if not isinstance(target_provider, str) or not target_provider.strip():
+        raise ValueError("manifest corpus.target_provider must be a non-empty string")
     if isinstance(responses_per_target, bool) or not isinstance(responses_per_target, int) or responses_per_target < 1:
         raise ValueError("manifest corpus.responses_per_target must be a positive integer")
     target_temperature = corpus.get("target_temperature")
@@ -136,9 +151,11 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
 
     return {
         **manifest,
+        "protocol_version": protocol_version.strip(),
         "corpus": {
             **corpus,
             "target_models": list(targets),
+            "target_provider": target_provider.strip(),
             "responses_per_target": responses_per_target,
             "target_temperature": target_temperature,
             "target_max_tokens": target_max_tokens,
@@ -146,6 +163,8 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
         "judges": normalized_judges,
         "judge_prompt_version": judge_prompt_version.strip(),
         "judge_prompt_sha256": judge_prompt_digest,
+        "judge_provider": judge_provider.strip(),
+        "judge_max_tokens": judge_max_tokens,
         "analysis": normalized_analysis,
         "repeats": repeats,
         "labels": {

@@ -9,7 +9,10 @@ import os
 
 import pytest
 
-from research._common import append_jsonl, load_env, read_jsonl, response_id, write_jsonl
+from research._common import (
+    append_jsonl, load_env, provider_config_digest, read_jsonl, response_id,
+    write_jsonl,
+)
 
 
 def test_load_env_reads_key_from_file(tmp_path, monkeypatch):
@@ -39,6 +42,24 @@ def test_response_id_is_stable_and_short():
     b = response_id("jailbreak", 0, "llama-3.1-8b-instant")
     assert a == b and len(a) == 12
     assert a != response_id("jailbreak", 1, "llama-3.1-8b-instant")
+
+
+def test_provider_config_digest_is_deterministic_and_excludes_secret_values():
+    first = provider_config_digest({
+        "provider": "custom", "model": "fixture", "api_key_env": "TOKEN",
+        "base_url": "https://model.example.test/v1", "password": "secret-a",
+    })
+    second = provider_config_digest({
+        "password": "secret-b", "base_url": "https://model.example.test/v1",
+        "api_key_env": "TOKEN", "model": "fixture", "provider": "custom",
+    })
+    assert first == second
+    assert len(first) == 64
+
+
+def test_provider_config_digest_rejects_non_mapping():
+    with pytest.raises(ValueError, match="mapping"):
+        provider_config_digest([("provider", "ollama")])
 
 
 def test_jsonl_writes_are_round_trippable_and_create_parent(tmp_path):

@@ -8,6 +8,7 @@ import os
 import sys
 import hashlib
 import tempfile
+from collections.abc import Mapping
 
 from agentprobe.config import load_config as _load_validated_config
 from agentprobe.providers import build_client
@@ -63,6 +64,35 @@ def response_id(category, attack_index, target_model):
     """
     raw = f"{category}|{attack_index}|{target_model}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+
+_PROVIDER_DIGEST_FIELDS = (
+    "provider", "model", "api_key_env", "base_url", "timeout_seconds",
+    "max_tokens", "temperature", "strength_rank",
+)
+
+
+def provider_config_digest(provider_config):
+    """Hash non-secret provider settings used for an evidence row.
+
+    API key values and arbitrary configuration fields are deliberately not
+    included. The validated config rejects literal API keys, while this
+    allowlist keeps a future provider extension from accidentally persisting
+    a secret in a provenance field.
+    """
+
+    if not isinstance(provider_config, Mapping):
+        raise ValueError("provider configuration must be a mapping")
+    material = {
+        key: provider_config[key]
+        for key in _PROVIDER_DIGEST_FIELDS
+        if key in provider_config
+    }
+    encoded = json.dumps(
+        material, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def canonical_digest(records):

@@ -45,15 +45,23 @@ import tempfile
 import time
 
 from research._common import (
-    load_config, build_client, read_jsonl, append_jsonl, canonical_digest,
+    load_config, build_client, provider_config_digest, read_jsonl, append_jsonl,
+    canonical_digest,
 )
 from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION, llm_judge
-from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest
+from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest, manifest_digest
+from attacks.library import ATTACK_LIBRARY
+from research.validate import validate_dataset
 
 
 def judge_configs_from_args(config, args, manifest=None):
     """Build the list of (provider_cfg, model, temperature) judge configs."""
     base_judge = config["judge"]
+    if manifest and base_judge.get("provider", "groq") != manifest["judge_provider"]:
+        raise ValueError(
+            "judge provider must match the manifest; use --manifest \"\" "
+            "for an exploratory deviation"
+        )
     if manifest and not args.judges and not args.temps:
         return [
             (base_judge, judge["model"], float(judge["temperature"]))
@@ -113,8 +121,17 @@ def already_done(existing, rid, model, temp, run_idx):
     return (rid, model, temp, run_idx) in existing
 
 
-def load_done_keys(path, corpus_sha256=None):
-    """Return completed keys only when evidence matches the frozen corpus."""
+def load_done_keys(path, corpus_sha256=None, expected_judge_prompt_version=None,
+                   expected_judge_prompt_sha256=None,
+                   expected_protocol_manifest_sha256=None,
+                   expected_judge_max_tokens=None):
+    """Return existing evidence keys when bound to the frozen corpus.
+
+    Failed rows are existing evidence too.  They remain in the active file
+    until ``--repair-errors`` explicitly archives them; treating them as
+    already present prevents a plain ``--resume`` from appending duplicate
+    keys and obscuring the original failure.
+    """
     if not os.path.exists(path):
         return set()
     keys = set()
@@ -125,6 +142,30 @@ def load_done_keys(path, corpus_sha256=None):
         if corpus_sha256 is not None and r.get("corpus_sha256") != corpus_sha256:
             raise ValueError(
                 "existing judge evidence is missing or has a different corpus_sha256"
+            )
+        if (expected_judge_prompt_version is not None
+                and r.get("judge_prompt_version") != expected_judge_prompt_version):
+            raise ValueError(
+                "existing judge evidence has a different or missing judge prompt version; "
+                "use --overwrite to collect fresh evidence"
+            )
+        if (expected_judge_prompt_sha256 is not None
+                and r.get("judge_prompt_sha256") != expected_judge_prompt_sha256):
+            raise ValueError(
+                "existing judge evidence has a different or missing judge prompt digest; "
+                "use --overwrite to collect fresh evidence"
+            )
+        if (expected_protocol_manifest_sha256 is not None
+                and r.get("protocol_manifest_sha256") != expected_protocol_manifest_sha256):
+            raise ValueError(
+                "existing judge evidence has a different or missing protocol manifest digest; "
+                "use --overwrite to collect fresh evidence"
+            )
+        if (expected_judge_max_tokens is not None
+                and r.get("judge_max_tokens") != expected_judge_max_tokens):
+            raise ValueError(
+                "existing judge evidence has a different or missing judge token budget; "
+                "use --overwrite to collect fresh evidence"
             )
         try:
             key = (r["response_id"], r["judge_model"],
@@ -138,8 +179,6 @@ def load_done_keys(path, corpus_sha256=None):
             seen.add(key)
         except TypeError as exc:
             raise ValueError("existing judge evidence contains an unhashable key") from exc
-        if r.get("error"):
-            continue
         keys.add(key)
     return keys
 
@@ -201,6 +240,10 @@ def main():
         "--repair-errors", action="store_true",
         help="archive failed rows and retry them (requires --resume)",
     )
+    ap.add_argument(
+        "--fail-on-error", action="store_true",
+        help="exit 3 after writing evidence if any judge call failed",
+    )
     args = ap.parse_args()
     if args.resume and args.overwrite:
         raise SystemExit("--resume and --overwrite are mutually exclusive")
@@ -224,6 +267,13 @@ def main():
     corpus = read_jsonl(args.corpus)
     if not corpus:
         raise SystemExit(f"No corpus at {args.corpus}. Run gen_corpus first.")
+    corpus_validation = validate_dataset(corpus, attack_library=ATTACK_LIBRARY)
+    if not corpus_validation["valid"]:
+        for error in corpus_validation["errors"]:
+            print(f"ERROR: {error}")
+        raise SystemExit("Corpus validation failed; repair or regenerate it before judging.")
+    for warning in corpus_validation["warnings"]:
+        print(f"WARNING: {warning}")
     corpus_sha256 = canonical_digest(corpus)
 
     try:
@@ -233,6 +283,14 @@ def main():
     rate_limit = config.get("scan", {}).get("rate_limit_seconds", 1)
     retries = config.get("scan", {}).get("retries", 2)
     retry_delay = config.get("scan", {}).get("retry_delay_seconds", 3)
+    base_judge = config["judge"]
+    judge_max_tokens = (manifest or {}).get(
+        "judge_max_tokens", base_judge.get("max_tokens", 120)
+    )
+    if (isinstance(judge_max_tokens, bool) or not isinstance(judge_max_tokens, int)
+            or not 1 <= judge_max_tokens <= 131072):
+        raise SystemExit("judge max token budget must be an integer between 1 and 131072")
+    protocol_manifest_sha256 = manifest_digest(manifest) if manifest else None
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     if os.path.exists(args.out) and not args.resume and not args.overwrite:
@@ -249,7 +307,14 @@ def main():
             print(f"[judges] archived {repaired} failed rows to {archive}")
     if args.resume:
         try:
-            done = load_done_keys(args.out, corpus_sha256)
+            done = load_done_keys(
+                args.out,
+                corpus_sha256,
+                expected_judge_prompt_version=(manifest or {}).get("judge_prompt_version"),
+                expected_judge_prompt_sha256=(manifest or {}).get("judge_prompt_sha256"),
+                expected_protocol_manifest_sha256=protocol_manifest_sha256,
+                expected_judge_max_tokens=judge_max_tokens if manifest else None,
+            )
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise SystemExit(f"Cannot resume judge evidence safely: {exc}")
     else:
@@ -285,8 +350,14 @@ def main():
                     continue
                 jr = llm_judge(client, model, row["attack_prompt"],
                                row["response"], temperature=temp,
-                               max_tokens=base_judge.get("max_tokens", 120),
+                               max_tokens=judge_max_tokens,
                                retries=retries, delay=retry_delay)
+                judge_config_sha256 = provider_config_digest({
+                    **base_judge,
+                    "model": model,
+                    "temperature": temp,
+                    "max_tokens": judge_max_tokens,
+                })
                 append_jsonl(args.out, {
                     "response_id": row["response_id"],
                     "category": row["category"],
@@ -296,6 +367,9 @@ def main():
                     "judge_model": model,
                     "judge_prompt_version": JUDGE_PROMPT_VERSION,
                     "judge_prompt_sha256": JUDGE_PROMPT_SHA256,
+                    "judge_config_sha256": judge_config_sha256,
+                    "judge_max_tokens": judge_max_tokens,
+                    "protocol_manifest_sha256": protocol_manifest_sha256,
                     "corpus_sha256": corpus_sha256,
                     "temperature": temp,
                     "run_idx": run_idx,
@@ -310,6 +384,14 @@ def main():
                           f"{row['category']}/{row['attack_index']} -> {jr.verdict}")
                 time.sleep(rate_limit)
 
+    judge_rows = read_jsonl(args.out) if os.path.exists(args.out) else []
+    operational_errors = sum(
+        bool(row.get("error")) for row in judge_rows
+        if isinstance(row, dict)
+    )
+    if args.fail_on_error and operational_errors:
+        print(f"ERROR: {operational_errors} judge call(s) recorded an operational error")
+        raise SystemExit(3)
     print(f"\nDone. Judgements at {args.out}. Next: label (research.label) then analyze.")
 
 

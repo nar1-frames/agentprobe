@@ -26,6 +26,8 @@ def _validate_base_url(provider: str, base_url: Any) -> None:
     parsed = urlparse(base_url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("base_url must be a non-empty HTTP(S) URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("base_url must not contain embedded credentials")
 
 
 def build_client(provider_config: Mapping[str, Any]):
@@ -37,6 +39,8 @@ def build_client(provider_config: Mapping[str, Any]):
     base_url = provider_config.get("base_url")
     _validate_base_url(provider, base_url)
     key_env = provider_config.get("api_key_env")
+    if provider in {"groq", "openai"} and not isinstance(key_env, str):
+        raise ValueError(f"{provider} provider requires api_key_env")
     api_key = os.environ.get(key_env) if key_env else "ollama"
     timeout = provider_config.get("timeout_seconds", 60)
     client_options = {"timeout": float(timeout), "max_retries": 0}

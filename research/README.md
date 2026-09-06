@@ -116,8 +116,15 @@ python -m research.publication_gate --primary ren --second friend --k 5 \
 `run_judges` supports `--resume`, `gen_corpus` uses atomic checkpoints when
 called with `--append`, and `label` automatically resumes from existing rows,
 so a dropped connection or a coffee break doesn't cost you the run. Resume
-also checks the canonical corpus digest; legacy or mismatched judge/label rows
-are refused rather than silently reused against a regenerated target response.
+also checks the canonical corpus digest and, for manifest-backed judge
+collection, the prompt/protocol/token-budget provenance; legacy or mismatched
+judge/label rows are refused rather than silently reused against a regenerated
+target response. Use `--overwrite` to start a fresh evidence file when an old
+snapshot lacks those fields.
+Both collection commands accept `--fail-on-error`: they still write the
+recoverable artifact, then exit with status 3 when any target or judge call is
+recorded as an operational failure. This makes provider outages visible to CI
+without destroying partial evidence.
 The checked-in manifest is authoritative for default corpus scope/settings,
 judge matrix/repeat count, and blinded human-label assignment. To run a
 deliberate exploratory deviation, pass `--manifest ""`; otherwise those

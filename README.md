@@ -128,8 +128,9 @@ recorder. Harness success is evaluated from ordered tool chains and
 scenario-specific outcomes (for example, a real secret reaching an email or an
 out-of-boundary path being read), not merely from tool names appearing in a
 trace. Harness JSON is versioned and summarized, written atomically with
-private permissions, includes assistant messages and ordered tool events, and
-redacts sensitive arguments and side-effect payloads before serialization.
+private permissions, includes assistant messages and ordered tool events,
+records non-secret live-run provenance, and redacts sensitive arguments and
+side-effect payloads before serialization.
 
 ---
 
@@ -272,6 +273,7 @@ docs/RESULTS.md              provenance: pilot scan vs frozen study snapshot
 | v1.2 | interactive model picker (local Ollama + cloud), judge-must-be-stronger rule enforced |
 | v1.3 | installable CLI, validated config, run provenance, resumable scan checkpoints, agent harness, research integrity gates |
 | v1.4 | package-owned scanner, shared provider boundary, outcome-aware harness traces, blinded study-label packets |
+| v1.5 | strict judge-output parsing, protocol/provider provenance for study evidence, safer collection resume semantics |
 
 ---
 
@@ -285,7 +287,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-195 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+212 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 

@@ -6,4 +6,4 @@ live at the repo root, but import these package modules so the detector and
 artifact formats have one source of truth.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"

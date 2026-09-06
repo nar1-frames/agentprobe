@@ -48,6 +48,8 @@ def _integer(value: Any, name: str, minimum: int, maximum: int) -> int:
 
 
 def _positive_number(value: Any, name: str, maximum=None) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be numeric")
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -73,6 +75,8 @@ def _validate_model_block(config: Mapping[str, Any], name: str) -> float:
     key_env = block.get("api_key_env")
     if key_env is not None and (not isinstance(key_env, str) or not key_env.strip()):
         raise ValueError(f"{name}.api_key_env must be a non-empty string or null")
+    if provider in {"groq", "openai"} and not isinstance(key_env, str):
+        raise ValueError(f"{name}.api_key_env is required for {provider} provider")
     base_url = block.get("base_url")
     if base_url is None:
         if provider == "custom":
@@ -83,6 +87,8 @@ def _validate_model_block(config: Mapping[str, Any], name: str) -> float:
         parsed_url = urlparse(base_url)
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
             raise ValueError(f"{name}.base_url must be a non-empty HTTP(S) URL")
+        if parsed_url.username is not None or parsed_url.password is not None:
+            raise ValueError(f"{name}.base_url must not contain embedded credentials")
     timeout = _positive_number(
         block.get("timeout_seconds", 60), f"{name}.timeout_seconds", 3600
     )

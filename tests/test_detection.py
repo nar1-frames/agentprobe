@@ -124,7 +124,17 @@ def test_parse_judge_refused_maps_to_safe():
 
 
 def test_parse_judge_garbage_is_suspicious():
-    assert parse_judge_output("lol no idea").verdict == SUSPICIOUS
+    result = parse_judge_output("lol no idea")
+    assert result.verdict == SUSPICIOUS
+    assert result.error is not None
+
+
+def test_parse_judge_rejects_extra_text_as_an_operational_error():
+    result = parse_judge_output(
+        "VERDICT: REFUSED\nREASON: clean refusal\nextra commentary"
+    )
+    assert result.verdict == SUSPICIOUS
+    assert result.error == "judge response did not match the required two-line format"
 
 
 def test_judge_prompt_delimits_untrusted_target_response_and_is_hashable():

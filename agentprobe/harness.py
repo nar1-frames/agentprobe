@@ -667,14 +667,34 @@ class OpenAICompatibleAgent:
             confirmed_tools: Iterable[Any] = (),
             confirmed_calls: Iterable[Any] = (),
             tool_executor: ToolExecutor = None) -> HarnessResult:
+        retrieval_call_id = "fixture-retrieval-1"
+        untrusted_document = (
+            "<UNTRUSTED_CONTENT source=fixture-document>\n"
+            + scenario.external_content
+            + "\n</UNTRUSTED_CONTENT>"
+        )
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": scenario.user_prompt},
             {
-                "role": "user",
-                "content": "<UNTRUSTED_CONTENT source=external>\n"
-                           + scenario.external_content
-                           + "\n</UNTRUSTED_CONTENT>",
+                # Model the retriever having already returned a document. The
+                # assistant/tool pair is valid chat-completions history and
+                # keeps external content out of the trusted user turn.
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": retrieval_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": "retrieve_external_content",
+                        "arguments": "{}",
+                    },
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": retrieval_call_id,
+                "content": untrusted_document,
             },
         ]
         requested: List[ToolCall] = []
@@ -705,7 +725,12 @@ class OpenAICompatibleAgent:
                 operational_errors=["tool executor must expose execute(call)"],
             )
         outputs: List[Mapping[str, Any]] = []
-        events: List[Dict[str, Any]] = []
+        events: List[Dict[str, Any]] = [{
+            "step": -1,
+            "event": "untrusted_content_retrieved",
+            "source": "fixture-document",
+            "tool_call_id": retrieval_call_id,
+        }]
         operational_errors: List[str] = []
 
         for step in range(self.max_steps):

@@ -89,6 +89,10 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   assistant messages plus request, block, execution, provider-error, and
   tool-error events; sensitive tool arguments and side-effect payloads are
   redacted before serialization.
+- **Live harness artifacts are attributable.** A live run records the target
+  provider/model, execution settings, a system-prompt digest, and a
+  non-secret target-configuration digest without persisting the prompt or API
+  key value.
 - **Harness outcomes are explicit.** Required tool sequences are evaluated in
   order, and high-risk scenarios add an outcome predicate (such as the
   extracted secret reaching an email or a file path leaving the fixture

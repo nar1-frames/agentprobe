@@ -2,6 +2,7 @@
   "protocol_version": "1.1",
   "corpus": {
     "target_models": ["llama-3.1-8b-instant"],
+    "target_provider": "groq",
     "responses_per_target": 49,
     "target_temperature": 0.0,
     "target_max_tokens": 512
@@ -9,6 +10,8 @@
   "attack_library_sha256": "1b268572becf8cb8ae3daa7a8e6f44da1e8f0eefb2866542384731cfbc5965d6",
   "judge_prompt_version": "2.0",
   "judge_prompt_sha256": "af30a365c7970d831cb95d74c7fa187f1b52655bf30e533970e51ac71d94a277",
+  "judge_provider": "groq",
+  "judge_max_tokens": 120,
   "judges": [
     {"model": "llama-3.1-8b-instant", "temperature": 0.0},
     {"model": "llama-3.1-8b-instant", "temperature": 0.7},

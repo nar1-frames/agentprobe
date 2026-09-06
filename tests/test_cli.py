@@ -89,3 +89,5 @@ def test_live_harness_cli_is_explicit_and_uses_configured_target(monkeypatch, tm
     report = json.loads(path.read_text(encoding="utf-8"))
     assert report["mode"] == "live:guarded"
     assert received["model"] == "fixture-3b"
+    assert report["run"]["target_model"] == "fixture-3b"
+    assert report["run"]["target_provider"] == "ollama"

@@ -180,6 +180,20 @@ def test_publication_gate_requires_frozen_target_generation_settings():
                for reason in report["blocking_reasons"])
 
 
+def test_publication_gate_requires_manifest_provider_provenance():
+    report = check_readiness(
+        _corpus(), _judgements(), _labels(), "ren", "friend", 5,
+        expected_target_provider="groq",
+        expected_judge_provider="groq",
+        expected_judge_max_tokens=120,
+        expected_protocol_manifest_sha256="a" * 64,
+    )
+    assert report["ready"] is False
+    assert any("target provider metadata" in reason for reason in report["blocking_reasons"])
+    assert any("judge provider metadata" in reason for reason in report["blocking_reasons"])
+    assert any("protocol manifest metadata" in reason for reason in report["blocking_reasons"])
+
+
 def test_publication_gate_rejects_evidence_from_a_different_corpus():
     corpus = _corpus()
     judgements = _judgements()

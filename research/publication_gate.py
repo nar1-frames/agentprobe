@@ -5,6 +5,7 @@ import csv
 import json
 import math
 import os
+import re
 from collections import defaultdict
 
 from attacks.library import ATTACK_LIBRARY
@@ -63,7 +64,11 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                     expected_target_temperature=None,
                     expected_target_max_tokens=None,
                     expected_second_overlap_fraction=None,
-                    expected_second_subset_seed=None):
+                    expected_second_subset_seed=None,
+                    expected_target_provider=None,
+                    expected_judge_provider=None,
+                    expected_judge_max_tokens=None,
+                    expected_protocol_manifest_sha256=None):
     """Return explicit blocking reasons; do not silently grade incomplete data."""
 
     if not isinstance(expected_k, int) or isinstance(expected_k, bool) or expected_k < 1:
@@ -99,6 +104,17 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                 f"corpus target models {sorted(observed_targets, key=str)} do not match "
                 f"manifest {sorted(expected_targets)}"
             )
+    if expected_target_provider is not None:
+        observed_providers = {
+            row.get("target_provider") for row in corpus
+            if isinstance(row, dict) and isinstance(row.get("target_provider"), str)
+        }
+        if observed_providers != {expected_target_provider}:
+            blocking.append(
+                "corpus target provider metadata does not match the manifest "
+                f"(observed {sorted(observed_providers, key=str)!r}, expected "
+                f"{expected_target_provider!r})"
+            )
     if expected_target_temperature is not None:
         raw_temperatures = [
             row.get("target_temperature") if isinstance(row, dict) else None
@@ -109,7 +125,10 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         except (TypeError, ValueError):
             observed_temperatures = []
         if (len(observed_temperatures) != len(corpus)
-                or set(observed_temperatures) != {float(expected_target_temperature)}):
+                or any(
+                    temperature != float(expected_target_temperature)
+                    for temperature in observed_temperatures
+                )):
             blocking.append(
                 "corpus target_temperature metadata does not match the manifest "
                 f"({len(observed_temperatures)}/{len(corpus)} rows present, expected "
@@ -121,11 +140,34 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
             for row in corpus
         ]
         if (len(observed_max_tokens) != len(corpus)
-                or set(observed_max_tokens) != {expected_target_max_tokens}):
+                or any(value != expected_target_max_tokens for value in observed_max_tokens)):
             blocking.append(
                 "corpus max_tokens metadata does not match the manifest "
-                f"({sorted(set(observed_max_tokens), key=str)!r} observed, "
+                f"({observed_max_tokens!r} observed, "
                 f"expected {expected_target_max_tokens})"
+            )
+    if expected_protocol_manifest_sha256 is not None:
+        corpus_protocols = [
+            row.get("protocol_manifest_sha256") if isinstance(row, dict) else None
+            for row in corpus
+        ]
+        if (len(corpus_protocols) != len(corpus)
+                or any(value != expected_protocol_manifest_sha256 for value in corpus_protocols)):
+            blocking.append(
+                "corpus protocol manifest metadata does not match the study manifest"
+            )
+        target_config_digests = [
+            row.get("target_config_sha256") if isinstance(row, dict) else None
+            for row in corpus
+        ]
+        if (len(target_config_digests) != len(corpus)
+                or not all(
+                    isinstance(digest, str)
+                    and re.fullmatch(r"[0-9a-f]{64}", digest)
+                    for digest in target_config_digests
+                )):
+            blocking.append(
+                "corpus target provider configuration provenance is missing or invalid"
             )
     if expected_attack_library_sha256 is not None:
         actual_attack_digest = attack_library_digest(ATTACK_LIBRARY)
@@ -153,17 +195,54 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         ]
         if (expected_judge_prompt_version is not None
                 and (len(prompt_versions) != len(judgements)
-                     or set(prompt_versions) != {expected_judge_prompt_version})):
+                     or any(value != expected_judge_prompt_version for value in prompt_versions))):
             blocking.append(
                 "judge prompt version metadata does not match the study manifest "
                 f"(expected {expected_judge_prompt_version})"
             )
         if (expected_judge_prompt_sha256 is not None
                 and (len(prompt_digests) != len(judgements)
-                     or set(prompt_digests) != {expected_judge_prompt_sha256})):
+                     or any(value != expected_judge_prompt_sha256 for value in prompt_digests))):
             blocking.append(
                 "judge prompt digest metadata does not match the study manifest"
             )
+    if expected_judge_provider is not None:
+        judge_providers = [
+            row.get("judge_provider") if isinstance(row, dict) else None
+            for row in judgements
+        ]
+        if (len(judge_providers) != len(judgements)
+                or any(value != expected_judge_provider for value in judge_providers)):
+            blocking.append("judge provider metadata does not match the study manifest")
+    if expected_judge_max_tokens is not None:
+        judge_token_budgets = [
+            row.get("judge_max_tokens") if isinstance(row, dict) else None
+            for row in judgements
+        ]
+        if (len(judge_token_budgets) != len(judgements)
+                or any(value != expected_judge_max_tokens for value in judge_token_budgets)):
+            blocking.append("judge max_tokens metadata does not match the study manifest")
+    if expected_protocol_manifest_sha256 is not None:
+        judge_protocols = [
+            row.get("protocol_manifest_sha256") if isinstance(row, dict) else None
+            for row in judgements
+        ]
+        if (len(judge_protocols) != len(judgements)
+                or any(value != expected_protocol_manifest_sha256 for value in judge_protocols)):
+            blocking.append(
+                "judge protocol manifest metadata does not match the study manifest"
+            )
+        judge_config_digests = [
+            row.get("judge_config_sha256") if isinstance(row, dict) else None
+            for row in judgements
+        ]
+        if (len(judge_config_digests) != len(judgements)
+                or not all(
+                    isinstance(digest, str)
+                    and re.fullmatch(r"[0-9a-f]{64}", digest)
+                    for digest in judge_config_digests
+                )):
+            blocking.append("judge configuration provenance is missing or invalid")
 
     if judgements:
         judge_digests = [
@@ -356,6 +435,10 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         "expected_judge_prompt_sha256": expected_judge_prompt_sha256,
         "expected_target_temperature": expected_target_temperature,
         "expected_target_max_tokens": expected_target_max_tokens,
+        "expected_target_provider": expected_target_provider,
+        "expected_judge_provider": expected_judge_provider,
+        "expected_judge_max_tokens": expected_judge_max_tokens,
+        "expected_protocol_manifest_sha256": expected_protocol_manifest_sha256,
         "corpus_sha256": corpus_sha256,
     }
 
@@ -415,6 +498,10 @@ def main():
     expected_judge_prompt_sha256 = (manifest or {}).get("judge_prompt_sha256")
     expected_target_temperature = (manifest or {}).get("corpus", {}).get("target_temperature")
     expected_target_max_tokens = (manifest or {}).get("corpus", {}).get("target_max_tokens")
+    expected_target_provider = (manifest or {}).get("corpus", {}).get("target_provider")
+    expected_judge_provider = (manifest or {}).get("judge_provider")
+    expected_judge_max_tokens = (manifest or {}).get("judge_max_tokens")
+    expected_protocol_manifest_sha256 = manifest_digest(manifest) if manifest else None
     try:
         report = check_readiness(
             corpus, judgements, _read_labels(args.labels), primary, second,
@@ -424,6 +511,10 @@ def main():
             expected_target_temperature, expected_target_max_tokens,
             (manifest or {}).get("labels", {}).get("second_overlap_fraction"),
             (manifest or {}).get("labels", {}).get("second_subset_seed"),
+            expected_target_provider,
+            expected_judge_provider,
+            expected_judge_max_tokens,
+            expected_protocol_manifest_sha256,
         )
     except ValueError as exc:
         ap.error(str(exc))

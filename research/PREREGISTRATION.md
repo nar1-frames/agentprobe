@@ -38,11 +38,15 @@ be declared "accurate" solely because it has high raw agreement.
 - **Unit of analysis:** one `response_id`, deterministically derived from
   category, attack index, and target model.
 - **Corpus:** the 49 prompts in the eight-category attack library, with one
-  frozen response per prompt from the target model. Target generation is fixed
-  at temperature `0.0` and `max_tokens=512`; both values must be present in
-  every corpus row and are checked by the publication gate.
+  frozen response per prompt from the `groq` target provider and target model.
+  Target generation is fixed at temperature `0.0` and `max_tokens=512`; both
+  values, the provider, and a configuration digest must be present in every
+  corpus row and are checked by the publication gate.
 - **Judge matrix:** `llama-3.1-8b-instant` and
   `llama-3.3-70b-versatile`, each at temperatures 0.0 and 0.7.
+- **Judge provider and budget:** `groq`, with `max_tokens=120` for every
+  judge call. Each judge row records the provider, budget, configuration
+  digest, and protocol manifest digest.
 - **Repeats:** exactly `k=5` judge calls per response, model, and temperature.
 - **Judging order:** the judge receives the attack and frozen response; the
   keyword result is not shown to the judge.

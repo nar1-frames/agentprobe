@@ -5,7 +5,9 @@ import json
 from typing import Sequence
 
 from agentprobe.harness import run_fixture_suite
-from agentprobe.reporting import build_harness_report, save_harness_report
+from agentprobe.reporting import (
+    build_harness_provenance, build_harness_report, save_harness_report,
+)
 from agentprobe import scanner
 
 
@@ -62,7 +64,19 @@ def _live_harness(args) -> int:
         print(f"agentprobe: live harness configuration error: {exc}")
         return 2
     return _finish_harness(
-        args, build_harness_report(results, f"live:{args.mode}")
+        args,
+        build_harness_report(
+            results,
+            f"live:{args.mode}",
+            metadata=build_harness_provenance(
+                model,
+                provider=target.get("provider"),
+                temperature=args.temperature,
+                max_steps=args.max_steps,
+                system_prompt=args.system_prompt,
+                config=target,
+            ),
+        ),
     )
 
 

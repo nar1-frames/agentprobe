@@ -216,6 +216,19 @@ def run_scan(target, judge, attack_library, rate_limit, max_tokens,
     )
 
 
+def _selected_run_config(config, target, judge):
+    """Bind picker-selected provider/model identity into report provenance."""
+
+    selected = dict(config)
+    for role, model in (("target", target), ("judge", judge)):
+        block = dict(config.get(role, {}))
+        for key in ("provider", "model", "api_key_env", "base_url"):
+            if key in model:
+                block[key] = model[key]
+        selected[role] = block
+    return selected
+
+
 # ============================================================
 # MAIN
 # ============================================================
@@ -272,12 +285,12 @@ def main():
         target["model"], judge["model"],
         target_provider=target.get("provider"),
         judge_provider=judge.get("provider"),
-        config=config, attack_library=attack_library,
+        config=_selected_run_config(config, target, judge),
         judge_prompt_version=JUDGE_PROMPT_VERSION,
         judge_prompt_sha256=JUDGE_PROMPT_SHA256,
     )
     json_report = build_json_report(
-        results, target["label"], judge["label"], metadata=report_metadata
+        results, target["model"], judge["model"], metadata=report_metadata
     )
     run_id = json_report["run"]["run_id"]
     if report_format in {"html", "both"}:

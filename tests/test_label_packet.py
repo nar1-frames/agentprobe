@@ -144,3 +144,12 @@ def test_manifest_backed_second_label_packet_uses_preregistered_subset(tmp_path)
     key_data = json.loads(key.read_text(encoding="utf-8"))
     assert len(key_data["items"]) == len(expected)
     assert key_data["subset_seed"] == manifest["labels"]["second_subset_seed"]
+
+
+def test_import_rejects_packet_from_a_different_protocol_manifest(tmp_path):
+    corpus, digest, packet, key = _export(tmp_path)
+    with pytest.raises(ValueError, match="different protocol manifest"):
+        read_packet_answers(
+            str(packet), str(key), digest, corpus=corpus,
+            expected_protocol_manifest_sha256="a" * 64,
+        )

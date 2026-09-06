@@ -3,7 +3,7 @@ import json
 from research.run_judges import load_done_keys, repair_error_rows
 
 
-def test_resume_ignores_failed_rows_until_explicit_repair(tmp_path):
+def test_resume_does_not_duplicate_failed_rows_until_explicit_repair(tmp_path):
     path = tmp_path / "judgements.jsonl"
     good = {
         "response_id": "ok", "judge_model": "judge", "temperature": 0,
@@ -15,7 +15,10 @@ def test_resume_ignores_failed_rows_until_explicit_repair(tmp_path):
     }
     path.write_text("\n".join(json.dumps(row) for row in (good, failed)) + "\n")
 
-    assert load_done_keys(path) == {("ok", "judge", 0.0, 0)}
+    assert load_done_keys(path) == {
+        ("ok", "judge", 0.0, 0),
+        ("failed", "judge", 0.0, 0),
+    }
     repaired, archive = repair_error_rows(path)
 
     assert repaired == 1

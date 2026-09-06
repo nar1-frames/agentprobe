@@ -50,7 +50,7 @@ from research._common import canonical_digest, read_jsonl
 from research.protocol import (
     DEFAULT_MANIFEST_PATH,
     expected_second_label_ids,
-    load_manifest,
+    load_manifest, manifest_digest,
 )
 from research.label_packet import (
     append_imported_labels,
@@ -211,6 +211,9 @@ def main():
             packet_rows = read_packet_answers(
                 args.import_packet, key_path, corpus_sha256, labeler=args.labeler,
                 corpus=corpus,
+                expected_protocol_manifest_sha256=(
+                    manifest_digest(manifest) if manifest else None
+                ),
             )
             count = append_imported_labels(args.out, packet_rows, corpus_sha256)
         except (OSError, ValueError, csv.Error, json.JSONDecodeError) as exc:

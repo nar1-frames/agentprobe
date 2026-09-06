@@ -63,6 +63,24 @@ def test_config_requires_and_validates_custom_provider_endpoint():
     assert validate_config(config)["target"]["base_url"] == "https://model.example.test/v1"
 
 
+@pytest.mark.parametrize("provider", ["groq", "openai"])
+def test_config_requires_api_key_environment_for_cloud_provider(provider):
+    config = _config()
+    config["target"] = {"provider": provider, "model": "target-3b"}
+    with pytest.raises(ValueError, match="api_key_env is required"):
+        validate_config(config)
+
+
+def test_config_rejects_credentials_embedded_in_endpoint():
+    config = _config()
+    config["target"] = {
+        "provider": "custom", "model": "target-3b",
+        "base_url": "https://user:password@model.example.test/v1",
+    }
+    with pytest.raises(ValueError, match="embedded credentials"):
+        validate_config(config)
+
+
 def test_config_accepts_explicit_strength_rank_and_retry_settings():
     config = _config()
     config["target"]["strength_rank"] = 1
@@ -103,6 +121,17 @@ def test_config_rejects_invalid_model_temperature(section):
     config = _config()
     config[section]["temperature"] = 2.1
     with pytest.raises(ValueError, match="temperature"):
+        validate_config(config)
+
+
+def test_config_rejects_boolean_numeric_settings():
+    config = _config()
+    config["target"]["temperature"] = True
+    with pytest.raises(ValueError, match="temperature"):
+        validate_config(config)
+    config = _config()
+    config["scan"]["rate_limit_seconds"] = False
+    with pytest.raises(ValueError, match="rate_limit_seconds"):
         validate_config(config)
 
 

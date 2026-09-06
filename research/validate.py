@@ -62,6 +62,11 @@ def validate_corpus(corpus, attack_library=None):
         if not isinstance(row["target_model"], str) or not row["target_model"].strip():
             errors.append(f"corpus row {index}: target_model must be a non-empty string")
             continue
+        if "target_provider" in row and (
+                not isinstance(row["target_provider"], str)
+                or not row["target_provider"].strip()
+        ):
+            errors.append(f"corpus row {index}: target_provider must be a non-empty string")
         if rid in ids:
             errors.append(f"corpus row {index}: duplicate response_id {rid}")
         ids.add(rid)
@@ -92,6 +97,17 @@ def validate_corpus(corpus, attack_library=None):
                 _integer(row["max_tokens"], "max_tokens", minimum=1)
             except (TypeError, ValueError):
                 errors.append(f"corpus row {index}: max_tokens is not a positive integer")
+        if "target_config_sha256" in row and (
+                not isinstance(row["target_config_sha256"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", row["target_config_sha256"])
+        ):
+            errors.append(f"corpus row {index}: target_config_sha256 is invalid")
+        if "protocol_manifest_sha256" in row and (
+                row["protocol_manifest_sha256"] is not None
+                and (not isinstance(row["protocol_manifest_sha256"], str)
+                     or not re.fullmatch(r"[0-9a-f]{64}", row["protocol_manifest_sha256"]))
+        ):
+            errors.append(f"corpus row {index}: protocol_manifest_sha256 is invalid")
         if attack_library is not None:
             attacks = attack_library.get(row["category"], [])
             if attack_index < 0 or attack_index >= len(attacks):
@@ -167,6 +183,24 @@ def validate_judgements(judgements, corpus_ids, corpus_by_id=None, corpus_sha256
             errors.append(f"judgement row {index}: corpus_sha256 is invalid")
         elif corpus_sha256 is not None and row_digest != corpus_sha256:
             errors.append(f"judgement row {index}: corpus_sha256 does not match corpus")
+        if "judge_max_tokens" in row:
+            try:
+                _integer(row["judge_max_tokens"], "judge_max_tokens", minimum=1)
+            except (TypeError, ValueError):
+                errors.append(
+                    f"judgement row {index}: judge_max_tokens is not positive integer"
+                )
+        if "judge_config_sha256" in row and (
+                not isinstance(row["judge_config_sha256"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", row["judge_config_sha256"])
+        ):
+            errors.append(f"judgement row {index}: judge_config_sha256 is invalid")
+        if "protocol_manifest_sha256" in row and (
+                row["protocol_manifest_sha256"] is not None
+                and (not isinstance(row["protocol_manifest_sha256"], str)
+                     or not re.fullmatch(r"[0-9a-f]{64}", row["protocol_manifest_sha256"]))
+        ):
+            errors.append(f"judgement row {index}: protocol_manifest_sha256 is invalid")
         if not 0 <= temp <= 2:
             errors.append(f"judgement row {index}: temperature must be between 0 and 2")
             continue
