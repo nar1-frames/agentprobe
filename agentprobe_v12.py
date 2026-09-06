@@ -40,6 +40,7 @@ import webbrowser
 from agentprobe.scanner import (
     build_client, filter_attacks, load_config,
     send_prompt, is_error_response, assess_vulnerability, calculate_finding_severity,
+    run_full_scan,
 )
 from report_html_v11 import generate_html_report, save_html_report
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
@@ -198,46 +199,21 @@ def run_scan(target, judge, attack_library, rate_limit, max_tokens,
              judge_max_tokens=120):
     target_client = build_client(target)
     judge_client = build_client(judge)
-    total = sum(len(v) for v in attack_library.values())
-
-    print("\n" + "=" * 60)
-    print(f"  TARGET: {target['label']}  ({target['provider']})")
-    print(f"  JUDGE:  {judge['label']}  ({judge['provider']})")
-    print(f"  {total} attacks across {len(attack_library)} categories")
-    print("=" * 60)
-
-    scan_results = {}
-    for category, attacks in attack_library.items():
-        print(f"\n[{category.upper()}] — {len(attacks)} prompts")
-        rows = []
-        for i, attack in enumerate(attacks):
-            prompt, severity = attack["prompt"], attack["severity"]
-            response = send_prompt(
-                target_client, target["model"], prompt, max_tokens=max_tokens,
-                temperature=target_temperature,
-                retries=retries, delay=retry_delay,
-            )
-            if is_error_response(response):
-                verdict = "SUSPICIOUS"
-                reason = response
-                method = "target-error"
-                finding = None
-            else:
-                verdict, reason, method = assess_vulnerability(
-                    target_client, target["model"], judge_client, judge["model"], prompt, response,
-                    judge_retries=retries, judge_retry_delay=retry_delay,
-                    judge_temperature=judge_temperature, judge_max_tokens=judge_max_tokens,
-                )
-                finding = None if method == "judge-error" else calculate_finding_severity(severity, verdict)
-            rows.append((attack, response, verdict, finding, reason, method))
-
-            emoji = VERDICT_EMOJI.get(verdict, "⚪")
-            sev = f"[{finding}]" if finding else ""
-            print(f"  {i+1}/{len(attacks)} {emoji} {verdict:<11} {sev:<10} "
-                  f"via {method:<9} — {prompt[:40]}...")
-            time.sleep(rate_limit)
-        scan_results[category] = rows
-    return scan_results
+    return run_full_scan(
+        target_client,
+        target["model"],
+        judge_client,
+        judge["model"],
+        attack_library,
+        rate_limit,
+        max_tokens=max_tokens,
+        retries=retries,
+        retry_delay=retry_delay,
+        target_temperature=target_temperature,
+        judge_temperature=judge_temperature,
+        judge_max_tokens=judge_max_tokens,
+        verbose=True,
+    )
 
 
 # ============================================================

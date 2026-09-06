@@ -153,6 +153,7 @@ def run_full_scan(
     run_metadata: Optional[Mapping[str, Any]] = None,
     checkpoint: Optional[ScanCheckpoint] = None,
     repair_errors: bool = False,
+    verbose: bool = False,
 ) -> dict[str, list[tuple[Any, ...]]]:
     """Run a scan, optionally checkpointing every completed attack."""
 
@@ -172,8 +173,17 @@ def run_full_scan(
             resume=resume,
         )
 
+    if verbose:
+        total = sum(len(attacks) for attacks in attack_library.values())
+        print(f"Target:   {target_model}")
+        print(f"Judge:    {judge_model}")
+        print(f"Prompts:  {total} across {len(attack_library)} categories")
+        print("=" * 60)
+
     scan_results: dict[str, list[tuple[Any, ...]]] = {}
     for category, attacks in attack_library.items():
+        if verbose:
+            print(f"\n[{category.upper()}] — {len(attacks)} prompts")
         category_results = []
         for position, attack in enumerate(attacks, start=1):
             attack_key = f"{category}:{attack.get('_library_index', position)}"
@@ -181,8 +191,12 @@ def run_full_scan(
                 row = checkpoint.row(attack_key)
                 if not (repair_errors and row[5] in ERROR_METHODS):
                     category_results.append(row)
+                    if verbose:
+                        print(f"  [resume] {attack_key} {row[2]} via {row[5]}")
                     continue
                 checkpoint.remove(attack_key)
+                if verbose:
+                    print(f"  [repair] {attack_key} retrying {row[5]}")
                 if row[5] == "judge-error" and not is_error_response(row[1]):
                     response = row[1]
                     verdict, reason, method = assess_vulnerability(
@@ -203,8 +217,15 @@ def run_full_scan(
                     repaired = (attack, response, verdict, finding, reason, method)
                     category_results.append(repaired)
                     checkpoint.record(category, repaired, position)
+                    if verbose:
+                        marker = {"VULNERABLE": "[VULN]", "PARTIAL": "[PART]",
+                                  "SUSPICIOUS": "[?]", "SAFE": "[safe]"}.get(verdict, "[?]")
+                        print(f"  {marker} {verdict} via {method}")
                     continue
 
+            if verbose:
+                print(f"  {position}/{len(attacks)} [{attack['severity']}] "
+                      f"{attack['prompt'][:50]}...")
             response = send_prompt(
                 target_client,
                 target_model,
@@ -236,6 +257,11 @@ def run_full_scan(
             category_results.append(row)
             if checkpoint is not None:
                 checkpoint.record(category, row, position)
+            if verbose:
+                marker = {"VULNERABLE": "[VULN]", "PARTIAL": "[PART]",
+                          "SUSPICIOUS": "[?]", "SAFE": "[safe]"}.get(verdict, "[?]")
+                finding_text = f"[{finding}]" if finding else ""
+                print(f"  {marker} {verdict} {finding_text} via {method}")
             time.sleep(rate_limit)
         scan_results[category] = category_results
         time.sleep(rate_limit)
