@@ -51,7 +51,7 @@ def test_harness_report_is_versioned_summarized_and_private(tmp_path):
         "controls": 1, "controls_passed": 1, "operational_errors": 1,
     }
     path = save_harness_report(report, str(tmp_path / "harness.json"))
-    assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.0"
+    assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.1"
     assert __import__("pathlib").Path(path).stat().st_mode & 0o077 == 0
 
 

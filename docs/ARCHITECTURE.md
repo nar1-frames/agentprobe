@@ -86,8 +86,14 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   duplicate or malformed function schemas, invalid call IDs, and
   non-JSON-safe arguments before a policy or executor can see them.
 - **Audit traces are ordered and data-minimized.** Harness JSON includes
-  request, block, execution, provider-error, and tool-error events; sensitive
-  tool arguments and side-effect payloads are redacted before serialization.
+  assistant messages plus request, block, execution, provider-error, and
+  tool-error events; sensitive tool arguments and side-effect payloads are
+  redacted before serialization.
+- **Harness outcomes are explicit.** Required tool sequences are evaluated in
+  order, and high-risk scenarios add an outcome predicate (such as the
+  extracted secret reaching an email or a file path leaving the fixture
+  boundary). A tool name appearing somewhere in a trace is not sufficient to
+  claim that the malicious objective was reached.
 - **Harness artifacts are durable evidence.** The CLI emits a versioned
   harness artifact with attack/control summaries and writes it atomically with
   private permissions; stdout JSON remains available for CI pipes.

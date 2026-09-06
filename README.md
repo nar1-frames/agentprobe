@@ -124,9 +124,12 @@ but still defaults to those fixture tools; connecting a real executor requires
 an explicit integration and separate least-privilege review. The same module
 also includes an OpenAI-compatible multi-step tool-calling loop, so a real
 agent client can be connected without bypassing the policy gate or trace
-recorder. Harness JSON is versioned and summarized, written atomically with
-private permissions, includes ordered tool events, and redacts sensitive
-arguments and side-effect payloads before serialization.
+recorder. Harness success is evaluated from ordered tool chains and
+scenario-specific outcomes (for example, a real secret reaching an email or an
+out-of-boundary path being read), not merely from tool names appearing in a
+trace. Harness JSON is versioned and summarized, written atomically with
+private permissions, includes assistant messages and ordered tool events, and
+redacts sensitive arguments and side-effect payloads before serialization.
 
 ---
 
@@ -268,6 +271,7 @@ docs/RESULTS.md              provenance: pilot scan vs frozen study snapshot
 | v1.1 | Mitigation Map + detection fixes (hedge-then-comply, token cap, retry) |
 | v1.2 | interactive model picker (local Ollama + cloud), judge-must-be-stronger rule enforced |
 | v1.3 | installable CLI, validated config, run provenance, resumable scan checkpoints, agent harness, research integrity gates |
+| v1.4 | package-owned scanner, shared provider boundary, outcome-aware harness traces, blinded study-label packets |
 
 ---
 
@@ -281,7 +285,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-191 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+195 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 
