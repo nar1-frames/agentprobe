@@ -68,6 +68,12 @@ For CI or a reproducible scripted run, use the target and judge from
 agentprobe scan --non-interactive --config config.yaml
 # For CI: write the reports, then exit nonzero if any provider call failed.
 agentprobe scan --non-interactive --config config.yaml --fail-on-error
+# For a long run: checkpoint each completed attack and resume after an
+# interruption. Checkpoints contain raw model responses; keep them local.
+agentprobe scan --non-interactive --config config.yaml \
+  --checkpoint reports/scan.checkpoint.json
+agentprobe scan --non-interactive --config config.yaml \
+  --checkpoint reports/scan.checkpoint.json --resume
 ```
 
 The automated path fails closed if it cannot verify that the configured judge
@@ -226,6 +232,7 @@ agentprobe/cli.py            installable CLI (`agentprobe scan` / `harness`)
 agentprobe/harness.py        offline end-to-end tool-use security harness
 agentprobe/config.py         validated config and bounded runtime settings
 agentprobe/reporting.py      versioned JSON + HTML provenance with atomic writes
+agentprobe/checkpoints.py     private, atomic, configuration-bound scan checkpoints
 agentprobe/models.py         shared model-size parsing and judge-strength gate
 attacks/library.py           the 49 attack prompts (pure data)
 report_html_v11.py, mitigations.py HTML report + canonical Mitigation Map
@@ -248,7 +255,7 @@ docs/RESULTS.md              provenance: pilot scan vs frozen study snapshot
 | v1.0 | professional HTML report + severity dashboard |
 | v1.1 | Mitigation Map + detection fixes (hedge-then-comply, token cap, retry) |
 | v1.2 | interactive model picker (local Ollama + cloud), judge-must-be-stronger rule enforced |
-| v1.3 | installable CLI, validated config, run provenance, agent harness, research integrity gates |
+| v1.3 | installable CLI, validated config, run provenance, resumable scan checkpoints, agent harness, research integrity gates |
 
 ---
 
@@ -262,7 +269,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-151 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+156 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 

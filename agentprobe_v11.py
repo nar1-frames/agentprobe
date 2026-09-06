@@ -31,6 +31,7 @@ from attacks.library import ATTACK_LIBRARY
 from report_html_v11 import generate_html_report, save_html_report
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from agentprobe.models import validate_judge_strength
+from agentprobe.checkpoints import ScanCheckpoint
 from agentprobe.config import load_config as _load_validated_config
 # v1.1.1: the detection engine now lives in agentprobe.detection (one source of
 # truth). keyword_check/llm_judge/calculate_finding_severity used to be defined
@@ -155,17 +156,51 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
                   attack_library, rate_limit, max_tokens=512, retries=2,
                   retry_delay=3, target_temperature=0.0,
                   judge_temperature=0.1,
-                  judge_max_tokens=120):
+                  judge_max_tokens=120, checkpoint_path=None, resume=False,
+                  run_metadata=None, checkpoint=None):
+    """Run the scan, optionally persisting one atomic checkpoint per attack.
+
+    ``checkpoint_path`` is intentionally opt-in so existing library callers
+    keep their behavior.  Once enabled, a checkpoint is bound to the target,
+    judge, filtered attack library, and supplied run metadata.  ``resume``
+    therefore cannot accidentally combine results produced by a different
+    configuration.
+    """
+
+    if checkpoint is not None and (checkpoint_path is not None or resume):
+        raise ValueError("pass either checkpoint or checkpoint_path/resume, not both")
+    if resume and not checkpoint_path and checkpoint is None:
+        raise ValueError("resume requires checkpoint_path")
+    if checkpoint is None and checkpoint_path:
+        checkpoint = ScanCheckpoint(
+            checkpoint_path,
+            target_model=target_model,
+            judge_model=judge_model,
+            attack_library=attack_library,
+            run_metadata=run_metadata,
+            resume=resume,
+        )
+
     total = sum(len(v) for v in attack_library.values())
     print(f"Target:   {target_model}")
     print(f"Judge:    {judge_model}")
     print(f"Prompts:  {total} across {len(attack_library)} categories")
+    if checkpoint is not None and resume:
+        print(f"Resuming checkpoint: {checkpoint.path}")
     print("=" * 60)
     scan_results = {}
     for category, attacks in attack_library.items():
         print(f"\n[{category.upper()}] — {len(attacks)} prompts")
         category_results = []
         for i, attack in enumerate(attacks):
+            attack_key = (
+                f"{category}:{attack.get('_library_index', i + 1)}"
+            )
+            if checkpoint is not None and checkpoint.has(attack_key):
+                row = checkpoint.row(attack_key)
+                category_results.append(row)
+                print(f"  [resume] {attack_key} {row[2]} via {row[5]}")
+                continue
             prompt = attack["prompt"]
             severity = attack["severity"]
             print(f"  {i+1}/{len(attacks)} [{severity}] {prompt[:50]}...")
@@ -186,7 +221,10 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
                     judge_temperature=judge_temperature, judge_max_tokens=judge_max_tokens,
                 )
                 finding_severity = None if method == "judge-error" else calculate_finding_severity(severity, verdict)
-            category_results.append((attack, response, verdict, finding_severity, reason, method))
+            row = (attack, response, verdict, finding_severity, reason, method)
+            category_results.append(row)
+            if checkpoint is not None:
+                checkpoint.record(category, row, i + 1)
             marker = {"VULNERABLE": "[VULN]", "PARTIAL": "[PART]",
                       "SUSPICIOUS": "[?]", "SAFE": "[safe]"}.get(verdict, "[?]")
             fs = f"[{finding_severity}]" if finding_severity else ""
@@ -194,11 +232,15 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
             time.sleep(rate_limit)
         scan_results[category] = category_results
         time.sleep(rate_limit)
+    if checkpoint is not None:
+        checkpoint.finalize()
     return scan_results
 
 
-def run_configured_scan(config_path="config.yaml"):
+def run_configured_scan(config_path="config.yaml", checkpoint_path=None, resume=False):
     """Run a reproducible scan from config without prompts or browser side effects."""
+    if resume and not checkpoint_path:
+        raise ValueError("resume requires checkpoint_path")
     config = load_config(config_path)
     target_cfg = config["target"]
     judge_cfg = config["judge"]
@@ -207,11 +249,38 @@ def run_configured_scan(config_path="config.yaml"):
     report_dir = output_cfg.get("report_dir", "reports")
     max_tokens = target_cfg.get("max_tokens", 512)
     validate_judge_strength(target_cfg["model"], judge_cfg["model"], target_cfg, judge_cfg)
-    target_client = build_client(target_cfg)
-    judge_client = build_client(judge_cfg)
     attack_library = filter_attacks(config)
     if not attack_library:
         raise ValueError("No attacks matched the configured scan filters")
+
+    report_format = output_cfg.get("report_format", "both")
+    report_metadata = build_run_metadata(
+        target_cfg["model"], judge_cfg["model"],
+        target_provider=target_cfg.get("provider"),
+        judge_provider=judge_cfg.get("provider"),
+        config=config, attack_library=attack_library,
+        judge_prompt_version=JUDGE_PROMPT_VERSION,
+        judge_prompt_sha256=JUDGE_PROMPT_SHA256,
+    )
+    checkpoint = None
+    if checkpoint_path:
+        checkpoint = ScanCheckpoint(
+            checkpoint_path,
+            target_model=target_cfg["model"],
+            judge_model=judge_cfg["model"],
+            attack_library=attack_library,
+            run_metadata=report_metadata,
+            resume=resume,
+        )
+        if resume:
+            # Preserve the original run ID and provenance in the final report.
+            report_metadata = dict(checkpoint.run_metadata)
+
+    # Validate the checkpoint before creating provider clients. A mismatched
+    # resume should fail without touching credentials or provider setup.
+    target_client = build_client(target_cfg)
+    judge_client = build_client(judge_cfg)
+
     results = run_full_scan(
         target_client,
         target_cfg["model"],
@@ -225,15 +294,7 @@ def run_configured_scan(config_path="config.yaml"):
         target_temperature=target_cfg.get("temperature", 0.0),
         judge_temperature=judge_cfg.get("temperature", 0.1),
         judge_max_tokens=judge_cfg.get("max_tokens", 120),
-    )
-    report_format = output_cfg.get("report_format", "both")
-    report_metadata = build_run_metadata(
-        target_cfg["model"], judge_cfg["model"],
-        target_provider=target_cfg.get("provider"),
-        judge_provider=judge_cfg.get("provider"),
-        config=config, attack_library=attack_library,
-        judge_prompt_version=JUDGE_PROMPT_VERSION,
-        judge_prompt_sha256=JUDGE_PROMPT_SHA256,
+        checkpoint=checkpoint,
     )
     json_report = build_json_report(
         results, target_cfg["model"], judge_cfg["model"], metadata=report_metadata

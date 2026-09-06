@@ -51,6 +51,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="exit nonzero after writing reports if a target or judge call failed",
     )
+    scan.add_argument(
+        "--checkpoint",
+        metavar="PATH",
+        help="atomically persist completed findings so an interrupted scan can resume",
+    )
+    scan.add_argument(
+        "--resume",
+        action="store_true",
+        help="resume or rebuild from the scan checkpoint supplied with --checkpoint",
+    )
     scan.set_defaults(handler="scan")
 
     harness = subparsers.add_parser("harness", help="run the offline agent security harness")
@@ -78,10 +88,17 @@ def main(argv: Sequence[str] = None) -> int:
     if args.handler == "harness":
         return _harness(args)
     if args.handler == "scan":
+        if args.resume and not args.checkpoint:
+            parser.error("--resume requires --checkpoint")
         if args.non_interactive:
             from agentprobe_v11 import run_configured_scan
             try:
-                run = run_configured_scan(args.config)
+                scan_kwargs = {}
+                if args.checkpoint is not None:
+                    scan_kwargs["checkpoint_path"] = args.checkpoint
+                if args.resume:
+                    scan_kwargs["resume"] = True
+                run = run_configured_scan(args.config, **scan_kwargs)
             except (OSError, KeyError, ValueError) as exc:
                 print(f"agentprobe: configuration/scan error: {exc}")
                 return 2
@@ -102,6 +119,8 @@ def main(argv: Sequence[str] = None) -> int:
         else:
             if args.fail_on_error:
                 parser.error("--fail-on-error requires --non-interactive")
+            if args.checkpoint or args.resume:
+                parser.error("--checkpoint/--resume currently require --non-interactive")
             # Keep the existing interactive UX while making it installable.
             from agentprobe_v12 import main as scan_main
             scan_main()

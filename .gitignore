@@ -9,6 +9,8 @@ __pycache__/
 
 # Reports contain scan results — keep local only
 reports/
+*.checkpoint.json
+*.checkpoint.jsonl
 .DS_Store
 
 # Disclosure workflow (v1.2) — real engagements + unpatched vulns stay local.

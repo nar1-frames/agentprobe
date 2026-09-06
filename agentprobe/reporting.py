@@ -39,7 +39,7 @@ def _digest(value):
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _attack_library_digest(attack_library):
+def attack_library_digest(attack_library):
     """Digest attack content, excluding runtime-only selection metadata."""
 
     canonical = {
@@ -50,6 +50,10 @@ def _attack_library_digest(attack_library):
         for category, attacks in attack_library.items()
     }
     return _digest(canonical)
+
+
+# Kept as a private compatibility alias for older internal callers.
+_attack_library_digest = attack_library_digest
 
 
 def build_run_metadata(target_model, judge_model, target_provider=None,
@@ -89,7 +93,7 @@ def build_run_metadata(target_model, judge_model, target_provider=None,
                 if key in scan:
                     metadata[f"scan_{key}"] = scan[key]
     if attack_library is not None:
-        metadata["attack_library_sha256"] = _attack_library_digest(attack_library)
+        metadata["attack_library_sha256"] = attack_library_digest(attack_library)
     return metadata
 
 

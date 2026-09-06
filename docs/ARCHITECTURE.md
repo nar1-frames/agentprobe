@@ -43,6 +43,13 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   config, selected attack library, and judge prompt. HTML and JSON paths share
   that run ID, and the HTML embeds the same provenance in metadata tags for
   independent review.
+- **Long scans are resumable without mixing evidence.** The optional scan
+  checkpoint is a versioned, private, atomically replaced JSON document. It is
+  written after each completed attack and is bound to the target, judge,
+  filtered attack-library digest, and behavioral configuration metadata. Resume
+  refuses an incompatible checkpoint and is idempotent for a completed one, so
+  a report can be rebuilt after an output failure; a process interruption
+  therefore loses at most the in-flight provider call.
 - **The empirical protocol is executable.** `research/study_manifest.json`
   pins the target scope, attack-library digest, judge matrix, repeat count, and
   labeler rules; the publication gate checks those requirements by default.

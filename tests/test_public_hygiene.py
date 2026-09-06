@@ -30,6 +30,11 @@ def test_public_hygiene_rejects_derived_research_artifacts():
     assert findings == ["data/judgements.jsonl.errors.jsonl: forbidden generated/private path"]
 
 
+def test_public_hygiene_rejects_scan_checkpoints():
+    findings = scan_content("scan.checkpoint.json", b'{"response": "sensitive"}')
+    assert findings == ["scan.checkpoint.json: forbidden generated/private path"]
+
+
 def test_current_tracked_tree_passes_public_hygiene():
     assert scan_public_tree(".") == []
 
