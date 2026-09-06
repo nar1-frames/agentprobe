@@ -74,6 +74,10 @@ agentprobe scan --non-interactive --config config.yaml \
   --checkpoint reports/scan.checkpoint.json
 agentprobe scan --non-interactive --config config.yaml \
   --checkpoint reports/scan.checkpoint.json --resume
+# Retry only checkpointed target/judge failures; successful findings remain
+# untouched, and judge-only failures reuse their original target response.
+agentprobe scan --non-interactive --config config.yaml \
+  --checkpoint reports/scan.checkpoint.json --resume --repair-errors
 ```
 
 The automated path fails closed if it cannot verify that the configured judge
@@ -270,7 +274,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-169 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+171 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 

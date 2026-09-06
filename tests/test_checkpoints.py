@@ -84,7 +84,7 @@ def test_scan_checkpoint_survives_interrupt_and_skips_completed_attack(tmp_path,
         if interrupted["value"] and len(calls) == 2:
             interrupted["value"] = False
             raise KeyboardInterrupt
-        return "I cannot help with that request."
+        return "I cannot help with that request. I will not provide it."
 
     monkeypatch.setattr(v11, "send_prompt", fake_send_prompt)
     monkeypatch.setattr(v11.time, "sleep", lambda _seconds: None)
@@ -107,3 +107,63 @@ def test_scan_checkpoint_survives_interrupt_and_skips_completed_attack(tmp_path,
     assert len(results["fixture"]) == 2
     assert calls == ["first", "second", "second"]
     assert json.loads(path.read_text(encoding="utf-8"))["status"] == "complete"
+
+
+def test_repair_errors_retries_only_failed_target_rows(tmp_path, monkeypatch):
+    library = _library()
+    path = tmp_path / "scan.checkpoint.json"
+    calls = []
+    first_attempt = {"value": True}
+
+    def fake_send_prompt(*args, **kwargs):
+        calls.append(args[2])
+        if args[2] == "first" and first_attempt["value"]:
+            first_attempt["value"] = False
+            return "[ERROR: transient provider failure]"
+        return "I cannot help with that request. I will not provide it."
+
+    monkeypatch.setattr(v11, "send_prompt", fake_send_prompt)
+    monkeypatch.setattr(v11.time, "sleep", lambda _seconds: None)
+    v11.run_full_scan(
+        object(), "target-3b", object(), "judge-8b", library, 0,
+        checkpoint_path=str(path), run_metadata={"config_sha256": "a" * 64},
+    )
+    repaired = v11.run_full_scan(
+        object(), "target-3b", object(), "judge-8b", library, 0,
+        checkpoint_path=str(path), resume=True, repair_errors=True,
+        run_metadata={"config_sha256": "a" * 64},
+    )
+    assert calls == ["first", "second", "first"]
+    assert repaired["fixture"][0][5] == "keyword"
+    assert json.loads(path.read_text(encoding="utf-8"))["status"] == "complete"
+
+
+def test_repair_judge_error_reuses_frozen_target_response(tmp_path, monkeypatch):
+    library_row = _library()["fixture"][0]
+    library = {"fixture": [library_row]}
+    path = tmp_path / "scan.checkpoint.json"
+    target_calls = []
+    judge_results = iter([
+        ("SUSPICIOUS", "judge unavailable", "judge-error"),
+        ("SAFE", "retry succeeded", "keyword"),
+    ])
+
+    monkeypatch.setattr(
+        v11, "send_prompt",
+        lambda *args, **kwargs: target_calls.append(args[2]) or "ambiguous response",
+    )
+    monkeypatch.setattr(v11, "assess_vulnerability", lambda *args, **kwargs: next(judge_results))
+    monkeypatch.setattr(v11.time, "sleep", lambda _seconds: None)
+
+    v11.run_full_scan(
+        object(), "target-3b", object(), "judge-8b", library, 0,
+        checkpoint_path=str(path), run_metadata={"config_sha256": "b" * 64},
+    )
+    repaired = v11.run_full_scan(
+        object(), "target-3b", object(), "judge-8b", library, 0,
+        checkpoint_path=str(path), resume=True, repair_errors=True,
+        run_metadata={"config_sha256": "b" * 64},
+    )
+    assert target_calls == [library_row["prompt"]]
+    assert repaired["fixture"][0][1] == "ambiguous response"
+    assert repaired["fixture"][0][5] == "keyword"

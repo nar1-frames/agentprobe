@@ -49,7 +49,9 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   filtered attack-library digest, and behavioral configuration metadata. Resume
   refuses an incompatible checkpoint and is idempotent for a completed one, so
   a report can be rebuilt after an output failure; a process interruption
-  therefore loses at most the in-flight provider call.
+  therefore loses at most the in-flight provider call. Explicit repair retries
+  only target/judge-error rows; a judge-only repair reuses the frozen target
+  response rather than silently sampling a replacement.
 - **The empirical protocol is executable.** `research/study_manifest.json`
   pins the target scope, attack-library digest, judge matrix, repeat count, and
   labeler rules; the publication gate checks those requirements by default.

@@ -38,12 +38,13 @@ def test_noninteractive_scan_passes_checkpoint_options(monkeypatch):
     monkeypatch.setattr(agentprobe_v11, "run_configured_scan", fake_run)
     assert main([
         "scan", "--non-interactive", "--checkpoint", "reports/run.checkpoint.json",
-        "--resume",
+        "--resume", "--repair-errors",
     ]) == 0
     assert received == {
         "config": "config.yaml",
         "checkpoint_path": "reports/run.checkpoint.json",
         "resume": True,
+        "repair_errors": True,
     }
 
 

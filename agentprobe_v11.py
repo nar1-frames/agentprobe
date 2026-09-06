@@ -157,7 +157,7 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
                   retry_delay=3, target_temperature=0.0,
                   judge_temperature=0.1,
                   judge_max_tokens=120, checkpoint_path=None, resume=False,
-                  run_metadata=None, checkpoint=None):
+                  run_metadata=None, checkpoint=None, repair_errors=False):
     """Run the scan, optionally persisting one atomic checkpoint per attack.
 
     ``checkpoint_path`` is intentionally opt-in so existing library callers
@@ -167,10 +167,12 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
     configuration.
     """
 
-    if checkpoint is not None and (checkpoint_path is not None or resume):
-        raise ValueError("pass either checkpoint or checkpoint_path/resume, not both")
+    if checkpoint is not None and checkpoint_path is not None:
+        raise ValueError("pass either checkpoint or checkpoint_path, not both")
     if resume and not checkpoint_path and checkpoint is None:
         raise ValueError("resume requires checkpoint_path")
+    if repair_errors and not resume:
+        raise ValueError("repair_errors requires resume")
     if checkpoint is None and checkpoint_path:
         checkpoint = ScanCheckpoint(
             checkpoint_path,
@@ -198,9 +200,36 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
             )
             if checkpoint is not None and checkpoint.has(attack_key):
                 row = checkpoint.row(attack_key)
-                category_results.append(row)
-                print(f"  [resume] {attack_key} {row[2]} via {row[5]}")
-                continue
+                if not (repair_errors and row[5] in {"target-error", "judge-error"}):
+                    category_results.append(row)
+                    print(f"  [resume] {attack_key} {row[2]} via {row[5]}")
+                    continue
+                checkpoint.remove(attack_key)
+                print(f"  [repair] {attack_key} retrying {row[5]}")
+
+                # A judge failure does not invalidate the target response.
+                # Preserve that response and retry only the judge stage so a
+                # repair cannot silently mix a new target sample into the
+                # existing evidence.
+                if row[5] == "judge-error" and not is_error_response(row[1]):
+                    response = row[1]
+                    verdict, reason, method = assess_vulnerability(
+                        target_client, target_model, judge_client, judge_model,
+                        attack["prompt"], response,
+                        judge_retries=retries, judge_retry_delay=retry_delay,
+                        judge_temperature=judge_temperature,
+                        judge_max_tokens=judge_max_tokens,
+                    )
+                    finding_severity = (
+                        None if method == "judge-error"
+                        else calculate_finding_severity(attack["severity"], verdict)
+                    )
+                    repaired_row = (
+                        attack, response, verdict, finding_severity, reason, method
+                    )
+                    category_results.append(repaired_row)
+                    checkpoint.record(category, repaired_row, i + 1)
+                    continue
             prompt = attack["prompt"]
             severity = attack["severity"]
             print(f"  {i+1}/{len(attacks)} [{severity}] {prompt[:50]}...")
@@ -237,10 +266,13 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
     return scan_results
 
 
-def run_configured_scan(config_path="config.yaml", checkpoint_path=None, resume=False):
+def run_configured_scan(config_path="config.yaml", checkpoint_path=None, resume=False,
+                        repair_errors=False):
     """Run a reproducible scan from config without prompts or browser side effects."""
     if resume and not checkpoint_path:
         raise ValueError("resume requires checkpoint_path")
+    if repair_errors and not resume:
+        raise ValueError("repair_errors requires resume")
     config = load_config(config_path)
     target_cfg = config["target"]
     judge_cfg = config["judge"]
@@ -295,6 +327,8 @@ def run_configured_scan(config_path="config.yaml", checkpoint_path=None, resume=
         judge_temperature=judge_cfg.get("temperature", 0.1),
         judge_max_tokens=judge_cfg.get("max_tokens", 120),
         checkpoint=checkpoint,
+        resume=resume,
+        repair_errors=repair_errors,
     )
     json_report = build_json_report(
         results, target_cfg["model"], judge_cfg["model"], metadata=report_metadata

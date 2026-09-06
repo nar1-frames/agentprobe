@@ -274,6 +274,17 @@ class ScanCheckpoint:
         self.state["updated_at"] = _utc_now()
         _write_atomic(self.path, self.state)
 
+    def remove(self, key: str) -> None:
+        """Remove one checkpointed row so an operational failure can retry."""
+
+        if key not in self._records:
+            raise CheckpointError(f"no checkpointed result for {key}")
+        del self._records[key]
+        self.state["results"] = list(self._records.values())
+        self.state["status"] = "in_progress"
+        self.state["updated_at"] = _utc_now()
+        _write_atomic(self.path, self.state)
+
     def finalize(self) -> None:
         if set(self._records) != self._attack_ids:
             missing = sorted(self._attack_ids - set(self._records))

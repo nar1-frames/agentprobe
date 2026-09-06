@@ -64,6 +64,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="resume or rebuild from the scan checkpoint supplied with --checkpoint",
     )
+    scan.add_argument(
+        "--repair-errors",
+        action="store_true",
+        help="with --resume, retry checkpointed target/judge failures only",
+    )
     scan.set_defaults(handler="scan")
 
     harness = subparsers.add_parser("harness", help="run the offline agent security harness")
@@ -93,6 +98,8 @@ def main(argv: Sequence[str] = None) -> int:
     if args.handler == "scan":
         if args.resume and not args.checkpoint:
             parser.error("--resume requires --checkpoint")
+        if args.repair_errors and not args.resume:
+            parser.error("--repair-errors requires --resume")
         if args.non_interactive:
             from agentprobe_v11 import run_configured_scan
             try:
@@ -101,6 +108,8 @@ def main(argv: Sequence[str] = None) -> int:
                     scan_kwargs["checkpoint_path"] = args.checkpoint
                 if args.resume:
                     scan_kwargs["resume"] = True
+                if args.repair_errors:
+                    scan_kwargs["repair_errors"] = True
                 run = run_configured_scan(args.config, **scan_kwargs)
             except (OSError, KeyError, ValueError) as exc:
                 print(f"agentprobe: configuration/scan error: {exc}")
@@ -122,8 +131,10 @@ def main(argv: Sequence[str] = None) -> int:
         else:
             if args.fail_on_error:
                 parser.error("--fail-on-error requires --non-interactive")
-            if args.checkpoint or args.resume:
-                parser.error("--checkpoint/--resume currently require --non-interactive")
+            if args.checkpoint or args.resume or args.repair_errors:
+                parser.error(
+                    "--checkpoint/--resume/--repair-errors currently require --non-interactive"
+                )
             # Keep the existing interactive UX while making it installable.
             from agentprobe_v12 import main as scan_main
             scan_main()
