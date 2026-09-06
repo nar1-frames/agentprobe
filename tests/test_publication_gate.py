@@ -194,6 +194,15 @@ def test_publication_gate_requires_manifest_provider_provenance():
     assert any("protocol manifest metadata" in reason for reason in report["blocking_reasons"])
 
 
+def test_publication_gate_requires_labeling_guide_provenance():
+    report = check_readiness(
+        _corpus(), _judgements(), _labels(), "ren", "friend", 5,
+        expected_labeling_guide_sha256="a" * 64,
+    )
+    assert report["ready"] is False
+    assert any("labeling guide" in reason for reason in report["blocking_reasons"])
+
+
 def test_publication_gate_rejects_evidence_from_a_different_corpus():
     corpus = _corpus()
     judgements = _judgements()

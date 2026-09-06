@@ -68,7 +68,8 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                     expected_target_provider=None,
                     expected_judge_provider=None,
                     expected_judge_max_tokens=None,
-                    expected_protocol_manifest_sha256=None):
+                    expected_protocol_manifest_sha256=None,
+                    expected_labeling_guide_sha256=None):
     """Return explicit blocking reasons; do not silently grade incomplete data."""
 
     if not isinstance(expected_k, int) or isinstance(expected_k, bool) or expected_k < 1:
@@ -181,7 +182,10 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         # API's small synthetic fixtures; the manifest-backed CLI always
         # supplies the attack-library digest and therefore gets fail-closed
         # artifact validation.
-        integrity = validate_dataset(corpus, judgements, labels, ATTACK_LIBRARY)
+        integrity = validate_dataset(
+            corpus, judgements, labels, ATTACK_LIBRARY,
+            expected_labeling_guide_sha256=expected_labeling_guide_sha256,
+        )
         for error in integrity["errors"]:
             blocking.append(f"dataset integrity: {error}")
     if expected_judge_prompt_version is not None or expected_judge_prompt_sha256 is not None:
@@ -263,6 +267,16 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                 or not all(digest == corpus_sha256 for digest in label_digests)):
             blocking.append(
                 "human labels are not bound to the current corpus digest"
+            )
+    if expected_labeling_guide_sha256 is not None:
+        guide_digests = [
+            row.get("labeling_guide_sha256") if isinstance(row, dict) else None
+            for row in labels
+        ]
+        if (len(guide_digests) != len(labels)
+                or any(value != expected_labeling_guide_sha256 for value in guide_digests)):
+            blocking.append(
+                "human labels are missing or bound to a different labeling guide"
             )
 
     primary_rows = [row for row in labels
@@ -439,6 +453,7 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         "expected_judge_provider": expected_judge_provider,
         "expected_judge_max_tokens": expected_judge_max_tokens,
         "expected_protocol_manifest_sha256": expected_protocol_manifest_sha256,
+        "expected_labeling_guide_sha256": expected_labeling_guide_sha256,
         "corpus_sha256": corpus_sha256,
     }
 
@@ -502,6 +517,7 @@ def main():
     expected_judge_provider = (manifest or {}).get("judge_provider")
     expected_judge_max_tokens = (manifest or {}).get("judge_max_tokens")
     expected_protocol_manifest_sha256 = manifest_digest(manifest) if manifest else None
+    expected_labeling_guide_sha256 = (manifest or {}).get("labeling_guide_sha256")
     try:
         report = check_readiness(
             corpus, judgements, _read_labels(args.labels), primary, second,
@@ -515,6 +531,7 @@ def main():
             expected_judge_provider,
             expected_judge_max_tokens,
             expected_protocol_manifest_sha256,
+            expected_labeling_guide_sha256,
         )
     except ValueError as exc:
         ap.error(str(exc))

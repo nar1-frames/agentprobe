@@ -556,6 +556,9 @@ def main():
             "primary_labeler": primary,
             "second_labeler": second,
             "protocol_manifest_sha256": manifest_digest(manifest) if manifest else None,
+            "labeling_guide_sha256": (
+                manifest.get("labeling_guide_sha256") if manifest else None
+            ),
         },
         "rq1": [], "rq2": [], "rq3": {}, "inter_annotator": {},
     }

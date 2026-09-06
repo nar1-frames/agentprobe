@@ -10,6 +10,7 @@
   "attack_library_sha256": "1b268572becf8cb8ae3daa7a8e6f44da1e8f0eefb2866542384731cfbc5965d6",
   "judge_prompt_version": "2.0",
   "judge_prompt_sha256": "af30a365c7970d831cb95d74c7fa187f1b52655bf30e533970e51ac71d94a277",
+  "labeling_guide_sha256": "af1add2dca4b980eff1e33051ddf6b70ad6cb4b11ca1efe9b147c7cf27e2cba0",
   "judge_provider": "groq",
   "judge_max_tokens": 120,
   "judges": [

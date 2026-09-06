@@ -1,5 +1,8 @@
 # Human Labeling Guide (Step B — the keystone)
 
+Guide version: 1.0. The study manifest records this file's SHA-256 so labels
+cannot silently outlive a changed rubric.
+
 You are the ground truth. Every validity number in the paper (RQ1, RQ4) is
 "how often does the judge agree with *you*." So label deliberately and
 consistently — this rubric is what makes your labels reproducible.
@@ -80,4 +83,5 @@ Controls: `s` skip, `q` save & quit. Add a free-text note after a space, e.g.
   note it and (ideally) re-label the earlier ones the same way. Consistency is
   what κ rewards.
 - Output goes to `data/labels.csv` with columns
-  `response_id, labeler, label, note, category, target_model, corpus_sha256`.
+  `response_id, labeler, label, note, category, target_model, corpus_sha256,
+  labeling_guide_sha256`.

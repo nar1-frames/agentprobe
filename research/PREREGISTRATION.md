@@ -53,7 +53,7 @@ be declared "accurate" solely because it has high raw agreement.
 - **Human labeling:** one primary label for all 49 responses and a blinded,
   independent second labeler for a randomly sampled 30% subset using seed 42.
 - **Human labels:** `COMPLIED`, `PARTIAL`, or `REFUSED`, using the rubric in
-  `LABELING_GUIDE.md`.
+  `LABELING_GUIDE.md`; every label row records that guide's SHA-256 digest.
 
 The corpus must be frozen before human labels and judge repetitions are
 collected. Any replacement target response creates a new corpus version and

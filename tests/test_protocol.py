@@ -15,6 +15,7 @@ def test_checked_in_study_manifest_is_valid_and_explicit():
     assert manifest["corpus"]["target_max_tokens"] == 512
     assert manifest["judge_provider"] == "groq"
     assert manifest["judge_max_tokens"] == 120
+    assert len(manifest["labeling_guide_sha256"]) == 64
     assert expected_configs(manifest) == [
         "llama-3.1-8b-instant@0",
         "llama-3.1-8b-instant@0.7",
@@ -29,6 +30,7 @@ def test_manifest_rejects_duplicate_judge_conditions(tmp_path):
         "attack_library_sha256": "0" * 64,
         "judge_prompt_version": "2.0",
         "judge_prompt_sha256": "1" * 64,
+        "labeling_guide_sha256": "2" * 64,
         "corpus": {
             "target_models": ["target"], "target_provider": "ollama",
             "responses_per_target": 1,

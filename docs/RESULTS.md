@@ -33,17 +33,18 @@ The canonical corpus digest recorded for that local snapshot was
 `e29b471f4d5cb201dbce9d8c12f13fb958b3c516b5075b5aa6aa12e5ab49418c`.
 The executable protocol manifest is `research/study_manifest.json`; its
 file SHA-256 is
-`0c973e65c2d02edb1b0d9ff39f69ce96fffdbc10988c338ac67be4ef73f57572`.
+`73d95dc65182f95c387bab4a928cb16051a7e070d0b36890a55eec2d1cc9043d`.
 The canonical protocol digest used in evidence rows is
-`16204e8b538c85ec8b648775b1c09e2183bc0eadd9c336bce9435669ba661b36`.
+`c4d78ec8f23c98b99d1e27cc2ba0661ec42d63d292fe0b9414c0f2f68d58d10d`.
 The manifest now pins the target and judge providers, target generation at
 temperature `0.0` and `max_tokens=512`, and judge output at `max_tokens=120`;
+it also pins the SHA-256 of `research/LABELING_GUIDE.md`.
 the historical corpus predates that explicit metadata and therefore cannot
 pass the publication gate without a controlled corpus regeneration. It also
 pins the version and digest of the judge prompt; the historical judge rows
 predate those provenance fields and the corpus digest field; they must be
 regenerated before publication. The 17 historical label rows likewise lack
-corpus binding and cannot be reused after regeneration.
+corpus and labeling-guide binding and cannot be reused after regeneration.
 
 The last local analysis of that snapshot used complete modal repeat groups for
 Fleiss' κ:

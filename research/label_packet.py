@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import tempfile
 from io import StringIO
 from typing import Mapping, Sequence
@@ -25,7 +26,7 @@ PACKET_SCHEMA_VERSION = "1.0"
 PACKET_FIELDS = ("item_id", "attack_prompt", "response", "label", "note")
 LABEL_FIELDS = (
     "response_id", "labeler", "label", "note", "category", "target_model",
-    "corpus_sha256",
+    "corpus_sha256", "labeling_guide_sha256",
 )
 LABELS = frozenset({"COMPLIED", "PARTIAL", "REFUSED"})
 
@@ -114,13 +115,19 @@ def _selected_rows(corpus, labeler: str, manifest=None, subset=None, seed=None):
 
 def export_packet(packet_path: str, key_path: str, corpus, corpus_sha256: str,
                   labeler: str, manifest=None, subset=None, seed=None,
-                  overwrite=False) -> tuple[str, str, int]:
+                  overwrite=False, labeling_guide_sha256: str | None = None
+                  ) -> tuple[str, str, int]:
     """Write a blinded CSV packet and a private mapping key."""
 
     if os.path.exists(packet_path) or os.path.exists(key_path):
         if not overwrite:
             raise ValueError("label packet already exists; use --overwrite-packet or new paths")
     rows, subset, seed = _selected_rows(corpus, labeler, manifest, subset, seed)
+    if labeling_guide_sha256 is None and manifest:
+        labeling_guide_sha256 = manifest.get("labeling_guide_sha256")
+    if labeling_guide_sha256 is not None and not re.fullmatch(
+            r"[0-9a-f]{64}", labeling_guide_sha256):
+        raise ValueError("labeling_guide_sha256 must be a 64-character SHA-256 hex digest")
     order = list(rows)
     random.Random(int(seed)).shuffle(order)
 
@@ -153,6 +160,7 @@ def export_packet(packet_path: str, key_path: str, corpus, corpus_sha256: str,
         "labeler": labeler,
         "corpus_sha256": corpus_sha256,
         "protocol_manifest_sha256": manifest_digest(manifest) if manifest else None,
+        "labeling_guide_sha256": labeling_guide_sha256,
         "packet_sha256": packet_sha256,
         "subset": subset,
         "subset_seed": seed,
@@ -165,7 +173,8 @@ def export_packet(packet_path: str, key_path: str, corpus, corpus_sha256: str,
 
 def read_packet_answers(packet_path: str, key_path: str, corpus_sha256: str,
                         labeler: str | None = None, corpus=None,
-                        expected_protocol_manifest_sha256: str | None = None
+                        expected_protocol_manifest_sha256: str | None = None,
+                        expected_labeling_guide_sha256: str | None = None
                         ) -> list[dict[str, str]]:
     """Validate a returned packet and convert completed rows to label records."""
 
@@ -179,6 +188,14 @@ def read_packet_answers(packet_path: str, key_path: str, corpus_sha256: str,
     if (expected_protocol_manifest_sha256 is not None
             and key.get("protocol_manifest_sha256") != expected_protocol_manifest_sha256):
         raise ValueError("label packet belongs to a different protocol manifest")
+    packet_guide_digest = key.get("labeling_guide_sha256")
+    if (packet_guide_digest is not None
+            and (not isinstance(packet_guide_digest, str)
+                 or not re.fullmatch(r"[0-9a-f]{64}", packet_guide_digest))):
+        raise ValueError("label packet key has an invalid labeling guide digest")
+    if (expected_labeling_guide_sha256 is not None
+            and packet_guide_digest != expected_labeling_guide_sha256):
+        raise ValueError("label packet belongs to a different labeling guide")
     packet_labeler = key.get("labeler")
     if not isinstance(packet_labeler, str) or not packet_labeler.strip():
         raise ValueError("label packet key has an invalid labeler")
@@ -266,6 +283,7 @@ def read_packet_answers(packet_path: str, key_path: str, corpus_sha256: str,
             "category": item.get("category", ""),
             "target_model": item.get("target_model", ""),
             "corpus_sha256": corpus_sha256,
+            "labeling_guide_sha256": packet_guide_digest,
         })
     return output
 

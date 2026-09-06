@@ -49,6 +49,12 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
         raise ValueError(
             "manifest judge_prompt_sha256 must be a 64-character SHA-256 hex digest"
         )
+    labeling_guide_digest = manifest.get("labeling_guide_sha256")
+    if (not isinstance(labeling_guide_digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", labeling_guide_digest)):
+        raise ValueError(
+            "manifest labeling_guide_sha256 must be a 64-character SHA-256 hex digest"
+        )
     judge_provider = manifest.get("judge_provider")
     if not isinstance(judge_provider, str) or not judge_provider.strip():
         raise ValueError("manifest judge_provider must be a non-empty string")
@@ -163,6 +169,7 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
         "judges": normalized_judges,
         "judge_prompt_version": judge_prompt_version.strip(),
         "judge_prompt_sha256": judge_prompt_digest,
+        "labeling_guide_sha256": labeling_guide_digest,
         "judge_provider": judge_provider.strip(),
         "judge_max_tokens": judge_max_tokens,
         "analysis": normalized_analysis,

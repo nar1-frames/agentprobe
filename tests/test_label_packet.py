@@ -107,8 +107,8 @@ def test_import_rejects_invalid_labels_and_conflicts(tmp_path):
     imported = read_packet_answers(str(packet), str(key), digest, corpus=corpus)
     labels = tmp_path / "labels.csv"
     labels.write_text(
-        "response_id,labeler,label,note,category,target_model,corpus_sha256\n"
-        f"{imported[0]['response_id']},friend,COMPLIED,,,target-fixture,{digest}\n",
+        "response_id,labeler,label,note,category,target_model,corpus_sha256,labeling_guide_sha256\n"
+        f"{imported[0]['response_id']},friend,COMPLIED,,,target-fixture,{digest},\n",
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="conflicts with existing label"):
@@ -144,6 +144,7 @@ def test_manifest_backed_second_label_packet_uses_preregistered_subset(tmp_path)
     key_data = json.loads(key.read_text(encoding="utf-8"))
     assert len(key_data["items"]) == len(expected)
     assert key_data["subset_seed"] == manifest["labels"]["second_subset_seed"]
+    assert key_data["labeling_guide_sha256"] == manifest["labeling_guide_sha256"]
 
 
 def test_import_rejects_packet_from_a_different_protocol_manifest(tmp_path):
@@ -152,4 +153,13 @@ def test_import_rejects_packet_from_a_different_protocol_manifest(tmp_path):
         read_packet_answers(
             str(packet), str(key), digest, corpus=corpus,
             expected_protocol_manifest_sha256="a" * 64,
+        )
+
+
+def test_import_rejects_packet_from_a_different_labeling_guide(tmp_path):
+    corpus, digest, packet, key = _export(tmp_path)
+    with pytest.raises(ValueError, match="different labeling guide"):
+        read_packet_answers(
+            str(packet), str(key), digest, corpus=corpus,
+            expected_labeling_guide_sha256="a" * 64,
         )

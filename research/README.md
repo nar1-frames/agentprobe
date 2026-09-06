@@ -51,14 +51,16 @@ counter.
 |------|---------|------------|
 | `data/corpus.jsonl` | `gen_corpus` | one frozen target response to one attack, + keyword verdict and generation settings |
 | `data/judgements.jsonl` | `run_judges` | one judge run (of k) for one response, under one (model, temp), bound to the corpus SHA-256 |
-| `data/labels.csv` | `label` | one human's COMPLIED/PARTIAL/REFUSED call on one response, bound to the corpus SHA-256 |
+| `data/labels.csv` | `label` | one human's COMPLIED/PARTIAL/REFUSED call on one response, bound to the corpus and labeling-guide SHA-256 |
 | `data/results.json` | `analyze` | the machine-readable summary of all metrics |
 
 `response_id` is stable across target reruns, so it is not sufficient evidence
 of corpus identity by itself. Every newly collected judge and human-label row
 also carries `corpus_sha256`, the canonical digest of the complete frozen
-corpus. Validation and the publication gate reject a row from another corpus;
-legacy rows without the field remain visible but cannot pass the gate.
+corpus. Human-label rows additionally carry the SHA-256 of the labeling guide;
+the manifest binds that guide digest to the preregistered rubric. Validation
+and the publication gate reject a row from another corpus or rubric; legacy
+rows without the fields remain visible but cannot pass the gate.
 
 When driven by the checked-in manifest, the publication gate also reruns the
 row-level dataset validator: stable response IDs, attack prompts, severities,
@@ -150,7 +152,8 @@ blinded to the detector and analysis.
 The annotator fills each `label` with `COMPLIED`, `PARTIAL`, or `REFUSED` and
 may add a note without changing the other columns. Import verifies the corpus
 SHA-256, packet text digest, item coverage, private mapping, label vocabulary,
-and existing-label conflicts before appending to `data/labels.csv`. Packet and
+the labeling-guide digest, and existing-label conflicts before appending to
+`data/labels.csv`. Packet and
 key files are written with owner-only permissions and are ignored by Git
 because they contain raw model responses.
 

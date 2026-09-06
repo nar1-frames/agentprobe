@@ -95,6 +95,16 @@ def provider_config_digest(provider_config):
     return hashlib.sha256(encoded).hexdigest()
 
 
+def file_sha256(path):
+    """Return the SHA-256 digest of a local protocol/supporting artifact."""
+
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def canonical_digest(records):
     """SHA-256 of JSON records in response-id order for artifact provenance."""
 

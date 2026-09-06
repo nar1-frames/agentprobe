@@ -37,7 +37,8 @@
 #   python -m research.label --import-packet /tmp/friend.csv
 #
 # labels.csv columns:
-#   response_id, labeler, label, note, category, target_model, corpus_sha256
+#   response_id, labeler, label, note, category, target_model, corpus_sha256,
+#   labeling_guide_sha256
 # ============================================================
 
 import argparse
@@ -46,7 +47,7 @@ import json
 import os
 import textwrap
 
-from research._common import canonical_digest, read_jsonl
+from research._common import canonical_digest, file_sha256, read_jsonl
 from research.protocol import (
     DEFAULT_MANIFEST_PATH,
     expected_second_label_ids,
@@ -61,11 +62,12 @@ from research.label_packet import (
 LABEL_KEYS = {"c": "COMPLIED", "p": "PARTIAL", "r": "REFUSED"}
 CSV_FIELDS = [
     "response_id", "labeler", "label", "note", "category", "target_model",
-    "corpus_sha256",
+    "corpus_sha256", "labeling_guide_sha256",
 ]
+LABELING_GUIDE_PATH = os.path.join(os.path.dirname(__file__), "LABELING_GUIDE.md")
 
 
-def load_existing(path, labeler, corpus_sha256=None):
+def load_existing(path, labeler, corpus_sha256=None, labeling_guide_sha256=None):
     """Return completed IDs only when existing labels match this corpus."""
     if not os.path.exists(path):
         return set()
@@ -80,6 +82,11 @@ def load_existing(path, labeler, corpus_sha256=None):
             if corpus_sha256 is not None and row.get("corpus_sha256") != corpus_sha256:
                 raise ValueError(
                     "existing human labels are missing or have a different corpus_sha256"
+                )
+            if (labeling_guide_sha256 is not None
+                    and row.get("labeling_guide_sha256") != labeling_guide_sha256):
+                raise ValueError(
+                    "existing human labels are missing or use a different labeling guide"
                 )
             if row.get("labeler") == labeler and row.get("response_id"):
                 done.add(row["response_id"])
@@ -200,6 +207,15 @@ def main():
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise SystemExit(f"Invalid study manifest: {exc}")
     manifest_labels = (manifest or {}).get("labels", {})
+    try:
+        labeling_guide_sha256 = file_sha256(LABELING_GUIDE_PATH)
+    except OSError as exc:
+        raise SystemExit(f"Cannot read labeling guide: {exc}")
+    if (manifest
+            and labeling_guide_sha256 != manifest["labeling_guide_sha256"]):
+        raise SystemExit(
+            "Labeling guide does not match the study manifest; use a new manifest/version"
+        )
 
     if args.import_packet:
         try:
@@ -214,6 +230,7 @@ def main():
                 expected_protocol_manifest_sha256=(
                     manifest_digest(manifest) if manifest else None
                 ),
+                expected_labeling_guide_sha256=labeling_guide_sha256,
             )
             count = append_imported_labels(args.out, packet_rows, corpus_sha256)
         except (OSError, ValueError, csv.Error, json.JSONDecodeError) as exc:
@@ -253,6 +270,7 @@ def main():
                 args.export_packet, key_path, corpus, corpus_sha256, labeler,
                 manifest=manifest, subset=subset, seed=seed,
                 overwrite=args.overwrite_packet,
+                labeling_guide_sha256=labeling_guide_sha256,
             )
         except (OSError, ValueError, TypeError) as exc:
             raise SystemExit(f"Cannot export label packet: {exc}")
@@ -264,7 +282,9 @@ def main():
     corpus = [row for row in corpus if not row.get("error")]
     corpus = pick_subset(corpus, subset, seed)
     try:
-        done = load_existing(args.out, labeler, corpus_sha256)
+        done = load_existing(
+            args.out, labeler, corpus_sha256, labeling_guide_sha256
+        )
     except (OSError, ValueError, csv.Error) as exc:
         raise SystemExit(f"Cannot resume labels safely: {exc}")
     todo = [r for r in corpus if r["response_id"] not in done]
@@ -298,6 +318,7 @@ def main():
                     "category": row["category"],
                     "target_model": row["target_model"],
                     "corpus_sha256": corpus_sha256,
+                    "labeling_guide_sha256": labeling_guide_sha256,
                 })
                 break
             print("  (use c / p / r / s / q)")

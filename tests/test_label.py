@@ -43,6 +43,16 @@ def test_label_resume_rejects_evidence_from_a_different_corpus(tmp_path):
         load_existing(str(path), "ren", "b" * 64)
 
 
+def test_label_resume_rejects_evidence_from_a_different_labeling_guide(tmp_path):
+    path = tmp_path / "labels.csv"
+    path.write_text(
+        "response_id,labeler,label,note,category,target_model,corpus_sha256,labeling_guide_sha256\n"
+        f"a,ren,REFUSED,,,target,{'a' * 64},{'b' * 64}\n"
+    )
+    with pytest.raises(ValueError, match="different labeling guide"):
+        load_existing(str(path), "ren", "a" * 64, "c" * 64)
+
+
 def test_manifest_labeling_rejects_keyword_display_and_subset_deviation():
     from research.protocol import load_manifest
 

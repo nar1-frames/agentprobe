@@ -236,10 +236,12 @@ def validate_judgements(judgements, corpus_ids, corpus_by_id=None, corpus_sha256
     }
 
 
-def validate_labels(labels, corpus_ids, corpus_sha256=None):
+def validate_labels(labels, corpus_ids, corpus_sha256=None,
+                    expected_labeling_guide_sha256=None):
     errors = []
     keys = set()
     missing_corpus_provenance = 0
+    missing_labeling_guide = 0
     for index, row in enumerate(labels, start=1):
         if not isinstance(row, dict):
             errors.append(f"label row {index}: expected a mapping")
@@ -271,16 +273,33 @@ def validate_labels(labels, corpus_ids, corpus_sha256=None):
             errors.append(f"label row {index}: corpus_sha256 is invalid")
         elif corpus_sha256 is not None and row_digest != corpus_sha256:
             errors.append(f"label row {index}: corpus_sha256 does not match corpus")
+        guide_digest = row.get("labeling_guide_sha256")
+        if guide_digest in (None, ""):
+            missing_labeling_guide += 1
+        elif (not isinstance(guide_digest, str)
+              or not re.fullmatch(r"[0-9a-f]{64}", guide_digest)):
+            errors.append(f"label row {index}: labeling_guide_sha256 is invalid")
+        elif (expected_labeling_guide_sha256 is not None
+              and guide_digest != expected_labeling_guide_sha256):
+            errors.append(
+                f"label row {index}: labeling_guide_sha256 does not match the study guide"
+            )
     warnings = []
     if missing_corpus_provenance:
         warnings.append(
             f"{missing_corpus_provenance} label rows lack corpus provenance metadata; "
             "publication gate will require relabeling"
         )
+    if missing_labeling_guide:
+        warnings.append(
+            f"{missing_labeling_guide} label rows lack labeling-guide provenance; "
+            "publication gate will require relabeling"
+        )
     return {"errors": errors, "warnings": warnings, "labels": len(labels)}
 
 
-def validate_dataset(corpus, judgements=None, labels=None, attack_library=None):
+def validate_dataset(corpus, judgements=None, labels=None, attack_library=None,
+                     expected_labeling_guide_sha256=None):
     """Return a JSON-friendly validation report; never mutates input data."""
 
     corpus = list(corpus or [])
@@ -295,7 +314,10 @@ def validate_dataset(corpus, judgements=None, labels=None, attack_library=None):
     judgement_report = validate_judgements(
         judgements, corpus_report["ids"], corpus_by_id, corpus_sha256
     )
-    label_report = validate_labels(labels, corpus_report["ids"], corpus_sha256)
+    label_report = validate_labels(
+        labels, corpus_report["ids"], corpus_sha256,
+        expected_labeling_guide_sha256,
+    )
     errors = corpus_report["errors"] + judgement_report["errors"] + label_report["errors"]
     warnings = corpus_report["warnings"] + judgement_report["warnings"] + label_report["warnings"]
     return {
