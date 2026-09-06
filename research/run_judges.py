@@ -11,8 +11,8 @@
 #   RQ2 (reliability): k repeats of the same config let you measure
 #        self-agreement — does the judge give the same answer when
 #        you ask it again? Fleiss' kappa over the k runs quantifies it.
-#   RQ4 (judge strength): put a strong judge (e.g. llama-3.3-70b) and
-#        a weak/same-family judge (the 8B target itself) in the config
+#   RQ4 (judge strength): put a strong judge (e.g. openai/gpt-oss-120b) and
+#        a weak/same-family judge (openai/gpt-oss-20b) in the config
 #        list, and you can compare each against the human labels.
 #   Temperature sweep: 0.0 vs 0.7 tells you whether sampling noise,
 #        not model choice, drives the disagreement.
@@ -27,7 +27,7 @@
 # -----
 #   python -m research.run_judges                      # judges from config
 #   python -m research.run_judges --k 5 --temps 0.0,0.7
-#   python -m research.run_judges --judges llama-3.3-70b-versatile,llama-3.1-8b-instant
+#   python -m research.run_judges --judges openai/gpt-oss-120b,openai/gpt-oss-20b
 #
 # Each line of judgements.jsonl:
 #   {
@@ -49,6 +49,7 @@ from research._common import (
     canonical_digest,
 )
 from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION, llm_judge
+from agentprobe.providers import preflight_model
 from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest, manifest_digest
 from attacks.library import ATTACK_LIBRARY
 from research.validate import validate_dataset
@@ -350,9 +351,13 @@ def main():
 
     # Build one client per distinct judge model (reused across temps/runs).
     clients = {}
-    for base_judge, model, _temp in configs:
-        if model not in clients:
-            clients[model] = build_client({**base_judge, "model": model})
+    try:
+        for base_judge, model, _temp in configs:
+            if model not in clients:
+                clients[model] = build_client({**base_judge, "model": model})
+                preflight_model(clients[model], model)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Judge provider preflight failed: {exc}")
 
     call = 0
     for base_judge, model, temp in configs:

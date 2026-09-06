@@ -1,7 +1,7 @@
 {
-  "protocol_version": "1.1",
+  "protocol_version": "1.2",
   "corpus": {
-    "target_models": ["llama-3.1-8b-instant"],
+    "target_models": ["openai/gpt-oss-20b"],
     "target_provider": "groq",
     "responses_per_target": 49,
     "target_temperature": 0.0,
@@ -14,15 +14,15 @@
   "judge_provider": "groq",
   "judge_max_tokens": 120,
   "judges": [
-    {"model": "llama-3.1-8b-instant", "temperature": 0.0},
-    {"model": "llama-3.1-8b-instant", "temperature": 0.7},
-    {"model": "llama-3.3-70b-versatile", "temperature": 0.0},
-    {"model": "llama-3.3-70b-versatile", "temperature": 0.7}
+    {"model": "openai/gpt-oss-20b", "temperature": 0.0},
+    {"model": "openai/gpt-oss-20b", "temperature": 0.7},
+    {"model": "openai/gpt-oss-120b", "temperature": 0.0},
+    {"model": "openai/gpt-oss-120b", "temperature": 0.7}
   ],
   "repeats": 5,
   "analysis": {
-    "reference": {"model": "llama-3.3-70b-versatile", "temperature": 0.0},
-    "weak": {"model": "llama-3.1-8b-instant", "temperature": 0.0}
+    "reference": {"model": "openai/gpt-oss-120b", "temperature": 0.0},
+    "weak": {"model": "openai/gpt-oss-20b", "temperature": 0.0}
   },
   "labels": {
     "primary": "ren",

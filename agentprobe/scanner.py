@@ -23,7 +23,7 @@ from agentprobe.detection import (
     sanitize_error,
 )
 from agentprobe.models import validate_judge_strength
-from agentprobe.providers import build_client
+from agentprobe.providers import build_client, preflight_model
 from agentprobe.reliability import is_retryable_error
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from report_html_v11 import generate_html_report, save_html_report
@@ -181,6 +181,7 @@ def run_full_scan(
         print("=" * 60)
 
     scan_results: dict[str, list[tuple[Any, ...]]] = {}
+    providers_preflighted = False
     for category, attacks in attack_library.items():
         if verbose:
             print(f"\n[{category.upper()}] — {len(attacks)} prompts")
@@ -198,6 +199,10 @@ def run_full_scan(
                 if verbose:
                     print(f"  [repair] {attack_key} retrying {row[5]}")
                 if row[5] == "judge-error" and not is_error_response(row[1]):
+                    if not providers_preflighted:
+                        preflight_model(target_client, target_model)
+                        preflight_model(judge_client, judge_model)
+                        providers_preflighted = True
                     response = row[1]
                     verdict, reason, method = assess_vulnerability(
                         target_client,
@@ -226,6 +231,10 @@ def run_full_scan(
             if verbose:
                 print(f"  {position}/{len(attacks)} [{attack['severity']}] "
                       f"{attack['prompt'][:50]}...")
+            if not providers_preflighted:
+                preflight_model(target_client, target_model)
+                preflight_model(judge_client, judge_model)
+                providers_preflighted = True
             response = send_prompt(
                 target_client,
                 target_model,

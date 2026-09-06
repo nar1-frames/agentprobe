@@ -81,13 +81,13 @@ the frozen protocol. Analysis JSON converts undefined statistics to strict JSON
 
 # STEP A — freeze the preregistered 49-response corpus
 python -m research.gen_corpus \
-    --models llama-3.1-8b-instant \
+    --models openai/gpt-oss-20b \
     --target-temperature 0.0 --max-tokens 512 \
     --out data/corpus.jsonl --overwrite
 
 # STEP C — judge the frozen corpus: strong + weak judge, two temps, k=5 each
 python -m research.run_judges \
-    --judges llama-3.3-70b-versatile,llama-3.1-8b-instant \
+    --judges openai/gpt-oss-120b,openai/gpt-oss-20b \
     --temps 0.0,0.7 --k 5
 
 # STEP B — human ground truth (the keystone). You label everything:
@@ -101,8 +101,8 @@ python -m research.label --labeler friend \
 
 # STEPS D/E — compute all the metrics
 python -m research.analyze --primary ren --second friend \
-    --reference-judge llama-3.3-70b-versatile --reference-temperature 0.0 \
-    --weak-judge llama-3.1-8b-instant --weak-temperature 0.0 \
+    --reference-judge openai/gpt-oss-120b --reference-temperature 0.0 \
+    --weak-judge openai/gpt-oss-20b --weak-temperature 0.0 \
     --json data/results.json
 
 # Optional integrity gate before analysis
@@ -113,10 +113,10 @@ python -m research.validate
 # supplies the target scope, labelers, exact judge matrix, and k=5 requirement;
 # it also verifies the deterministic 30% second-label subset.
 python -m research.publication_gate --primary ren --second friend --k 5 \
-  --expected-config llama-3.1-8b-instant@0.0 \
-  --expected-config llama-3.1-8b-instant@0.7 \
-  --expected-config llama-3.3-70b-versatile@0.0 \
-  --expected-config llama-3.3-70b-versatile@0.7
+  --expected-config openai/gpt-oss-20b@0.0 \
+  --expected-config openai/gpt-oss-20b@0.7 \
+  --expected-config openai/gpt-oss-120b@0.0 \
+  --expected-config openai/gpt-oss-120b@0.7
 ```
 
 `run_judges` supports `--resume`, `gen_corpus` uses atomic checkpoints when
@@ -177,8 +177,8 @@ because they contain raw model responses.
   verdict; `analyze` joins it against the judge majority and also reports the
   **keyword-decisive rate** — how often the free path decides on its own. *Needs
   corpus + judgements.*
-- **RQ4 — Judge strength.** Put a strong judge (`llama-3.3-70b`) and a
-  weak/same-family judge (the 8B target itself) in `--judges`; RQ1 is reported
+- **RQ4 — Judge strength.** Put a strong judge (`openai/gpt-oss-120b`) and a
+  weak/same-family judge (`openai/gpt-oss-20b`) in `--judges`; RQ1 is reported
   **per judge config**, so you compare κ(strong, human) vs κ(weak, human)
   directly. `analyze` also reports a cautious proxy-error-overlap statistic for
   weak-judge versus keyword-stage errors on human-labeled items. Because keyword
@@ -235,6 +235,7 @@ tests/                      pytest over the detector and the metrics
 2. **Broader live scenario coverage** — connect more real agent frameworks to
    the OpenAI-compatible adapter while preserving the fixture-only regression
    suite.
-3. **Protocol execution** — freeze/register manifest v1.1, regenerate the
-   historical corpus with explicit target settings, then collect the remaining
-   human labels and judge repetitions without changing the manifest.
+3. **Protocol execution** — freeze/register manifest v1.2 (see
+   [`PROTOCOL_CHANGELOG.md`](PROTOCOL_CHANGELOG.md)), collect its new corpus
+   with explicit target settings, then collect human labels and judge
+   repetitions without changing the manifest.

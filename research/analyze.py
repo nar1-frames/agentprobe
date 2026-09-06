@@ -19,7 +19,7 @@
 # -----
 #   python -m research.analyze
 #   python -m research.analyze --primary ren --second friend \
-#       --reference-judge llama-3.3-70b-versatile --reference-temperature 0.0 \
+#       --reference-judge openai/gpt-oss-120b --reference-temperature 0.0 \
 #       --json data/results.json
 # ============================================================
 

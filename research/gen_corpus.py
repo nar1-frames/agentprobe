@@ -23,7 +23,7 @@
 # Usage
 # -----
 #   python -m research.gen_corpus                # models/settings from manifest
-#   python -m research.gen_corpus --models llama-3.1-8b-instant,gemma2-9b-it
+#   python -m research.gen_corpus --models openai/gpt-oss-20b,gemma2-9b-it
 #   python -m research.gen_corpus --out data/corpus.jsonl --max-tokens 512
 #
 # Each line of corpus.jsonl:
@@ -47,6 +47,7 @@ from research._common import (
     load_config, build_client, provider_config_digest, response_id, read_jsonl,
     write_jsonl,
 )
+from agentprobe.providers import preflight_model
 from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest, manifest_digest
 from attacks.library import ATTACK_LIBRARY
 from agentprobe.detection import keyword_check, sanitize_error
@@ -178,6 +179,7 @@ def generate(target_cfg, model, out_path, max_tokens, target_temperature,
                 continue
         if client is None:
             client = build_client({**target_cfg, "model": model})
+            preflight_model(client, model)
         prompt = attack["prompt"]
         text, err = send_prompt(
             client, model, prompt, max_tokens=max_tokens,
@@ -294,12 +296,15 @@ def main():
         # first record atomically below.
         records_by_id = {}
 
-    for model in models:
-        generate(
-            target_cfg, model, args.out, max_tokens, target_temperature,
-            rate_limit, retries, retry_delay, records_by_id,
-            protocol_manifest_sha256=(manifest_digest(manifest) if manifest else None),
-        )
+    try:
+        for model in models:
+            generate(
+                target_cfg, model, args.out, max_tokens, target_temperature,
+                rate_limit, retries, retry_delay, records_by_id,
+                protocol_manifest_sha256=(manifest_digest(manifest) if manifest else None),
+            )
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Corpus generation failed: {exc}")
 
     operational_errors = sum(
         bool(row.get("error")) for row in records_by_id.values()

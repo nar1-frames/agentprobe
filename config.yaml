@@ -11,7 +11,7 @@
 # --- TARGET: the AI being tested for vulnerabilities ---------
 target:
   provider: groq                    # groq | openai | ollama | custom
-  model: llama-3.1-8b-instant       # any model name your provider supports
+  model: openai/gpt-oss-20b         # any model name your provider supports
   api_key_env: GROQ_API_KEY         # name of the env var holding your API key
   base_url: null                    # null = use provider default
                                     # ollama example: http://localhost:11434/v1
@@ -25,7 +25,7 @@ target:
 # Can be a different provider than the target.
 judge:
   provider: groq
-  model: llama-3.3-70b-versatile
+  model: openai/gpt-oss-120b
   api_key_env: GROQ_API_KEY
   base_url: null
   timeout_seconds: 60

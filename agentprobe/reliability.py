@@ -20,6 +20,11 @@ _RETRYABLE_ERRNOS = frozenset({
     errno.ECONNABORTED, errno.ECONNREFUSED, errno.ECONNRESET,
     errno.EHOSTUNREACH, errno.ENETUNREACH, errno.ETIMEDOUT, errno.EPIPE,
 })
+_PERMANENT_MESSAGE_MARKERS = (
+    "model_not_found", "model does not exist", "does not exist or you do not have access",
+    "invalid api key", "incorrect api key", "authentication failed",
+    "permission denied", "invalid request",
+)
 
 
 def _status_code(error):
@@ -35,6 +40,9 @@ def _status_code(error):
 def is_retryable_error(error) -> bool:
     """Return whether a provider failure is safe to retry."""
 
+    message = str(error).lower()
+    if any(marker in message for marker in _PERMANENT_MESSAGE_MARKERS):
+        return False
     status = _status_code(error)
     if status in _RETRYABLE_STATUS_CODES:
         return True
@@ -45,7 +53,6 @@ def is_retryable_error(error) -> bool:
         return True
     # A few test doubles and lightweight adapters surface only a message,
     # rather than an HTTP status attribute. Keep this fallback narrow.
-    message = str(error).lower()
     if any(marker in message for marker in (
         "429", "rate limit", "too many requests", "503 service unavailable",
         "temporarily unavailable",

@@ -31,11 +31,17 @@ snapshot, not as a public evidence release:
 
 The canonical corpus digest recorded for that local snapshot was
 `e29b471f4d5cb201dbce9d8c12f13fb958b3c516b5075b5aa6aa12e5ab49418c`.
-The executable protocol manifest is `research/study_manifest.json`; its
-file SHA-256 is
-`73d95dc65182f95c387bab4a928cb16051a7e070d0b36890a55eec2d1cc9043d`.
-The canonical protocol digest used in evidence rows is
+The historical snapshot used the then-current v1.1 manifest file SHA-256
+`73d95dc65182f95c387bab4a928cb16051a7e070d0b36890a55eec2d1cc9043d` and
+canonical protocol digest
 `c4d78ec8f23c98b99d1e27cc2ba0661ec42d63d292fe0b9414c0f2f68d58d10d`.
+The checked-in executable manifest is now protocol v1.2, with its model
+migration documented in `research/PROTOCOL_CHANGELOG.md`; it defines a new
+study corpus and must not be joined to this historical snapshot.
+The v1.2 manifest file SHA-256 is
+`71b4646cea3f9160d662875548b61a600f382e7373f70f405231941d276d84c8`, and its
+canonical protocol digest is
+`27c5f070589ee9c49b730c4db42900c68a90043faa2a68f6a9a39307f885c369`.
 The manifest now pins the target and judge providers, target generation at
 temperature `0.0` and `max_tokens=512`, and judge output at `max_tokens=120`;
 it also pins the SHA-256 of `research/LABELING_GUIDE.md`.
@@ -78,14 +84,14 @@ general claim about model quality.
 ```bash
 python -m research.validate
 python -m research.publication_gate --primary ren --second friend --k 5 \
-    --expected-config llama-3.1-8b-instant@0.0 \
-    --expected-config llama-3.1-8b-instant@0.7 \
-    --expected-config llama-3.3-70b-versatile@0.0 \
-    --expected-config llama-3.3-70b-versatile@0.7
+    --expected-config openai/gpt-oss-20b@0.0 \
+    --expected-config openai/gpt-oss-20b@0.7 \
+    --expected-config openai/gpt-oss-120b@0.0 \
+    --expected-config openai/gpt-oss-120b@0.7
 python -m research.analyze --primary ren \
-    --reference-judge llama-3.3-70b-versatile \
+    --reference-judge openai/gpt-oss-120b \
     --reference-temperature 0.0 \
-    --weak-judge llama-3.1-8b-instant \
+    --weak-judge openai/gpt-oss-20b \
     --weak-temperature 0.0 \
     --json /tmp/agentprobe-results.json
 python -m research.export --results /tmp/agentprobe-results.json \

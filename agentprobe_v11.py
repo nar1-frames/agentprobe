@@ -31,7 +31,10 @@ from agentprobe.reporting import build_json_report, build_run_metadata, save_jso
 from agentprobe.models import validate_judge_strength
 from agentprobe.checkpoints import ScanCheckpoint
 from agentprobe.config import load_config as _load_validated_config
-from agentprobe.providers import build_client as _build_provider_client
+from agentprobe.providers import (
+    build_client as _build_provider_client,
+    preflight_model as _preflight_model,
+)
 # v1.1.1: the detection engine now lives in agentprobe.detection (one source of
 # truth). keyword_check/llm_judge/calculate_finding_severity used to be defined
 # inline below; they were extracted verbatim and are imported here instead.
@@ -286,6 +289,8 @@ def run_configured_scan(config_path="config.yaml", checkpoint_path=None, resume=
     # resume should fail without touching credentials or provider setup.
     target_client = build_client(target_cfg)
     judge_client = build_client(judge_cfg)
+    _preflight_model(target_client, target_cfg["model"])
+    _preflight_model(judge_client, judge_cfg["model"])
 
     results = run_full_scan(
         target_client,

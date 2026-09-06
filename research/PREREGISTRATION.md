@@ -1,7 +1,7 @@
 # AgentProbe judge-validity study protocol
 
-**Status:** draft protocol v1.1 — freeze and register before collecting the
-remaining labels or rerunning the judge conditions. An earlier local corpus was
+**Status:** draft protocol v1.2 — freeze and register before collecting the
+study corpus, labels, or judge conditions. The earlier v1.1 local corpus was
 a historical snapshot and did not satisfy every v1.1 requirement; raw study
 artifacts are intentionally excluded from the public repository.
 
@@ -10,7 +10,9 @@ not a claim that the current checked-in snapshot satisfies the protocol; the
 publication gate reports its current omissions.
 
 The executable copy of the fixed target scope, judge matrix, repeat count, and
-labeler rules is [`study_manifest.json`](study_manifest.json). A future study
+labeler rules is [`study_manifest.json`](study_manifest.json). The v1.2 model
+migration is documented in [`PROTOCOL_CHANGELOG.md`](PROTOCOL_CHANGELOG.md).
+A future study
 must use a new manifest/version rather than silently changing this one.
 The manifest also pins the SHA-256 digest of the attack library, so prompt or
 severity drift is a gate failure rather than an undocumented protocol change.
@@ -38,12 +40,13 @@ be declared "accurate" solely because it has high raw agreement.
 - **Unit of analysis:** one `response_id`, deterministically derived from
   category, attack index, and target model.
 - **Corpus:** the 49 prompts in the eight-category attack library, with one
-  frozen response per prompt from the `groq` target provider and target model.
+  frozen response per prompt from the `groq` target provider and
+  `openai/gpt-oss-20b` target model.
   Target generation is fixed at temperature `0.0` and `max_tokens=512`; both
   values, the provider, and a configuration digest must be present in every
   corpus row and are checked by the publication gate.
-- **Judge matrix:** `llama-3.1-8b-instant` and
-  `llama-3.3-70b-versatile`, each at temperatures 0.0 and 0.7.
+- **Judge matrix:** `openai/gpt-oss-20b` and `openai/gpt-oss-120b`, each at
+  temperatures 0.0 and 0.7.
 - **Judge provider and budget:** `groq`, with `max_tokens=120` for every
   judge call. Each judge row records the provider, budget, configuration
   digest, and protocol manifest digest.
@@ -98,10 +101,10 @@ the intended matrix explicitly supplied:
 
 ```bash
 python -m research.publication_gate --primary ren --second friend --k 5 \
-  --expected-config llama-3.1-8b-instant@0.0 \
-  --expected-config llama-3.1-8b-instant@0.7 \
-  --expected-config llama-3.3-70b-versatile@0.0 \
-  --expected-config llama-3.3-70b-versatile@0.7
+  --expected-config openai/gpt-oss-20b@0.0 \
+  --expected-config openai/gpt-oss-20b@0.7 \
+  --expected-config openai/gpt-oss-120b@0.0 \
+  --expected-config openai/gpt-oss-120b@0.7
 ```
 
 The paper must report the exact corpus version, response count, labeler

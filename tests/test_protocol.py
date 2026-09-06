@@ -7,9 +7,9 @@ from research.protocol import expected_configs, expected_second_label_ids, load_
 
 def test_checked_in_study_manifest_is_valid_and_explicit():
     manifest = load_manifest()
-    assert manifest["protocol_version"] == "1.1"
+    assert manifest["protocol_version"] == "1.2"
     assert manifest["repeats"] == 5
-    assert manifest["corpus"]["target_models"] == ["llama-3.1-8b-instant"]
+    assert manifest["corpus"]["target_models"] == ["openai/gpt-oss-20b"]
     assert manifest["corpus"]["target_provider"] == "groq"
     assert manifest["corpus"]["target_temperature"] == 0.0
     assert manifest["corpus"]["target_max_tokens"] == 512
@@ -17,10 +17,10 @@ def test_checked_in_study_manifest_is_valid_and_explicit():
     assert manifest["judge_max_tokens"] == 120
     assert len(manifest["labeling_guide_sha256"]) == 64
     assert expected_configs(manifest) == [
-        "llama-3.1-8b-instant@0",
-        "llama-3.1-8b-instant@0.7",
-        "llama-3.3-70b-versatile@0",
-        "llama-3.3-70b-versatile@0.7",
+        "openai/gpt-oss-20b@0",
+        "openai/gpt-oss-20b@0.7",
+        "openai/gpt-oss-120b@0",
+        "openai/gpt-oss-120b@0.7",
     ]
 
 

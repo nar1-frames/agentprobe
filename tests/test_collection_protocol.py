@@ -22,10 +22,10 @@ def test_judge_collection_defaults_to_manifest_matrix():
         {"judge": {"provider": "groq", "model": "fallback"}}, args, manifest
     )
     assert [(model, temperature) for _base, model, temperature in configs] == [
-        ("llama-3.1-8b-instant", 0.0),
-        ("llama-3.1-8b-instant", 0.7),
-        ("llama-3.3-70b-versatile", 0.0),
-        ("llama-3.3-70b-versatile", 0.7),
+        ("openai/gpt-oss-20b", 0.0),
+        ("openai/gpt-oss-20b", 0.7),
+        ("openai/gpt-oss-120b", 0.0),
+        ("openai/gpt-oss-120b", 0.7),
     ]
 
 
@@ -57,6 +57,26 @@ def test_corpus_target_request_receives_explicit_temperature():
     assert response == "fixture response"
     assert error is None
     assert calls[0]["temperature"] == 0.0
+
+
+def test_corpus_does_not_retry_a_permanent_model_not_found_error():
+    calls = []
+
+    class ModelNotFound(Exception):
+        status_code = 404
+
+    class Completions:
+        def create(self, **_kwargs):
+            calls.append(True)
+            raise ModelNotFound("model_not_found")
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+    response, error = send_prompt(
+        client, "missing-model", "attack", retries=3, delay=0,
+    )
+    assert response is None
+    assert "model_not_found" in error
+    assert len(calls) == 1
 
 
 def test_corpus_row_records_protocol_and_provider_provenance(tmp_path, monkeypatch):

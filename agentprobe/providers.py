@@ -6,6 +6,8 @@ import os
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
+from agentprobe.detection import sanitize_error
+
 
 try:
     from dotenv import load_dotenv
@@ -63,3 +65,40 @@ def build_client(provider_config: Mapping[str, Any]):
             kwargs["base_url"] = "http://localhost:11434/v1"
         return OpenAI(**kwargs)
     raise ValueError(f"Unknown provider: '{provider}'")
+
+
+def preflight_model(client: Any, model: str) -> bool:
+    """Verify a provider-listed model before spending prompt-call budget.
+
+    OpenAI-compatible SDKs expose a ``models.list`` endpoint, but not every
+    compatible server implements it. If the endpoint is absent, the caller
+    continues normally; if it exists, an explicit non-match or provider error
+    fails before the first attack request. This catches retired/unauthorized
+    model IDs without multiplying a permanent error across a full corpus.
+    """
+
+    if not isinstance(model, str) or not model.strip():
+        raise ValueError("model must be a non-empty string")
+    models_api = getattr(client, "models", None)
+    list_models = getattr(models_api, "list", None)
+    if not callable(list_models):
+        return False
+    try:
+        listing = list_models()
+    except Exception as exc:  # noqa: BLE001 - provider boundary is fail-closed
+        raise ValueError(f"model availability preflight failed: {sanitize_error(exc)}") from exc
+    data = listing.get("data") if isinstance(listing, Mapping) else getattr(listing, "data", None)
+    if data is None:
+        # A compatible endpoint returned an unexpected shape. Do not claim
+        # availability from an unverifiable response.
+        raise ValueError("model availability preflight returned no model list")
+    if not isinstance(data, (list, tuple)):
+        raise ValueError("model availability preflight returned an invalid model list")
+    model_ids = set()
+    for item in data:
+        item_id = item.get("id") if isinstance(item, Mapping) else getattr(item, "id", None)
+        if isinstance(item_id, str):
+            model_ids.add(item_id)
+    if model not in model_ids:
+        raise ValueError(f"model '{model}' is not available from the configured provider")
+    return True
