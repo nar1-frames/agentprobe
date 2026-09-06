@@ -18,6 +18,7 @@ from typing import Any, Dict, Mapping
 
 
 SCHEMA_VERSION = "1.0"
+HARNESS_SCHEMA_VERSION = "1.0"
 TOOL_VERSION = "1.3.0"
 VERDICTS = ("VULNERABLE", "PARTIAL", "SAFE", "SUSPICIOUS")
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
@@ -169,6 +170,77 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
     }
 
 
+def build_harness_report(results, mode, generated_at=None):
+    """Build a versioned, machine-readable report for harness executions."""
+
+    serialized = []
+    for result in results:
+        if hasattr(result, "to_dict"):
+            result = result.to_dict()
+        if not isinstance(result, Mapping):
+            raise ValueError("harness results must be mappings or expose to_dict()")
+        try:
+            json.dumps(result, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"harness result is not JSON-serializable: {exc}") from exc
+        serialized.append(dict(result))
+
+    attack_results = [row for row in serialized if row.get("scenario_kind") == "attack"]
+    control_results = [row for row in serialized if row.get("scenario_kind") == "control"]
+    operational_errors = sum(
+        len(row.get("operational_errors") or []) for row in serialized
+    )
+    return {
+        "schema_version": HARNESS_SCHEMA_VERSION,
+        "artifact_type": "agentprobe_harness",
+        "tool": "agentprobe",
+        "tool_version": TOOL_VERSION,
+        "generated_at": generated_at or _utc_now(),
+        "mode": mode,
+        "summary": {
+            "scenarios": len(serialized),
+            "attacks": len(attack_results),
+            "attack_successes": sum(bool(row.get("attack_succeeded")) for row in attack_results),
+            "controls": len(control_results),
+            "controls_passed": sum(bool(row.get("control_succeeded")) for row in control_results),
+            "operational_errors": operational_errors,
+        },
+        "results": serialized,
+    }
+
+
+def _write_json_atomic(path, payload, prefix):
+    """Atomically write a private JSON artifact to an explicit path."""
+
+    path = os.fspath(path)
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=prefix, suffix=".json", dir=directory)
+    try:
+        os.chmod(temporary, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False, allow_nan=False)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, path)
+        try:
+            directory_fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            pass
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+    return path
+
+
 def save_json_report(report: Mapping[str, Any], target_model: str, report_dir: str) -> str:
     """Write a scan artifact and return its path."""
 
@@ -178,18 +250,12 @@ def save_json_report(report: Mapping[str, Any], target_model: str, report_dir: s
     run_id = str((report.get("run") or {}).get("run_id", uuid.uuid4().hex))
     run_fragment = safe_filename_component(run_id)[:32] or "run"
     path = os.path.join(report_dir, f"scan_{safe_name}_{run_stamp}_{run_fragment[:8]}.json")
-    fd, temp_path = tempfile.mkstemp(prefix=".agentprobe-", suffix=".json", dir=report_dir)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(report, f, indent=2, ensure_ascii=False)
-            f.write("\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temp_path, path)
-    except Exception:
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
-        raise
-    return path
+    return _write_json_atomic(path, report, ".agentprobe-")
+
+
+def save_harness_report(report: Mapping[str, Any], path: str) -> str:
+    """Atomically write a private harness report to the requested path."""
+
+    if not isinstance(path, str) or not path.strip() or path == "-":
+        raise ValueError("harness report path must be a non-empty file path")
+    return _write_json_atomic(path, report, ".agentprobe-harness-")

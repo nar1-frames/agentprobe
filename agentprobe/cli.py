@@ -5,19 +5,22 @@ import json
 from typing import Sequence
 
 from agentprobe.harness import run_fixture_suite
+from agentprobe.reporting import build_harness_report, save_harness_report
 
 
 def _harness(args) -> int:
-    results = [result.to_dict() for result in run_fixture_suite(args.mode)]
+    report = build_harness_report(run_fixture_suite(args.mode), args.mode)
+    results = report["results"]
     if args.json:
-        payload = {"schema_version": "1.0", "mode": args.mode, "results": results}
-        text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
-        if args.json == "-":
-            print(text, end="")
-        else:
-            with open(args.json, "w", encoding="utf-8") as f:
-                f.write(text)
-            print(f"Wrote harness report to {args.json}")
+        try:
+            if args.json == "-":
+                print(json.dumps(report, indent=2, ensure_ascii=False) + "\n", end="")
+            else:
+                save_harness_report(report, args.json)
+                print(f"Wrote harness report to {args.json}")
+        except (OSError, TypeError, ValueError) as exc:
+            print(f"agentprobe: harness report error: {exc}")
+            return 2
     else:
         print(f"AgentProbe fixture harness — mode: {args.mode}")
         for result in results:

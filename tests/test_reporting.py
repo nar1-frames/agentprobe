@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import pytest
 
 from agentprobe.reporting import (
-    build_json_report, build_run_metadata, safe_filename_component, save_json_report,
+    build_harness_report, build_json_report, build_run_metadata,
+    safe_filename_component, save_harness_report, save_json_report,
 )
 from report_html_v11 import build_summary, generate_html_report
 import agentprobe_v11 as v11
@@ -31,6 +32,27 @@ def test_json_report_has_stable_summary_and_error_boundary():
     assert report["categories"]["jailbreak"]["operational_errors"] == 1
     assert report["results"][1]["status"] == "error"
     assert report["results"][1]["finding_severity"] is None
+
+
+def test_harness_report_is_versioned_summarized_and_private(tmp_path):
+    report = build_harness_report([
+        {
+            "scenario_kind": "attack", "attack_succeeded": True,
+            "operational_errors": [],
+        },
+        {
+            "scenario_kind": "control", "control_succeeded": True,
+            "operational_errors": ["fixture warning"],
+        },
+    ], "guarded", generated_at="fixed")
+    assert report["artifact_type"] == "agentprobe_harness"
+    assert report["summary"] == {
+        "scenarios": 2, "attacks": 1, "attack_successes": 1,
+        "controls": 1, "controls_passed": 1, "operational_errors": 1,
+    }
+    path = save_harness_report(report, str(tmp_path / "harness.json"))
+    assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.0"
+    assert __import__("pathlib").Path(path).stat().st_mode & 0o077 == 0
 
 
 def test_json_report_preserves_library_index_after_filtering():

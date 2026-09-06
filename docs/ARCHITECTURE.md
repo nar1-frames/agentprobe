@@ -71,6 +71,9 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
 - **Audit traces are ordered and data-minimized.** Harness JSON includes
   request, block, execution, provider-error, and tool-error events; sensitive
   tool arguments and side-effect payloads are redacted before serialization.
+- **Harness artifacts are durable evidence.** The CLI emits a versioned
+  harness artifact with attack/control summaries and writes it atomically with
+  private permissions; stdout JSON remains available for CI pipes.
 - **Provider errors are sanitized before persistence.** Common API keys and
   tenant identifiers are removed from scanner, research, and harness error
   records.

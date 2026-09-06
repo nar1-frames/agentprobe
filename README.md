@@ -115,7 +115,8 @@ agentprobe harness --mode vulnerable --json reports/harness.json
 The fixture tools never touch the network, filesystem, mail, or real accounts.
 The same module also includes an OpenAI-compatible multi-step tool-calling loop,
 so a real agent client can be connected without bypassing the policy gate or
-trace recorder. Harness JSON includes ordered tool events and redacts sensitive
+trace recorder. Harness JSON is versioned and summarized, written atomically
+with private permissions, includes ordered tool events, and redacts sensitive
 arguments and side-effect payloads before serialization.
 
 ---
@@ -269,7 +270,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-163 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+165 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 

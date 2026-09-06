@@ -1,3 +1,5 @@
+import json
+
 import agentprobe_v11
 
 from agentprobe.cli import main
@@ -43,3 +45,11 @@ def test_noninteractive_scan_passes_checkpoint_options(monkeypatch):
         "checkpoint_path": "reports/run.checkpoint.json",
         "resume": True,
     }
+
+
+def test_harness_json_output_is_versioned(tmp_path):
+    path = tmp_path / "harness.json"
+    assert main(["harness", "--mode", "guarded", "--json", str(path)]) == 0
+    report = json.loads(path.read_text(encoding="utf-8"))
+    assert report["artifact_type"] == "agentprobe_harness"
+    assert report["summary"]["controls_passed"] == 1
