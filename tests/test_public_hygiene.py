@@ -1,4 +1,6 @@
-from research.public_hygiene import scan_content, scan_public_tree
+import zipfile
+
+from research.public_hygiene import scan_content, scan_public_tree, scan_wheel
 
 
 def test_public_hygiene_rejects_credential_like_data_outside_tests():
@@ -41,3 +43,14 @@ def test_current_tracked_tree_passes_public_hygiene():
 
 def test_current_candidate_tree_passes_public_hygiene():
     assert scan_public_tree(".", include_untracked=True) == []
+
+
+def test_public_hygiene_rejects_backup_and_duplicate_wheel_entries(tmp_path):
+    path = tmp_path / "agentprobe.whl"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("agentprobe/scanner.py", "")
+        archive.writestr("agentprobe-backup-preconsolidation/old.py", "")
+        archive.writestr("agentprobe/detection 2.py", "")
+    findings = scan_wheel(path)
+    assert any("backup-preconsolidation" in finding for finding in findings)
+    assert any("detection 2.py" in finding for finding in findings)

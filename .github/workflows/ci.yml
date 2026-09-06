@@ -36,3 +36,9 @@ jobs:
 
       - name: Check public-tree hygiene
         run: python -m research.public_hygiene
+
+      - name: Build and audit public wheel
+        run: |
+          mkdir -p /tmp/agentprobe-wheel
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/agentprobe-wheel .
+          python -m research.public_hygiene --wheel /tmp/agentprobe-wheel/*.whl

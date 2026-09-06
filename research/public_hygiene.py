@@ -11,6 +11,7 @@ are not.
 import argparse
 import re
 import subprocess
+import zipfile
 from pathlib import Path
 
 
@@ -108,6 +109,25 @@ def scan_public_tree(root=".", include_untracked=False):
     return findings
 
 
+def scan_wheel(path):
+    """Check a built wheel for local backups, caches, or duplicate artifacts."""
+
+    findings = []
+    try:
+        with zipfile.ZipFile(path) as archive:
+            for name in archive.namelist():
+                relative = Path(name)
+                if ("agentprobe-backup-preconsolidation" in relative.parts
+                        or "_variants_from_B" in relative.parts
+                        or any(part in {".git", "__pycache__", ".pytest_cache"}
+                               for part in relative.parts)
+                        or re.search(r" 2\.[^/]+$", relative.name)):
+                    findings.append(f"{name}: forbidden wheel artifact")
+    except (OSError, zipfile.BadZipFile) as exc:
+        findings.append(f"{path}: cannot inspect wheel ({exc})")
+    return findings
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Check the tracked public repository surface")
     parser.add_argument("--root", default=".", help="Git worktree to inspect")
@@ -115,9 +135,15 @@ def main(argv=None):
         "--include-untracked", action="store_true",
         help="also inspect non-ignored files not yet in the Git index",
     )
+    parser.add_argument(
+        "--wheel", default=None,
+        help="also inspect a built wheel for backup, cache, and duplicate artifacts",
+    )
     args = parser.parse_args(argv)
     try:
         findings = scan_public_tree(args.root, include_untracked=args.include_untracked)
+        if args.wheel:
+            findings.extend(scan_wheel(args.wheel))
     except (OSError, subprocess.CalledProcessError, UnicodeError) as exc:
         parser.error(f"could not inspect tracked files: {exc}")
     if findings:
