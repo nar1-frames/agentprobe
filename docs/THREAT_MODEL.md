@@ -60,10 +60,13 @@ tool invocation.
    tool name was allowlisted.
 5. High-impact tool policies may deny requests whose origin is untrusted
    external content, independent of a user confirmation.
-6. Real credentials are read from environment variables, not YAML or reports.
-7. Serialized harness traces redact secret-like tool arguments and side-effect
+6. Tool calls from the live model adapter are treated as unproven provenance;
+   guarded high-impact email actions remain denied unless an integration
+   supplies a separately reviewed provenance-aware policy.
+7. Real credentials are read from environment variables, not YAML or reports.
+8. Serialized harness traces redact secret-like tool arguments and side-effect
    payloads; provider error records redact common credentials and tenant IDs.
-8. Publication analysis excludes incomplete and failed judge groups instead of
+9. Publication analysis excludes incomplete and failed judge groups instead of
    imputing their verdicts.
 
 ## Out of scope

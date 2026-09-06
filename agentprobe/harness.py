@@ -141,6 +141,8 @@ class ToolPolicy:
                   confirmed_calls: Iterable[Any] = ()) -> Tuple[bool, str]:
         if not isinstance(call.name, str) or not call.name.strip():
             return False, "tool name must be a non-empty string"
+        if not isinstance(call.origin, str) or not call.origin.strip():
+            return False, "tool origin must be a non-empty string"
         if not isinstance(call.arguments, Mapping):
             return False, "tool arguments must be a JSON object"
         try:
@@ -506,7 +508,40 @@ def _parse_tool_call(raw_call: Any) -> ToolCall:
         raw_arguments = json.loads(raw_arguments)
     if not isinstance(raw_arguments, Mapping):
         raise ValueError("tool arguments must be a JSON object")
+    try:
+        json.dumps(dict(raw_arguments), ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("tool arguments must be JSON-serializable") from exc
     return ToolCall(str(name), dict(raw_arguments), origin="live-model")
+
+
+def _validate_tool_schemas(tool_schemas: Any) -> List[Mapping[str, Any]]:
+    """Validate the schema boundary before sending it to a provider."""
+
+    if not isinstance(tool_schemas, list):
+        raise ValueError("tool_schemas must be a list")
+    names = set()
+    for index, schema in enumerate(tool_schemas, start=1):
+        if not isinstance(schema, Mapping):
+            raise ValueError(f"tool schema {index} must be an object")
+        if schema.get("type") != "function":
+            raise ValueError(f"tool schema {index} must have type=function")
+        function = schema.get("function")
+        if not isinstance(function, Mapping):
+            raise ValueError(f"tool schema {index}.function must be an object")
+        name = function.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"tool schema {index}.function.name must be non-empty")
+        if name in names:
+            raise ValueError(f"duplicate tool schema name: {name}")
+        names.add(name)
+        if not isinstance(function.get("parameters"), Mapping):
+            raise ValueError(f"tool schema {index}.function.parameters must be an object")
+    try:
+        json.dumps(tool_schemas, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"tool schemas must be JSON-serializable: {exc}") from exc
+    return list(tool_schemas)
 
 
 class OpenAICompatibleAgent:
@@ -526,12 +561,17 @@ class OpenAICompatibleAgent:
             raise ValueError("temperature must be finite")
         if not 0 <= temperature <= 2:
             raise ValueError("temperature must be between 0 and 2")
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("model must be a non-empty string")
+        if not isinstance(system_prompt, str):
+            raise ValueError("system_prompt must be a string")
+        schemas = FIXTURE_TOOL_SCHEMAS if tool_schemas is None else tool_schemas
         self.client = client
         self.model = model
         self.system_prompt = system_prompt
         self.max_steps = max_steps
         self.temperature = temperature
-        self.tool_schemas = list(tool_schemas or FIXTURE_TOOL_SCHEMAS)
+        self.tool_schemas = _validate_tool_schemas(schemas)
 
     def run(self, scenario: Scenario, policy: ToolPolicy,
             confirmed_tools: Iterable[Any] = (),
@@ -615,6 +655,18 @@ class OpenAICompatibleAgent:
             malformed_call = False
             for raw_call in raw_calls:
                 call_id = _field(raw_call, "id", f"step-{step}-{len(wire_calls)}")
+                if not isinstance(call_id, str) or not call_id.strip():
+                    blocked.append({
+                        "call": {"raw_type": type(raw_call).__name__},
+                        "reason": "tool call id must be a non-empty string",
+                    })
+                    events.append({
+                        "step": step, "event": "tool_malformed",
+                        "call": {"raw_type": type(raw_call).__name__},
+                        "reason": "tool call id must be a non-empty string",
+                    })
+                    malformed_call = True
+                    continue
                 try:
                     call = _parse_tool_call(raw_call)
                 except (TypeError, ValueError, json.JSONDecodeError) as exc:
@@ -650,7 +702,9 @@ class OpenAICompatibleAgent:
                     "type": "function",
                     "function": {
                         "name": call.name,
-                        "arguments": json.dumps(dict(call.arguments)),
+                        "arguments": json.dumps(
+                            dict(call.arguments), ensure_ascii=False, allow_nan=False
+                        ),
                     },
                 })
                 resolved = ToolCall(call.name, _resolve(call.arguments, outputs), call.origin)
@@ -782,7 +836,12 @@ def policy_for(mode: str) -> ToolPolicy:
             frozenset({"read_file", "send_email"}),
             confirmation_required=frozenset({"send_email"}),
             argument_rules=FIXTURE_ARGUMENT_RULES,
-            blocked_origins={"send_email": frozenset({"external_content"})},
+            # The live adapter cannot prove which context caused a model
+            # request. Treating the model-originated high-impact call as
+            # untrusted prevents a broad confirmation from turning retrieved
+            # content into an email side effect. Integrations may supply a
+            # provenance-aware policy explicitly after review.
+            blocked_origins={"send_email": frozenset({"external_content", "live-model"})},
         )
     raise ValueError(f"unknown harness mode: {mode}")
 

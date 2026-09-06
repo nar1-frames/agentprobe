@@ -59,6 +59,14 @@ def test_guarded_file_policy_rejects_path_traversal():
     assert reason == "arguments fail the tool boundary policy"
 
 
+def test_policy_rejects_malformed_tool_origin_without_raising():
+    allowed, reason = policy_for("guarded").authorize(
+        ToolCall("read_file", {"path": "/workspace/fixtures/log.txt"}, origin=[])
+    )
+    assert allowed is False
+    assert reason == "tool origin must be a non-empty string"
+
+
 def test_guarded_email_policy_validates_schema_after_confirmation():
     policy = policy_for("guarded")
     malformed = ToolCall("send_email", {"recipient": "owner@example.test"})
@@ -122,6 +130,17 @@ def test_origin_policy_denies_external_high_impact_tool_even_with_confirmation()
         False, "tool origin is not trusted for this operation"
     )
     assert policy.authorize(trusted, confirmed_calls=(trusted,))[0] is True
+
+
+def test_guarded_policy_denies_unproven_live_model_email_even_with_confirmation():
+    policy = policy_for("guarded")
+    live = ToolCall(
+        "send_email", {"recipient": "owner@example.test", "body": "approved"},
+        origin="live-model",
+    )
+    assert policy.authorize(live, confirmed_calls=(live,)) == (
+        False, "tool origin is not trusted for this operation"
+    )
 
 
 def test_fixture_suite_is_reproducible_and_serializable():
@@ -369,3 +388,46 @@ def test_live_adapter_bounds_steps_and_temperature():
             pass
         else:
             raise AssertionError(f"invalid adapter settings accepted: {kwargs}")
+
+
+def test_live_adapter_rejects_invalid_tool_schema_boundary():
+    client = _FakeToolCallingClient()
+    valid = {
+        "type": "function",
+        "function": {
+            "name": "read_secret",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+    for schemas in ([valid, valid], [dict(valid, type="invalid")], ["not-a-schema"]):
+        try:
+            OpenAICompatibleAgent(client, "fixture-model", "system", tool_schemas=schemas)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid tool schemas accepted: {schemas!r}")
+
+
+def test_live_adapter_rejects_non_json_tool_arguments_before_execution():
+    class _NanClient:
+        class _Completions:
+            def create(self, **_kwargs):
+                return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
+                    content=None,
+                    tool_calls=[SimpleNamespace(
+                        id="nan-call",
+                        function=SimpleNamespace(
+                            name="read_secret", arguments={"value": float("nan")}
+                        ),
+                    )],
+                ))])
+
+        @property
+        def chat(self):
+            return SimpleNamespace(completions=self._Completions())
+
+    result = OpenAICompatibleAgent(
+        _NanClient(), "fixture-model", "system"
+    ).run(_scenario("harness-indirect-secret-exfil"), policy_for("vulnerable"))
+    assert result.executed_tool_calls == []
+    assert "JSON-serializable" in result.blocked_tool_calls[0]["reason"]

@@ -67,7 +67,11 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   every later request for the same tool.
 - **High-impact tools can be origin-scoped.** The fixture architecture policy
   denies external-content email requests even if a broad confirmation is
-  present; user-origin requests still require their own exact approval.
+  present; unproven `live-model` email requests are denied by default as well,
+  while user-origin requests still require their own exact approval.
+- **Provider schemas and calls are input boundaries.** The live adapter rejects
+  duplicate or malformed function schemas, invalid call IDs, and
+  non-JSON-safe arguments before a policy or executor can see them.
 - **Audit traces are ordered and data-minimized.** Harness JSON includes
   request, block, execution, provider-error, and tool-error events; sensitive
   tool arguments and side-effect payloads are redacted before serialization.
