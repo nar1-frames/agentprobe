@@ -27,7 +27,9 @@ agentprobe = "agentprobe.cli:main"
 py-modules = ["agentprobe_v11", "agentprobe_v12", "report_html_v11", "disclosure_cli", "mitigations"]
 
 [tool.setuptools.packages.find]
-include = ["agentprobe*", "attacks*", "disclosure*", "research*"]
+include = ["agentprobe", "agentprobe.*", "attacks", "attacks.*",
+           "disclosure", "disclosure.*", "research", "research.*"]
+exclude = ["agentprobe-backup*", "_variants_from_B*", "build*", "dist*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
