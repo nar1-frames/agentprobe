@@ -52,7 +52,7 @@ def test_harness_report_is_versioned_summarized_and_private(tmp_path):
         "controls": 1, "controls_passed": 1, "operational_errors": 1,
     }
     path = save_harness_report(report, str(tmp_path / "harness.json"))
-    assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.2"
+    assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.3"
     assert __import__("pathlib").Path(path).stat().st_mode & 0o077 == 0
 
 
@@ -138,13 +138,16 @@ def test_run_metadata_pins_judge_prompt_provenance():
 def test_harness_provenance_identifies_live_run_without_system_prompt():
     metadata = build_harness_provenance(
         "target-3b", provider="ollama", temperature=0.0, max_steps=4,
+        max_tokens=256,
         system_prompt="private prompt", config={
             "provider": "ollama", "model": "target-3b", "api_key_env": None,
+            "max_tokens": 256, "temperature": 0.0,
         },
     )
     assert metadata["target_model"] == "target-3b"
     assert metadata["target_provider"] == "ollama"
     assert metadata["max_steps"] == 4
+    assert metadata["target_max_tokens"] == 256
     assert len(metadata["target_config_sha256"]) == 64
     assert len(metadata["system_prompt_sha256"]) == 64
     assert "private prompt" not in metadata
@@ -255,7 +258,7 @@ def test_empty_provider_message_becomes_target_error(monkeypatch):
                 @staticmethod
                 def create(**_kwargs):
                     class Message:
-                        content = None
+                        content = EmptyTarget.content
                     class Choice:
                         message = Message()
                     class Result:
@@ -263,9 +266,11 @@ def test_empty_provider_message_becomes_target_error(monkeypatch):
                     return Result()
 
     monkeypatch.setattr(v11.time, "sleep", lambda *_args: None)
-    response = v11.send_prompt(EmptyTarget(), "target", "attack", retries=0)
-    assert response.startswith("[ERROR:")
-    assert "no text content" in response
+    for content in (None, "   "):
+        EmptyTarget.content = content
+        response = v11.send_prompt(EmptyTarget(), "target", "attack", retries=0)
+        assert response.startswith("[ERROR:")
+        assert "no text content" in response
 
 
 def test_permanent_target_error_is_not_retried(monkeypatch):

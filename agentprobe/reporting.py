@@ -18,8 +18,8 @@ from typing import Any, Dict, Mapping
 
 
 SCHEMA_VERSION = "1.0"
-HARNESS_SCHEMA_VERSION = "1.2"
-TOOL_VERSION = "1.5.0"
+HARNESS_SCHEMA_VERSION = "1.3"
+TOOL_VERSION = "1.6.0"
 VERDICTS = ("VULNERABLE", "PARTIAL", "SAFE", "SUSPICIOUS")
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
 
@@ -171,7 +171,7 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
 
 
 def build_harness_provenance(model, provider=None, temperature=None, max_steps=None,
-                             system_prompt=None, config=None):
+                             max_tokens=None, system_prompt=None, config=None):
     """Create non-secret provenance for a live harness execution."""
 
     metadata = {
@@ -185,6 +185,8 @@ def build_harness_provenance(model, provider=None, temperature=None, max_steps=N
         metadata["target_temperature"] = temperature
     if max_steps is not None:
         metadata["max_steps"] = max_steps
+    if max_tokens is not None:
+        metadata["target_max_tokens"] = max_tokens
     if system_prompt is not None:
         metadata["system_prompt_sha256"] = hashlib.sha256(
             str(system_prompt).encode("utf-8")
@@ -194,7 +196,7 @@ def build_harness_provenance(model, provider=None, temperature=None, max_steps=N
             key: config[key]
             for key in (
                 "provider", "model", "api_key_env", "base_url",
-                "timeout_seconds", "strength_rank",
+                "timeout_seconds", "max_tokens", "temperature", "strength_rank",
             )
             if key in config
         }

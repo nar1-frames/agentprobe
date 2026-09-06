@@ -116,7 +116,7 @@ def send_prompt(
             if not choices:
                 raise ValueError("provider response contained no choices")
             content = getattr(getattr(choices[0], "message", None), "content", None)
-            if not isinstance(content, str):
+            if not isinstance(content, str) or not content.strip():
                 raise ValueError("provider response contained no text content")
             return content
         except Exception as exc:  # noqa: BLE001 - provider boundary must be recorded

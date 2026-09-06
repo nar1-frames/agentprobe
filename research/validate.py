@@ -61,6 +61,8 @@ def validate_corpus(corpus, attack_library=None):
             continue
         if not isinstance(row["target_model"], str) or not row["target_model"].strip():
             errors.append(f"corpus row {index}: target_model must be a non-empty string")
+        if not isinstance(row["response"], str):
+            errors.append(f"corpus row {index}: response must be text")
             continue
         if "target_provider" in row and (
                 not isinstance(row["target_provider"], str)

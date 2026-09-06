@@ -64,8 +64,9 @@ tool invocation.
    guarded high-impact email actions remain denied unless an integration
    supplies a separately reviewed provenance-aware policy.
 7. Real credentials are read from environment variables, not YAML or reports.
-8. Serialized harness traces redact secret-like tool arguments and side-effect
-   payloads; provider error records redact common credentials and tenant IDs.
+8. Serialized harness traces redact secret-like tool arguments, side-effect
+   payloads, and known tool-returned secrets echoed in assistant text; provider
+   error records redact common credentials and tenant IDs.
 9. Publication analysis excludes incomplete and failed judge groups instead of
    imputing their verdicts.
 

@@ -43,6 +43,14 @@ def test_validation_rejects_corpus_prompt_or_severity_drift():
     assert any("severity differs" in error for error in report["errors"])
 
 
+def test_validation_rejects_non_text_corpus_responses():
+    corpus = [_corpus_row()]
+    corpus[0]["response"] = {"content": "not a model response"}
+    report = validate_dataset(corpus)
+    assert report["valid"] is False
+    assert any("response must be text" in error for error in report["errors"])
+
+
 def test_validation_rejects_fractional_run_index_and_nonfinite_temperature():
     corpus = [_corpus_row()]
     judgements = [

@@ -108,7 +108,7 @@ def send_prompt(client, model, prompt, max_tokens=512, temperature=0.0,
                 temperature=temperature,
             )
             content = result.choices[0].message.content
-            if not isinstance(content, str):
+            if not isinstance(content, str) or not content.strip():
                 raise ValueError("provider response contained no text content")
             return content
         except Exception as e:

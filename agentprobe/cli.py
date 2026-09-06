@@ -55,10 +55,12 @@ def _live_harness(args) -> int:
         config = scanner.load_config(args.config)
         target = config["target"]
         model = args.model or target["model"]
+        max_tokens = target.get("max_tokens", 512) if args.max_tokens is None else args.max_tokens
         client = scanner.build_client({**target, "model": model})
         results = run_live_fixture_suite(
             client, model, mode=args.mode, system_prompt=args.system_prompt,
             max_steps=args.max_steps, temperature=args.temperature,
+            max_tokens=max_tokens,
         )
     except (OSError, KeyError, TypeError, ValueError) as exc:
         print(f"agentprobe: live harness configuration error: {exc}")
@@ -73,6 +75,7 @@ def _live_harness(args) -> int:
                 provider=target.get("provider"),
                 temperature=args.temperature,
                 max_steps=args.max_steps,
+                max_tokens=max_tokens,
                 system_prompt=args.system_prompt,
                 config=target,
             ),
@@ -142,6 +145,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="system prompt sent to the live harness model",
     )
     harness.add_argument("--max-steps", type=int, default=4)
+    harness.add_argument(
+        "--max-tokens", type=int, default=None,
+        help="live model output-token budget (default: target.max_tokens)",
+    )
     harness.add_argument("--temperature", type=float, default=0.0)
     harness.set_defaults(handler="harness")
     return parser

@@ -116,6 +116,8 @@ agentprobe harness --mode guarded
 agentprobe harness --mode vulnerable --json reports/harness.json
 # Opt-in live model exercise; tools remain in-memory fixtures by default.
 agentprobe harness --live --mode guarded --config config.yaml --fail-on-error
+# Override the live budget when needed (otherwise target.max_tokens is used).
+agentprobe harness --live --mode guarded --config config.yaml --max-tokens 256
 ```
 
 The fixture tools never touch the network, filesystem, mail, or real accounts.
@@ -124,13 +126,15 @@ but still defaults to those fixture tools; connecting a real executor requires
 an explicit integration and separate least-privilege review. The same module
 also includes an OpenAI-compatible multi-step tool-calling loop, so a real
 agent client can be connected without bypassing the policy gate or trace
-recorder. Harness success is evaluated from ordered tool chains and
+recorder. The live harness sends and records an explicit token budget, and its
+report redacts known tool-returned secrets even when a model repeats one in
+assistant text. Harness success is evaluated from ordered tool chains and
 scenario-specific outcomes (for example, a real secret reaching an email or an
 out-of-boundary path being read), not merely from tool names appearing in a
 trace. Harness JSON is versioned and summarized, written atomically with
 private permissions, includes assistant messages and ordered tool events,
-records non-secret live-run provenance, and redacts sensitive arguments and
-side-effect payloads before serialization.
+records non-secret live-run provenance, and redacts sensitive arguments,
+side-effect payloads, and known secrets before serialization.
 
 ---
 
@@ -274,6 +278,7 @@ docs/RESULTS.md              provenance: pilot scan vs frozen study snapshot
 | v1.3 | installable CLI, validated config, run provenance, resumable scan checkpoints, agent harness, research integrity gates |
 | v1.4 | package-owned scanner, shared provider boundary, outcome-aware harness traces, blinded study-label packets |
 | v1.5 | strict judge-output parsing, protocol/provider provenance for study evidence, safer collection resume semantics |
+| v1.6 | live harness token-budget provenance, strict tool-call identity validation, and report-wide secret redaction |
 
 ---
 
