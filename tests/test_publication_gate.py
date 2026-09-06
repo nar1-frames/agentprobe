@@ -1,7 +1,7 @@
 import pytest
 
 from research._common import canonical_digest, response_id
-from research.publication_gate import check_readiness
+from research.publication_gate import check_readiness, _jsonable
 from research.protocol import attack_library_digest, expected_second_label_ids
 from attacks.library import ATTACK_LIBRARY
 
@@ -217,6 +217,12 @@ def test_publication_gate_requires_exact_provider_configuration_digests():
                for reason in report["blocking_reasons"])
     assert any("judge provider configuration provenance does not match" in reason
                for reason in report["blocking_reasons"])
+
+
+def test_publication_gate_diagnostics_are_json_serializable():
+    value = _jsonable({("judge", 0.0): "a" * 64, "digests": {"b" * 64}})
+    assert value["judge@0"] == "a" * 64
+    assert value["digests"] == ["b" * 64]
 
 
 def test_publication_gate_rejects_evidence_from_a_different_corpus():

@@ -506,6 +506,22 @@ def _read_labels(path):
         return list(csv.DictReader(f))
 
 
+def _jsonable(value):
+    """Convert diagnostic values to stable JSON without losing key meaning."""
+
+    if isinstance(value, dict):
+        return {
+            (f"{key[0]}@{key[1]:g}" if isinstance(key, tuple) and len(key) == 2
+             else str(key)): _jsonable(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (set, tuple)):
+        return [_jsonable(item) for item in sorted(value, key=str)]
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    return value
+
+
 def main():
     ap = argparse.ArgumentParser(description="Check whether the study can be published.")
     ap.add_argument("--corpus", default="data/corpus.jsonl")
@@ -619,7 +635,7 @@ def main():
         print(f"BLOCKED: {reason}")
     if args.json:
         with open(args.json, "w", encoding="utf-8") as f:
-            json.dump(report, f, indent=2)
+            json.dump(_jsonable(report), f, indent=2)
             f.write("\n")
     return 0 if report["ready"] else 1
 
