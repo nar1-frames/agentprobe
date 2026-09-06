@@ -73,7 +73,10 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                     expected_protocol_manifest_sha256=None,
                     expected_labeling_guide_sha256=None,
                     expected_target_config_sha256=None,
-                    expected_judge_config_sha256=None):
+                    expected_judge_config_sha256=None,
+                    expected_target_reasoning_effort=None,
+                    expected_target_system_prompt=None,
+                    expected_judge_reasoning_effort=None):
     """Return explicit blocking reasons; do not silently grade incomplete data."""
 
     if not isinstance(expected_k, int) or isinstance(expected_k, bool) or expected_k < 1:
@@ -119,6 +122,26 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                 "corpus target provider metadata does not match the manifest "
                 f"(observed {sorted(observed_providers, key=str)!r}, expected "
                 f"{expected_target_provider!r})"
+            )
+    if expected_target_reasoning_effort is not None:
+        observed_efforts = [
+            row.get("target_reasoning_effort") if isinstance(row, dict) else None
+            for row in corpus
+        ]
+        if len(observed_efforts) != len(corpus) or any(
+                effort != expected_target_reasoning_effort for effort in observed_efforts):
+            blocking.append(
+                "corpus target_reasoning_effort metadata does not match the study manifest"
+            )
+    if expected_target_system_prompt is not None:
+        observed_prompts = [
+            row.get("target_system_prompt") if isinstance(row, dict) else None
+            for row in corpus
+        ]
+        if len(observed_prompts) != len(corpus) or any(
+                prompt != expected_target_system_prompt for prompt in observed_prompts):
+            blocking.append(
+                "corpus target_system_prompt metadata does not match the study manifest"
             )
     if expected_target_temperature is not None:
         raw_temperatures = [
@@ -227,6 +250,16 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
                      or any(value != expected_judge_prompt_sha256 for value in prompt_digests))):
             blocking.append(
                 "judge prompt digest metadata does not match the study manifest"
+            )
+    if expected_judge_reasoning_effort is not None:
+        observed_efforts = [
+            row.get("judge_reasoning_effort") if isinstance(row, dict) else None
+            for row in judgements
+        ]
+        if len(observed_efforts) != len(judgements) or any(
+                effort != expected_judge_reasoning_effort for effort in observed_efforts):
+            blocking.append(
+                "judge reasoning_effort metadata does not match the study manifest"
             )
     if expected_judge_provider is not None:
         judge_providers = [
@@ -495,6 +528,9 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         "expected_labeling_guide_sha256": expected_labeling_guide_sha256,
         "expected_target_config_sha256": expected_target_config_sha256,
         "expected_judge_config_sha256": expected_judge_config_sha256,
+        "expected_target_reasoning_effort": expected_target_reasoning_effort,
+        "expected_target_system_prompt": expected_target_system_prompt,
+        "expected_judge_reasoning_effort": expected_judge_reasoning_effort,
         "corpus_sha256": corpus_sha256,
     }
 
@@ -581,6 +617,11 @@ def main():
     expected_labeling_guide_sha256 = (manifest or {}).get("labeling_guide_sha256")
     expected_target_config_sha256 = None
     expected_judge_config_sha256 = None
+    expected_target_reasoning_effort = (manifest or {}).get("target_reasoning_effort")
+    expected_target_system_prompt = (manifest or {}).get("corpus", {}).get(
+        "target_system_prompt"
+    )
+    expected_judge_reasoning_effort = (manifest or {}).get("judge_reasoning_effort")
     if manifest:
         try:
             config = load_config(args.config)
@@ -622,6 +663,9 @@ def main():
             expected_labeling_guide_sha256,
             expected_target_config_sha256,
             expected_judge_config_sha256,
+            expected_target_reasoning_effort,
+            expected_target_system_prompt,
+            expected_judge_reasoning_effort,
         )
     except ValueError as exc:
         ap.error(str(exc))

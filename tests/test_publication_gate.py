@@ -219,6 +219,19 @@ def test_publication_gate_requires_exact_provider_configuration_digests():
                for reason in report["blocking_reasons"])
 
 
+def test_publication_gate_requires_explicit_reasoning_and_system_context_metadata():
+    report = check_readiness(
+        _corpus(), _judgements(), _labels(), "ren", "friend", 5,
+        expected_target_reasoning_effort="low",
+        expected_target_system_prompt="No tools.",
+        expected_judge_reasoning_effort="low",
+    )
+    assert report["ready"] is False
+    assert any("target_reasoning_effort" in reason for reason in report["blocking_reasons"])
+    assert any("target_system_prompt" in reason for reason in report["blocking_reasons"])
+    assert any("judge reasoning_effort" in reason for reason in report["blocking_reasons"])
+
+
 def test_publication_gate_diagnostics_are_json_serializable():
     value = _jsonable({("judge", 0.0): "a" * 64, "digests": {"b" * 64}})
     assert value["judge@0"] == "a" * 64
