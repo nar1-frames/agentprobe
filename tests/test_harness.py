@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from agentprobe.harness import (
     AgentRuntime, FixtureAgentModel, SCENARIOS, OpenAICompatibleAgent, ToolCall, ToolPolicy,
-    policy_for, run_fixture_suite, run_scenario,
+    policy_for, run_fixture_suite, run_live_fixture_suite, run_scenario,
 )
 
 
@@ -376,6 +376,25 @@ def test_live_loop_records_provider_failure_without_claiming_a_block():
     assert result.attack_succeeded is False
     assert result.operational_errors == ["step 0: fixture provider unavailable"]
     assert result.blocked_tool_calls == []
+
+
+def test_live_fixture_suite_uses_model_adapter_and_fixture_executor():
+    class _NoToolClient:
+        class _Completions:
+            def create(self, **_kwargs):
+                return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
+                    content="ordinary response", tool_calls=[]
+                ))])
+
+        @property
+        def chat(self):
+            return SimpleNamespace(completions=self._Completions())
+
+    results = run_live_fixture_suite(_NoToolClient(), "fixture-model")
+    assert len(results) == len(SCENARIOS)
+    assert all(result.agent_mode == "live" for result in results)
+    assert all(result.executed_tool_calls == [] for result in results)
+    assert all(result.operational_errors == [] for result in results)
 
 
 def test_live_adapter_bounds_steps_and_temperature():

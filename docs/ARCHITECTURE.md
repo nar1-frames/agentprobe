@@ -95,9 +95,11 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
 
 `agentprobe.harness.AgentModel` is the adapter seam for deterministic models,
 and `OpenAICompatibleAgent` is the live multi-step adapter for
-OpenAI-compatible chat APIs. It accepts an explicit schema set and tool
-executor for integration tests, while defaulting to fixture tools. Both paths
-return `ToolCall` objects and keep `AgentRuntime`/`ToolPolicy` as the policy and
-audit boundary. New scenarios should state their objective and required tool
-sequence so success is measured from observed execution rather than from a
-judge's interpretation.
+OpenAI-compatible chat APIs. `agentprobe harness --live` exercises that adapter
+against the configured target model while still defaulting to fixture tools;
+it is opt-in because it makes provider calls. The adapter accepts an explicit
+schema set and tool executor for integration tests, while defaulting to fixture
+tools. Both paths return `ToolCall` objects and keep `AgentRuntime`/`ToolPolicy`
+as the policy and audit boundary. New scenarios should state their objective
+and required tool sequence so success is measured from observed execution
+rather than from a judge's interpretation.

@@ -54,3 +54,38 @@ def test_harness_json_output_is_versioned(tmp_path):
     report = json.loads(path.read_text(encoding="utf-8"))
     assert report["artifact_type"] == "agentprobe_harness"
     assert report["summary"]["controls_passed"] == 1
+
+
+def test_live_harness_cli_is_explicit_and_uses_configured_target(monkeypatch, tmp_path):
+    class _NoToolClient:
+        class _Completions:
+            def create(self, **_kwargs):
+                return type("Response", (), {
+                    "choices": [type("Choice", (), {
+                        "message": type("Message", (), {
+                            "content": "ordinary response", "tool_calls": [],
+                        })(),
+                    })()],
+                })()
+
+        @property
+        def chat(self):
+            return type("Chat", (), {"completions": self._Completions()})()
+
+    monkeypatch.setattr(agentprobe_v11, "load_config", lambda _path: {
+        "target": {"provider": "ollama", "model": "fixture-3b"},
+    })
+    received = {}
+
+    def fake_build_client(config):
+        received.update(config)
+        return _NoToolClient()
+
+    monkeypatch.setattr(agentprobe_v11, "build_client", fake_build_client)
+    path = tmp_path / "live-harness.json"
+    assert main([
+        "harness", "--live", "--config", "fixture.yaml", "--json", str(path),
+    ]) == 0
+    report = json.loads(path.read_text(encoding="utf-8"))
+    assert report["mode"] == "live:guarded"
+    assert received["model"] == "fixture-3b"

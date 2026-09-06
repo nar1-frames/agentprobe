@@ -114,13 +114,18 @@ refusal from an architectural control that makes the action impossible:
 ```bash
 agentprobe harness --mode guarded
 agentprobe harness --mode vulnerable --json reports/harness.json
+# Opt-in live model exercise; tools remain in-memory fixtures by default.
+agentprobe harness --live --mode guarded --config config.yaml --fail-on-error
 ```
 
 The fixture tools never touch the network, filesystem, mail, or real accounts.
-The same module also includes an OpenAI-compatible multi-step tool-calling loop,
-so a real agent client can be connected without bypassing the policy gate or
-trace recorder. Harness JSON is versioned and summarized, written atomically
-with private permissions, includes ordered tool events, and redacts sensitive
+The `--live` path uses the configured target provider for the model conversation
+but still defaults to those fixture tools; connecting a real executor requires
+an explicit integration and separate least-privilege review. The same module
+also includes an OpenAI-compatible multi-step tool-calling loop, so a real
+agent client can be connected without bypassing the policy gate or trace
+recorder. Harness JSON is versioned and summarized, written atomically with
+private permissions, includes ordered tool events, and redacts sensitive
 arguments and side-effect payloads before serialization.
 
 ---
