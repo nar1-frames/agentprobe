@@ -22,7 +22,7 @@
 #
 # Usage
 # -----
-#   python -m research.gen_corpus                # models from --models or config target
+#   python -m research.gen_corpus                # models/settings from manifest
 #   python -m research.gen_corpus --models llama-3.1-8b-instant,gemma2-9b-it
 #   python -m research.gen_corpus --out data/corpus.jsonl --max-tokens 512
 #
@@ -38,6 +38,7 @@
 # ============================================================
 
 import argparse
+import json
 import math
 import os
 import time
@@ -45,6 +46,7 @@ import time
 from research._common import (
     load_config, build_client, response_id, read_jsonl, write_jsonl,
 )
+from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest
 from attacks.library import ATTACK_LIBRARY
 from agentprobe.detection import keyword_check, sanitize_error
 from agentprobe.reliability import is_retryable_error
@@ -79,6 +81,55 @@ def iter_attacks():
     for category, attacks in ATTACK_LIBRARY.items():
         for idx, attack in enumerate(attacks):
             yield category, idx, attack
+
+
+def resolve_generation_plan(target_cfg, models_arg=None, max_tokens_arg=None,
+                            temperature_arg=None, manifest=None):
+    """Resolve and validate corpus settings before any provider call."""
+
+    manifest_corpus = (manifest or {}).get("corpus", {})
+    if models_arg is None:
+        models = list(manifest_corpus.get("target_models", [])) or [target_cfg["model"]]
+    else:
+        models = [model.strip() for model in models_arg.split(",")]
+    if not models or any(not model for model in models) or len(set(models)) != len(models):
+        raise ValueError("target model list must contain unique non-empty names")
+
+    max_tokens = (
+        max_tokens_arg if max_tokens_arg is not None
+        else manifest_corpus.get("target_max_tokens", target_cfg.get("max_tokens", 512))
+    )
+    target_temperature = (
+        temperature_arg if temperature_arg is not None
+        else manifest_corpus.get("target_temperature", target_cfg.get("temperature", 0.0))
+    )
+
+    if manifest:
+        expected_models = set(manifest_corpus["target_models"])
+        if set(models) != expected_models or len(models) != len(expected_models):
+            raise ValueError(
+                "--models must match the manifest target scope; use --manifest "
+                "\"\" for an exploratory deviation"
+            )
+        if max_tokens != manifest_corpus["target_max_tokens"]:
+            raise ValueError(
+                "--max-tokens must match the manifest; use --manifest \"\" "
+                "for an exploratory deviation"
+            )
+        if float(target_temperature) != float(manifest_corpus["target_temperature"]):
+            raise ValueError(
+                "--target-temperature must match the manifest; use --manifest "
+                "\"\" for an exploratory deviation"
+            )
+
+    if isinstance(max_tokens, bool) or not isinstance(max_tokens, int):
+        raise ValueError("--max-tokens must be an integer")
+    if max_tokens < 1 or max_tokens > 131072:
+        raise ValueError("--max-tokens must be between 1 and 131072")
+    target_temperature = float(target_temperature)
+    if not math.isfinite(target_temperature) or not 0 <= target_temperature <= 2:
+        raise ValueError("--target-temperature must be between 0 and 2")
+    return models, max_tokens, target_temperature
 
 
 def generate(target_cfg, model, out_path, max_tokens, target_temperature,
@@ -157,6 +208,10 @@ def main():
     ap.add_argument("--models", default=None,
                     help="comma-separated target model names (default: config target.model)")
     ap.add_argument("--out", default="data/corpus.jsonl")
+    ap.add_argument(
+        "--manifest", default=DEFAULT_MANIFEST_PATH,
+        help="study protocol for default target scope/settings; use an empty value to disable",
+    )
     ap.add_argument("--max-tokens", type=int, default=None,
                     help="override target.max_tokens (default: config or 512)")
     ap.add_argument("--target-temperature", type=float, default=None,
@@ -170,24 +225,24 @@ def main():
     if args.append and args.overwrite:
         raise SystemExit("--append and --overwrite are mutually exclusive")
 
+    manifest = None
+    if args.manifest:
+        try:
+            manifest = load_manifest(args.manifest)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Invalid study manifest: {exc}")
+
     config = load_config(args.config)
     target_cfg = config["target"]
-    max_tokens = args.max_tokens if args.max_tokens is not None else target_cfg.get("max_tokens", 512)
-    if max_tokens < 1 or max_tokens > 131072:
-        raise SystemExit("--max-tokens must be between 1 and 131072")
-    target_temperature = (
-        args.target_temperature
-        if args.target_temperature is not None
-        else target_cfg.get("temperature", 0.0)
-    )
-    if not math.isfinite(target_temperature) or not 0 <= target_temperature <= 2:
-        raise SystemExit("--target-temperature must be between 0 and 2")
+    try:
+        models, max_tokens, target_temperature = resolve_generation_plan(
+            target_cfg, args.models, args.max_tokens, args.target_temperature, manifest,
+        )
+    except (TypeError, ValueError) as exc:
+        raise SystemExit(str(exc))
     rate_limit = config.get("scan", {}).get("rate_limit_seconds", 1)
     retries = config.get("scan", {}).get("retries", 2)
     retry_delay = config.get("scan", {}).get("retry_delay_seconds", 3)
-
-    models = ([m.strip() for m in args.models.split(",")] if args.models
-              else [target_cfg["model"]])
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     if os.path.exists(args.out) and not args.append and not args.overwrite:

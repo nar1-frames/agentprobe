@@ -77,6 +77,38 @@ def judge_configs_from_args(config, args, manifest=None):
     return configs
 
 
+def validate_manifest_overrides(args, manifest):
+    """Reject accidental judge-matrix deviations before any provider call."""
+
+    if not manifest:
+        return
+    expected_models = {judge["model"] for judge in manifest["judges"]}
+    expected_temps = {float(judge["temperature"]) for judge in manifest["judges"]}
+    if args.judges is not None:
+        models = [model.strip() for model in args.judges.split(",")]
+        if set(models) != expected_models or len(models) != len(expected_models):
+            raise ValueError(
+                "--judges must match the manifest matrix; use --manifest \"\" "
+                "for an exploratory deviation"
+            )
+    if args.temps is not None:
+        try:
+            temperatures = [float(value) for value in args.temps.split(",")]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("--temps must contain numeric values") from exc
+        if (set(temperatures) != expected_temps
+                or len(temperatures) != len(expected_temps)):
+            raise ValueError(
+                "--temps must match the manifest matrix; use --manifest \"\" "
+                "for an exploratory deviation"
+            )
+    if args.k is not None and args.k != manifest["repeats"]:
+        raise ValueError(
+            "--k must match the manifest repeat count; use --manifest \"\" "
+            "for an exploratory deviation"
+        )
+
+
 def already_done(existing, rid, model, temp, run_idx):
     return (rid, model, temp, run_idx) in existing
 
@@ -180,6 +212,10 @@ def main():
             manifest = load_manifest(args.manifest)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise SystemExit(f"Invalid study manifest: {exc}")
+    try:
+        validate_manifest_overrides(args, manifest)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
     k = args.k if args.k is not None else (manifest or {}).get("repeats", 5)
     if k < 1:
         raise SystemExit("--k must be at least 1")

@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import pytest
 
 from research.protocol import load_manifest
-from research.run_judges import judge_configs_from_args
-from research.gen_corpus import send_prompt
+from research.run_judges import judge_configs_from_args, validate_manifest_overrides
+from research.gen_corpus import resolve_generation_plan, send_prompt
 import research.run_judges as run_judges
 from research._common import canonical_digest
 
@@ -55,6 +55,39 @@ def test_corpus_target_request_receives_explicit_temperature():
     assert response == "fixture response"
     assert error is None
     assert calls[0]["temperature"] == 0.0
+
+
+def test_corpus_generation_defaults_to_manifest_scope_and_settings():
+    manifest = load_manifest()
+    models, max_tokens, temperature = resolve_generation_plan(
+        {"model": "wrong-config-model", "max_tokens": 99, "temperature": 0.7},
+        manifest=manifest,
+    )
+    assert models == manifest["corpus"]["target_models"]
+    assert max_tokens == manifest["corpus"]["target_max_tokens"]
+    assert temperature == manifest["corpus"]["target_temperature"]
+
+
+def test_corpus_generation_rejects_manifest_deviation_before_provider_calls():
+    manifest = load_manifest()
+    with pytest.raises(ValueError, match="--target-temperature must match"):
+        resolve_generation_plan(
+            {"model": "target"}, temperature_arg=0.7, manifest=manifest,
+        )
+
+
+def test_judge_collection_rejects_manifest_matrix_deviation_before_provider_calls():
+    manifest = load_manifest()
+    args = SimpleNamespace(judges="only-one", temps=None, k=None)
+    with pytest.raises(ValueError, match="--judges must match"):
+        validate_manifest_overrides(args, manifest)
+
+
+def test_judge_collection_rejects_manifest_repeat_deviation_before_provider_calls():
+    manifest = load_manifest()
+    args = SimpleNamespace(judges=None, temps=None, k=1)
+    with pytest.raises(ValueError, match="--k must match"):
+        validate_manifest_overrides(args, manifest)
 
 
 def test_judge_rows_record_the_frozen_corpus_digest(tmp_path, monkeypatch):

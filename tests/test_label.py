@@ -1,6 +1,8 @@
 import pytest
 
-from research.label import load_existing, pick_subset
+from types import SimpleNamespace
+
+from research.label import load_existing, pick_subset, validate_labeling_options
 from research.protocol import expected_second_label_ids
 
 
@@ -39,3 +41,19 @@ def test_label_resume_rejects_evidence_from_a_different_corpus(tmp_path):
     )
     with pytest.raises(ValueError, match="corpus_sha256"):
         load_existing(str(path), "ren", "b" * 64)
+
+
+def test_manifest_labeling_rejects_keyword_display_and_subset_deviation():
+    from research.protocol import load_manifest
+
+    manifest = load_manifest()
+    with pytest.raises(ValueError, match="show-hits is disabled"):
+        validate_labeling_options(
+            SimpleNamespace(show_hits=True, subset=None, seed=None),
+            manifest, "ren",
+        )
+    with pytest.raises(ValueError, match="--subset must match"):
+        validate_labeling_options(
+            SimpleNamespace(show_hits=False, subset=0.5, seed=None),
+            manifest, "friend",
+        )

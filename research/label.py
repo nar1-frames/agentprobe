@@ -98,6 +98,33 @@ def pick_subset(corpus, subset, seed):
     return [row for row in corpus if row.get("response_id") in selected_ids]
 
 
+def validate_labeling_options(args, manifest, labeler):
+    """Keep manifest-backed labels blind and on the preregistered subset."""
+
+    if not manifest:
+        return
+    labels = manifest["labels"]
+    if args.show_hits:
+        raise ValueError(
+            "--show-hits is disabled for manifest-backed labeling because it can "
+            "bias ground truth; use --manifest \"\" for exploratory labeling"
+        )
+    if labeler != labels["second"]:
+        return
+    expected_subset = float(labels["second_overlap_fraction"])
+    expected_seed = labels["second_subset_seed"]
+    if args.subset is not None and float(args.subset) != expected_subset:
+        raise ValueError(
+            "--subset must match the manifest second-label assignment; use "
+            "--manifest \"\" for an exploratory deviation"
+        )
+    if args.seed is not None and args.seed != expected_seed:
+        raise ValueError(
+            "--seed must match the manifest second-label assignment; use "
+            "--manifest \"\" for an exploratory deviation"
+        )
+
+
 def render(row, idx, n, show_hits):
     bar = "=" * 64
     body = row["response"] or "[empty / error response]"
@@ -146,6 +173,10 @@ def main():
             raise SystemExit(f"Invalid study manifest: {exc}")
     manifest_labels = (manifest or {}).get("labels", {})
     labeler = args.labeler or manifest_labels.get("primary", "primary")
+    try:
+        validate_labeling_options(args, manifest, labeler)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
     subset = args.subset
     seed = args.seed
     if manifest and labeler == manifest_labels.get("second"):

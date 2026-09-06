@@ -109,6 +109,12 @@ called with `--append`, and `label` automatically resumes from existing rows,
 so a dropped connection or a coffee break doesn't cost you the run. Resume
 also checks the canonical corpus digest; legacy or mismatched judge/label rows
 are refused rather than silently reused against a regenerated target response.
+The checked-in manifest is authoritative for default corpus scope/settings,
+judge matrix/repeat count, and blinded human-label assignment. To run a
+deliberate exploratory deviation, pass `--manifest ""`; otherwise those
+overrides fail before any provider call or label is collected. In particular,
+manifest-backed labeling disables `--show-hits` so keyword output cannot bias
+the human ground truth.
 If judge rows contain provider failures, use
 `run_judges --resume --repair-errors`; failed rows are archived beside the
 active JSONL file and retried without creating duplicate evidence keys. Fresh
