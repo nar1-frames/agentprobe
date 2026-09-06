@@ -6,6 +6,7 @@ from typing import Sequence
 
 from agentprobe.harness import run_fixture_suite
 from agentprobe.reporting import build_harness_report, save_harness_report
+from agentprobe import scanner
 
 
 def _finish_harness(args, report) -> int:
@@ -47,13 +48,12 @@ def _harness(args) -> int:
 
 def _live_harness(args) -> int:
     from agentprobe.harness import run_live_fixture_suite
-    from agentprobe_v11 import build_client, load_config
 
     try:
-        config = load_config(args.config)
+        config = scanner.load_config(args.config)
         target = config["target"]
         model = args.model or target["model"]
-        client = build_client({**target, "model": model})
+        client = scanner.build_client({**target, "model": model})
         results = run_live_fixture_suite(
             client, model, mode=args.mode, system_prompt=args.system_prompt,
             max_steps=args.max_steps, temperature=args.temperature,
@@ -147,7 +147,6 @@ def main(argv: Sequence[str] = None) -> int:
         if args.repair_errors and not args.resume:
             parser.error("--repair-errors requires --resume")
         if args.non_interactive:
-            from agentprobe_v11 import run_configured_scan
             try:
                 scan_kwargs = {}
                 if args.checkpoint is not None:
@@ -156,7 +155,7 @@ def main(argv: Sequence[str] = None) -> int:
                     scan_kwargs["resume"] = True
                 if args.repair_errors:
                     scan_kwargs["repair_errors"] = True
-                run = run_configured_scan(args.config, **scan_kwargs)
+                run = scanner.run_configured_scan(args.config, **scan_kwargs)
             except (OSError, KeyError, ValueError) as exc:
                 print(f"agentprobe: configuration/scan error: {exc}")
                 return 2

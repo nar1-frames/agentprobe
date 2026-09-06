@@ -239,6 +239,7 @@ All 49 prompts AgentProbe sends, grouped by category. Each is a public prompt-in
 agentprobe_v01.py … v12.py   the learning arc, each version adds one capability
 agentprobe_v12.py            ← interactive local/cloud model picker
 agentprobe/cli.py            installable CLI (`agentprobe scan` / `harness`)
+agentprobe/scanner.py        package scanner path used by automation and CI
 agentprobe/harness.py        offline end-to-end tool-use security harness
 agentprobe/config.py         validated config and bounded runtime settings
 agentprobe/reporting.py      versioned JSON + HTML provenance with atomic writes
@@ -279,7 +280,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-171 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+190 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 

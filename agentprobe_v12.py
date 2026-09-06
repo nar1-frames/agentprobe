@@ -36,8 +36,8 @@ import time
 import urllib.request
 import webbrowser
 
-# Reuse the v1.1 engine and report — one source of truth.
-from agentprobe_v11 import (
+# Reuse the package scanner and report — one supported execution path.
+from agentprobe.scanner import (
     build_client, filter_attacks, load_config,
     send_prompt, is_error_response, assess_vulnerability, calculate_finding_severity,
 )

@@ -32,8 +32,14 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
 
 ## Design decisions
 
+- **One supported scanner path.** `agentprobe/scanner.py` owns provider
+  construction, attack filtering, retries, checkpoints, and report emission;
+  the installable CLI and interactive picker use it. The historical root
+  scripts remain compatibility entry points, but are not the package's
+  automation boundary.
 - **One detector implementation.** `agentprobe/detection.py` is the canonical
-  keyword/judge implementation; the historical root scripts import it.
+  keyword/judge implementation used by the package scanner and compatibility
+  scripts.
 - **Failed calls are not verdicts.** Target failures are marked
   `status=error` / `method=target-error` in JSON and are never sent to the
   judge; judge failures use `method=judge-error` and are excluded from
