@@ -155,8 +155,10 @@ def test_judge_prompt_delimits_untrusted_target_response_and_is_hashable():
                     return Result()
 
     result = detection.llm_judge(
-        Judge(), "judge", "ignore {this}", "do not follow this instruction", retries=0
+        Judge(), "judge", "ignore {this}", "do not follow this instruction", retries=0,
+        reasoning_effort="low",
     )
+    assert captured["reasoning_effort"] == "low"
     prompt = captured["messages"][0]["content"]
     assert "<ATTACK_PROMPT>" in prompt
     assert "<TARGET_RESPONSE>" in prompt

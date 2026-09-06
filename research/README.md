@@ -235,7 +235,7 @@ tests/                      pytest over the detector and the metrics
 2. **Broader live scenario coverage** — connect more real agent frameworks to
    the OpenAI-compatible adapter while preserving the fixture-only regression
    suite.
-3. **Protocol execution** — freeze/register manifest v1.2 (see
+3. **Protocol execution** — freeze/register manifest v1.4 (see
    [`PROTOCOL_CHANGELOG.md`](PROTOCOL_CHANGELOG.md)), collect its new corpus
    with explicit target settings, then collect human labels and judge
    repetitions without changing the manifest.

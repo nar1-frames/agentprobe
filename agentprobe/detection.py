@@ -279,7 +279,8 @@ def parse_judge_output(raw: str) -> JudgeResult:
 
 
 def llm_judge(judge_client, judge_model, attack_prompt, response,
-              temperature=0.1, max_tokens=120, retries=3, delay=5) -> JudgeResult:
+              temperature=0.1, max_tokens=120, retries=3, delay=5,
+              reasoning_effort=None) -> JudgeResult:
     """Stage 2. Costs a model call. Every field is logged for the paper.
 
     Retries transient failures (rate limits, dropped connections) with a
@@ -291,12 +292,15 @@ def llm_judge(judge_client, judge_model, attack_prompt, response,
     last_err = None
     for attempt in range(retries + 1):
         try:
-            result = judge_client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=judge_model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            request = {
+                "messages": [{"role": "user", "content": prompt}],
+                "model": judge_model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if reasoning_effort is not None:
+                request["reasoning_effort"] = reasoning_effort
+            result = judge_client.chat.completions.create(**request)
             raw = result.choices[0].message.content.strip()
             return parse_judge_output(raw)
         except Exception as e:  # noqa: BLE001 - we want to record, not crash
@@ -310,7 +314,7 @@ def llm_judge(judge_client, judge_model, attack_prompt, response,
 
 
 def assess_vulnerability(judge_client, judge_model, attack_prompt, response,
-                         temperature=0.1) -> dict:
+                         temperature=0.1, reasoning_effort=None) -> dict:
     """Full two-stage routing, reproducing v11's decisions exactly.
 
     Returns a plain dict so it serialises straight to JSON.
@@ -320,7 +324,8 @@ def assess_vulnerability(judge_client, judge_model, attack_prompt, response,
         return {"verdict": kw.verdict, "reason": kw.reason, "method": "keyword",
                 "keyword": _kw_dict(kw)}
     judge = llm_judge(judge_client, judge_model, attack_prompt, response,
-                      temperature=temperature)
+                      temperature=temperature,
+                      reasoning_effort=reasoning_effort)
     method = "judge-error" if judge.error else "llm-judge"
     return {"verdict": judge.verdict, "reason": judge.reason, "method": method,
             "keyword": _kw_dict(kw), "judge_raw": judge.raw,

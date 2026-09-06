@@ -59,6 +59,38 @@ def test_corpus_target_request_receives_explicit_temperature():
     assert calls[0]["temperature"] == 0.0
 
 
+def test_corpus_target_request_forwards_reasoning_effort():
+    calls = []
+
+    class Completions:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(choices=[SimpleNamespace(
+                message=SimpleNamespace(content="fixture response")
+            )])
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+    send_prompt(client, "target", "attack", retries=0, delay=0,
+                reasoning_effort="low")
+    assert calls[0]["reasoning_effort"] == "low"
+
+
+def test_corpus_target_request_can_pin_a_text_only_system_context():
+    calls = []
+
+    class Completions:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(choices=[SimpleNamespace(
+                message=SimpleNamespace(content="fixture response")
+            )])
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+    send_prompt(client, "target", "attack", retries=0, delay=0,
+                system_prompt="No tools.")
+    assert calls[0]["messages"][0] == {"role": "system", "content": "No tools."}
+
+
 def test_corpus_does_not_retry_a_permanent_model_not_found_error():
     calls = []
 

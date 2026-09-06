@@ -55,17 +55,22 @@ from agentprobe.reliability import is_retryable_error
 
 
 def send_prompt(client, model, prompt, max_tokens=512, temperature=0.0,
-                retries=2, delay=3):
+                retries=2, delay=3, reasoning_effort=None, system_prompt=None):
     """One target call, with retry/backoff. Returns (text, error_or_None)."""
     last_err = None
     for attempt in range(retries + 1):
         try:
-            result = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            request = {
+                "messages": ([{"role": "system", "content": system_prompt}]
+                             if system_prompt else [])
+                            + [{"role": "user", "content": prompt}],
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if reasoning_effort is not None:
+                request["reasoning_effort"] = reasoning_effort
+            result = client.chat.completions.create(**request)
             content = result.choices[0].message.content
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("provider response contained no text content")
@@ -143,7 +148,8 @@ def resolve_generation_plan(target_cfg, models_arg=None, max_tokens_arg=None,
 
 def generate(target_cfg, model, out_path, max_tokens, target_temperature,
              rate_limit, retries=2, retry_delay=3, records_by_id=None,
-             protocol_manifest_sha256=None):
+             protocol_manifest_sha256=None, reasoning_effort=None,
+             system_prompt=None):
     provider = target_cfg.get("provider", "groq")
     target_config_sha256 = provider_config_digest({
         **target_cfg,
@@ -165,6 +171,8 @@ def generate(target_cfg, model, out_path, max_tokens, target_temperature,
                 existing.get("target_model") == model
                 and existing.get("max_tokens") == max_tokens
                 and existing.get("target_temperature") == target_temperature
+                and existing.get("target_reasoning_effort") == reasoning_effort
+                and existing.get("target_system_prompt") == system_prompt
                 and existing.get("attack_prompt") == attack["prompt"]
                 and existing.get("target_config_sha256") == target_config_sha256
                 and existing.get("protocol_manifest_sha256") == protocol_manifest_sha256
@@ -185,6 +193,8 @@ def generate(target_cfg, model, out_path, max_tokens, target_temperature,
             client, model, prompt, max_tokens=max_tokens,
             temperature=target_temperature,
             retries=retries, delay=retry_delay,
+            reasoning_effort=reasoning_effort,
+            system_prompt=system_prompt,
         )
         response = text if text is not None else ""
         kw = keyword_check(response)
@@ -203,6 +213,8 @@ def generate(target_cfg, model, out_path, max_tokens, target_temperature,
             "collected_at": collected_at,
             "max_tokens": max_tokens,
             "target_temperature": target_temperature,
+            "target_reasoning_effort": reasoning_effort,
+            "target_system_prompt": system_prompt,
             "response": response,
             "keyword_verdict": kw.verdict,
             "keyword_decisive": kw.decisive,
@@ -272,6 +284,18 @@ def main():
     rate_limit = config.get("scan", {}).get("rate_limit_seconds", 1)
     retries = config.get("scan", {}).get("retries", 2)
     retry_delay = config.get("scan", {}).get("retry_delay_seconds", 3)
+    target_reasoning_effort = target_cfg.get("reasoning_effort")
+    if manifest and target_reasoning_effort != manifest.get("target_reasoning_effort"):
+        raise SystemExit(
+            "target reasoning_effort must match the manifest; use --manifest \"\" "
+            "for an exploratory deviation"
+        )
+    target_system_prompt = target_cfg.get("system_prompt")
+    if manifest and target_system_prompt != manifest.get("corpus", {}).get("target_system_prompt"):
+        raise SystemExit(
+            "target system_prompt must match the manifest; use --manifest \"\" "
+            "for an exploratory deviation"
+        )
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     if os.path.exists(args.out) and not args.append and not args.overwrite:
@@ -302,6 +326,8 @@ def main():
                 target_cfg, model, args.out, max_tokens, target_temperature,
                 rate_limit, retries, retry_delay, records_by_id,
                 protocol_manifest_sha256=(manifest_digest(manifest) if manifest else None),
+                reasoning_effort=target_reasoning_effort,
+                system_prompt=target_system_prompt,
             )
     except (OSError, ValueError) as exc:
         raise SystemExit(f"Corpus generation failed: {exc}")

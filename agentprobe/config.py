@@ -22,6 +22,9 @@ VALID_CATEGORIES = frozenset({
     "context_manipulation", "tool_misuse",
 })
 VALID_SEVERITIES = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+VALID_REASONING_EFFORTS = frozenset({
+    "none", "default", "minimal", "low", "medium", "high", "xhigh", "max",
+})
 
 
 def _mapping(value: Any, name: str) -> Mapping[str, Any]:
@@ -101,6 +104,15 @@ def _validate_model_block(config: Mapping[str, Any], name: str) -> float:
             raise ValueError(f"{name}.strength_rank must be numeric")
         if not math.isfinite(rank) or rank < 0:
             raise ValueError(f"{name}.strength_rank must be >= 0")
+    if "reasoning_effort" in block:
+        effort = block["reasoning_effort"]
+        if not isinstance(effort, str) or effort not in VALID_REASONING_EFFORTS:
+            raise ValueError(
+                f"{name}.reasoning_effort must be one of "
+                f"{', '.join(sorted(VALID_REASONING_EFFORTS))}"
+            )
+    if "system_prompt" in block and not isinstance(block["system_prompt"], str):
+        raise ValueError(f"{name}.system_prompt must be a string")
     return timeout
 
 

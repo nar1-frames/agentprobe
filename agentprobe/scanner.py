@@ -71,6 +71,7 @@ def assess_vulnerability(
     judge_retry_delay: float = 5,
     judge_temperature: float = 0.1,
     judge_max_tokens: int = 120,
+    judge_reasoning_effort: Optional[str] = None,
 ) -> tuple[str, str, str]:
     """Route one response through the canonical keyword/judge detector."""
 
@@ -87,6 +88,7 @@ def assess_vulnerability(
         max_tokens=judge_max_tokens,
         retries=judge_retries,
         delay=judge_retry_delay,
+        reasoning_effort=judge_reasoning_effort,
     )
     return judge.verdict, judge.reason, "judge-error" if judge.error else "llm-judge"
 
@@ -100,18 +102,25 @@ def send_prompt(
     temperature: float = 0.0,
     retries: int = 2,
     delay: float = 3,
+    reasoning_effort: Optional[str] = None,
+    system_prompt: Optional[str] = None,
 ) -> str:
     """Call a target model and turn exhausted failures into explicit evidence."""
 
     last_error = None
     for attempt in range(retries + 1):
         try:
-            result = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            request = {
+                "messages": ([{"role": "system", "content": system_prompt}]
+                             if system_prompt else [])
+                            + [{"role": "user", "content": prompt}],
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if reasoning_effort is not None:
+                request["reasoning_effort"] = reasoning_effort
+            result = client.chat.completions.create(**request)
             choices = getattr(result, "choices", None)
             if not choices:
                 raise ValueError("provider response contained no choices")
@@ -148,6 +157,9 @@ def run_full_scan(
     target_temperature: float = 0.0,
     judge_temperature: float = 0.1,
     judge_max_tokens: int = 120,
+    target_reasoning_effort: Optional[str] = None,
+    judge_reasoning_effort: Optional[str] = None,
+    target_system_prompt: Optional[str] = None,
     checkpoint_path: Optional[str] = None,
     resume: bool = False,
     run_metadata: Optional[Mapping[str, Any]] = None,
@@ -215,6 +227,7 @@ def run_full_scan(
                         judge_retry_delay=retry_delay,
                         judge_temperature=judge_temperature,
                         judge_max_tokens=judge_max_tokens,
+                        judge_reasoning_effort=judge_reasoning_effort,
                     )
                     finding = None if method == "judge-error" else calculate_finding_severity(
                         attack["severity"], verdict
@@ -243,6 +256,8 @@ def run_full_scan(
                 temperature=target_temperature,
                 retries=retries,
                 delay=retry_delay,
+                reasoning_effort=target_reasoning_effort,
+                system_prompt=target_system_prompt,
             )
             if is_error_response(response):
                 verdict, reason, method, finding = "SUSPICIOUS", response, "target-error", None
@@ -258,6 +273,7 @@ def run_full_scan(
                     judge_retry_delay=retry_delay,
                     judge_temperature=judge_temperature,
                     judge_max_tokens=judge_max_tokens,
+                    judge_reasoning_effort=judge_reasoning_effort,
                 )
                 finding = None if method == "judge-error" else calculate_finding_severity(
                     attack["severity"], verdict
@@ -343,6 +359,9 @@ def run_configured_scan(
         target_temperature=target.get("temperature", 0.0),
         judge_temperature=judge.get("temperature", 0.1),
         judge_max_tokens=judge.get("max_tokens", 120),
+        target_reasoning_effort=target.get("reasoning_effort"),
+        judge_reasoning_effort=judge.get("reasoning_effort"),
+        target_system_prompt=target.get("system_prompt"),
         checkpoint=checkpoint,
         resume=resume,
         repair_errors=repair_errors,

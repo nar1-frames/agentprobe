@@ -85,9 +85,13 @@ def build_run_metadata(target_model, judge_model, target_provider=None,
             block = config.get(role) if isinstance(config, Mapping) else None
             if not isinstance(block, Mapping):
                 continue
-            for key in ("temperature", "max_tokens"):
+            for key in ("temperature", "max_tokens", "reasoning_effort"):
                 if key in block:
                     metadata[f"{prefix}_{key}"] = block[key]
+            if "system_prompt" in block and isinstance(block["system_prompt"], str):
+                metadata[f"{prefix}_system_prompt_sha256"] = hashlib.sha256(
+                    block["system_prompt"].encode("utf-8")
+                ).hexdigest()
         scan = config.get("scan") if isinstance(config, Mapping) else None
         if isinstance(scan, Mapping):
             for key in ("retries", "retry_delay_seconds", "rate_limit_seconds"):
@@ -171,7 +175,8 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
 
 
 def build_harness_provenance(model, provider=None, temperature=None, max_steps=None,
-                             max_tokens=None, system_prompt=None, config=None):
+                             max_tokens=None, system_prompt=None, config=None,
+                             reasoning_effort=None):
     """Create non-secret provenance for a live harness execution."""
 
     metadata = {
@@ -187,6 +192,8 @@ def build_harness_provenance(model, provider=None, temperature=None, max_steps=N
         metadata["max_steps"] = max_steps
     if max_tokens is not None:
         metadata["target_max_tokens"] = max_tokens
+    if reasoning_effort is not None:
+        metadata["target_reasoning_effort"] = reasoning_effort
     if system_prompt is not None:
         metadata["system_prompt_sha256"] = hashlib.sha256(
             str(system_prompt).encode("utf-8")
@@ -197,6 +204,7 @@ def build_harness_provenance(model, provider=None, temperature=None, max_steps=N
             for key in (
                 "provider", "model", "api_key_env", "base_url",
                 "timeout_seconds", "max_tokens", "temperature", "strength_rank",
+                "reasoning_effort",
             )
             if key in config
         }

@@ -61,6 +61,7 @@ def _live_harness(args) -> int:
             client, model, mode=args.mode, system_prompt=args.system_prompt,
             max_steps=args.max_steps, temperature=args.temperature,
             max_tokens=max_tokens,
+            reasoning_effort=target.get("reasoning_effort"),
         )
     except (OSError, KeyError, TypeError, ValueError) as exc:
         print(f"agentprobe: live harness configuration error: {exc}")
@@ -76,6 +77,7 @@ def _live_harness(args) -> int:
                 temperature=args.temperature,
                 max_steps=args.max_steps,
                 max_tokens=max_tokens,
+                reasoning_effort=target.get("reasoning_effort"),
                 system_prompt=args.system_prompt,
                 config=target,
             ),

@@ -82,7 +82,7 @@ def filter_attacks(config):
 def assess_vulnerability(target_client, target_model, judge_client, judge_model,
                          attack_prompt, response, judge_retries=3,
                          judge_retry_delay=5, judge_temperature=0.1,
-                         judge_max_tokens=120):
+                         judge_max_tokens=120, judge_reasoning_effort=None):
     kw = keyword_check(response)
     # kw.decisive is the boolean v11's `confidence >= 2` was standing in for.
     # It reproduces v11's routing EXACTLY: hedge-then-comply (PARTIAL) or a
@@ -94,22 +94,28 @@ def assess_vulnerability(target_client, target_model, judge_client, judge_model,
         judge_client, judge_model, attack_prompt, response,
         temperature=judge_temperature, max_tokens=judge_max_tokens,
         retries=judge_retries, delay=judge_retry_delay,
+        reasoning_effort=judge_reasoning_effort,
     )
     return judge.verdict, judge.reason, "judge-error" if judge.error else "llm-judge"
 def send_prompt(client, model, prompt, max_tokens=512, temperature=0.0,
-                retries=2, delay=3):
+                retries=2, delay=3, reasoning_effort=None, system_prompt=None):
     # v1.1 FIX: default cap raised from 200 -> 512 (hedge-then-comply payloads
     # live after the refusal and were being truncated), and transient API errors
     # now retry instead of crashing the whole scan.
     last_err = None
     for attempt in range(retries + 1):
         try:
-            result = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            request = {
+                "messages": ([{"role": "system", "content": system_prompt}]
+                             if system_prompt else [])
+                            + [{"role": "user", "content": prompt}],
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if reasoning_effort is not None:
+                request["reasoning_effort"] = reasoning_effort
+            result = client.chat.completions.create(**request)
             content = result.choices[0].message.content
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("provider response contained no text content")
@@ -133,7 +139,9 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
                   attack_library, rate_limit, max_tokens=512, retries=2,
                   retry_delay=3, target_temperature=0.0,
                   judge_temperature=0.1,
-                  judge_max_tokens=120, checkpoint_path=None, resume=False,
+                  judge_max_tokens=120, target_reasoning_effort=None,
+                  judge_reasoning_effort=None, target_system_prompt=None,
+                  checkpoint_path=None, resume=False,
                   run_metadata=None, checkpoint=None, repair_errors=False):
     """Run the scan, optionally persisting one atomic checkpoint per attack.
 
@@ -196,6 +204,7 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
                         judge_retries=retries, judge_retry_delay=retry_delay,
                         judge_temperature=judge_temperature,
                         judge_max_tokens=judge_max_tokens,
+                        judge_reasoning_effort=judge_reasoning_effort,
                     )
                     finding_severity = (
                         None if method == "judge-error"
@@ -214,6 +223,8 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
                 target_client, target_model, prompt, max_tokens=max_tokens,
                 temperature=target_temperature,
                 retries=retries, delay=retry_delay,
+                reasoning_effort=target_reasoning_effort,
+                system_prompt=target_system_prompt,
             )
             if is_error_response(response):
                 verdict = "SUSPICIOUS"
@@ -225,6 +236,7 @@ def run_full_scan(target_client, target_model, judge_client, judge_model,
                     target_client, target_model, judge_client, judge_model, prompt, response,
                     judge_retries=retries, judge_retry_delay=retry_delay,
                     judge_temperature=judge_temperature, judge_max_tokens=judge_max_tokens,
+                    judge_reasoning_effort=judge_reasoning_effort,
                 )
                 finding_severity = None if method == "judge-error" else calculate_finding_severity(severity, verdict)
             row = (attack, response, verdict, finding_severity, reason, method)
@@ -305,6 +317,9 @@ def run_configured_scan(config_path="config.yaml", checkpoint_path=None, resume=
         target_temperature=target_cfg.get("temperature", 0.0),
         judge_temperature=judge_cfg.get("temperature", 0.1),
         judge_max_tokens=judge_cfg.get("max_tokens", 120),
+        target_reasoning_effort=target_cfg.get("reasoning_effort"),
+        judge_reasoning_effort=judge_cfg.get("reasoning_effort"),
+        target_system_prompt=target_cfg.get("system_prompt"),
         checkpoint=checkpoint,
         resume=resume,
         repair_errors=repair_errors,

@@ -7,14 +7,17 @@ from research.protocol import expected_configs, expected_second_label_ids, load_
 
 def test_checked_in_study_manifest_is_valid_and_explicit():
     manifest = load_manifest()
-    assert manifest["protocol_version"] == "1.2"
+    assert manifest["protocol_version"] == "1.4"
     assert manifest["repeats"] == 5
     assert manifest["corpus"]["target_models"] == ["openai/gpt-oss-20b"]
     assert manifest["corpus"]["target_provider"] == "groq"
     assert manifest["corpus"]["target_temperature"] == 0.0
     assert manifest["corpus"]["target_max_tokens"] == 512
+    assert manifest["corpus"]["target_system_prompt"].startswith("This evaluation interface")
+    assert manifest["target_reasoning_effort"] == "low"
     assert manifest["judge_provider"] == "groq"
     assert manifest["judge_max_tokens"] == 120
+    assert manifest["judge_reasoning_effort"] == "low"
     assert len(manifest["labeling_guide_sha256"]) == 64
     assert expected_configs(manifest) == [
         "openai/gpt-oss-20b@0",

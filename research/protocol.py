@@ -9,6 +9,9 @@ import random
 
 
 DEFAULT_MANIFEST_PATH = os.path.join(os.path.dirname(__file__), "study_manifest.json")
+VALID_REASONING_EFFORTS = frozenset({
+    "none", "default", "minimal", "low", "medium", "high", "xhigh", "max",
+})
 
 
 def attack_library_digest(attack_library):
@@ -90,6 +93,17 @@ def load_manifest(path=DEFAULT_MANIFEST_PATH):
         raise ValueError(
             "manifest corpus.target_max_tokens must be an integer between 1 and 131072"
         )
+    target_reasoning_effort = manifest.get("target_reasoning_effort")
+    if (target_reasoning_effort is not None
+            and target_reasoning_effort not in VALID_REASONING_EFFORTS):
+        raise ValueError("manifest target_reasoning_effort is not supported")
+    target_system_prompt = corpus.get("target_system_prompt")
+    if target_system_prompt is not None and not isinstance(target_system_prompt, str):
+        raise ValueError("manifest corpus.target_system_prompt must be a string")
+    judge_reasoning_effort = manifest.get("judge_reasoning_effort")
+    if (judge_reasoning_effort is not None
+            and judge_reasoning_effort not in VALID_REASONING_EFFORTS):
+        raise ValueError("manifest judge_reasoning_effort is not supported")
 
     normalized_judges = []
     seen = set()

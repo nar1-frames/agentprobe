@@ -294,6 +294,12 @@ def main():
     retries = config.get("scan", {}).get("retries", 2)
     retry_delay = config.get("scan", {}).get("retry_delay_seconds", 3)
     base_judge = config["judge"]
+    judge_reasoning_effort = base_judge.get("reasoning_effort")
+    if manifest and judge_reasoning_effort != manifest.get("judge_reasoning_effort"):
+        raise SystemExit(
+            "judge reasoning_effort must match the manifest; use --manifest \"\" "
+            "for an exploratory deviation"
+        )
     judge_max_tokens = (manifest or {}).get(
         "judge_max_tokens", base_judge.get("max_tokens", 120)
     )
@@ -377,7 +383,8 @@ def main():
                 jr = llm_judge(client, model, row["attack_prompt"],
                                row["response"], temperature=temp,
                                max_tokens=judge_max_tokens,
-                               retries=retries, delay=retry_delay)
+                               retries=retries, delay=retry_delay,
+                               reasoning_effort=judge_reasoning_effort)
                 judge_config_sha256 = provider_config_digest({
                     **base_judge,
                     "model": model,
@@ -395,6 +402,7 @@ def main():
                     "judge_prompt_sha256": JUDGE_PROMPT_SHA256,
                     "judge_config_sha256": judge_config_sha256,
                     "judge_max_tokens": judge_max_tokens,
+                    "judge_reasoning_effort": judge_reasoning_effort,
                     "protocol_manifest_sha256": protocol_manifest_sha256,
                     "corpus_sha256": corpus_sha256,
                     "temperature": temp,

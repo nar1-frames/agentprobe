@@ -68,7 +68,7 @@ def response_id(category, attack_index, target_model):
 
 _PROVIDER_DIGEST_FIELDS = (
     "provider", "model", "api_key_env", "base_url", "timeout_seconds",
-    "max_tokens", "temperature", "strength_rank",
+    "max_tokens", "temperature", "strength_rank", "reasoning_effort",
 )
 
 
@@ -88,6 +88,13 @@ def provider_config_digest(provider_config):
         for key in _PROVIDER_DIGEST_FIELDS
         if key in provider_config
     }
+    if "system_prompt" in provider_config:
+        prompt = provider_config["system_prompt"]
+        if not isinstance(prompt, str):
+            raise ValueError("provider configuration system_prompt must be a string")
+        material["system_prompt_sha256"] = hashlib.sha256(
+            prompt.encode("utf-8")
+        ).hexdigest()
     encoded = json.dumps(
         material, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
         allow_nan=False,

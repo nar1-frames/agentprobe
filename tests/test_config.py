@@ -129,6 +129,15 @@ def test_config_rejects_boolean_numeric_settings():
     config["target"]["temperature"] = True
     with pytest.raises(ValueError, match="temperature"):
         validate_config(config)
+
+
+def test_config_validates_reasoning_effort():
+    config = _config()
+    config["target"]["reasoning_effort"] = "low"
+    assert validate_config(config)["target"]["reasoning_effort"] == "low"
+    config["target"]["reasoning_effort"] = "ultra"
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        validate_config(config)
     config = _config()
     config["scan"]["rate_limit_seconds"] = False
     with pytest.raises(ValueError, match="rate_limit_seconds"):

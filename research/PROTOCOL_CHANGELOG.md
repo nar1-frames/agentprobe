@@ -18,3 +18,19 @@ the v1.2 analysis.
 The model-list check establishes that the IDs are advertised, not that a full
 study run will succeed. Collection must still record provider failures and
 remain subject to the publication gate.
+
+## 2026-09-06 — v1.3 reasoning-budget migration
+
+The v1.2 smoke and corpus runs showed that GPT-OSS can consume a 512-token
+target budget on reasoning and return no answer content for some prompts; the
+120-token judge budget has the same risk. Protocol v1.3 explicitly pins Groq's
+`reasoning_effort=low` for target and judge calls. The v1.2 rows remain a
+private failed artifact and are not reused.
+
+## 2026-09-06 — v1.4 text-only target context
+
+The v1.3 run produced two provider-side failures when the target attempted to
+call nonexistent tools in the text-only chat interface. Protocol v1.4 pins an
+explicit no-tools system context for every target request and records that
+context in the target configuration digest. The failed v1.3 rows are not
+reused.
