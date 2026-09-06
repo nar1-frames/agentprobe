@@ -1,6 +1,10 @@
-# I Had Never Written a Line of Code. Six Months Later I Fired 49 Attacks at an AI — Most Got Through.
+# I Had Never Written a Line of Code. Six Months Later I Built an AI Security Scanner.
 
 *By Naren Ranjith*
+
+> Draft note: this post describes one dated engineering pilot, not a
+> publication-ready estimate of attack success. The study that evaluates the
+> detector and its LLM judge is still incomplete.
 
 ---
 
@@ -41,7 +45,8 @@ The two-stage design is the whole trick: keyword matching is fast but dumb, and 
 
 ## What it found
 
-**49 attacks. 29 got through. A 59% success rate — with 10 rated CRITICAL.**
+**49 attacks. 29 were flagged in one pilot — a 59% scanner finding rate, with
+10 rated CRITICAL.**
 
 A few that stuck with me:
 

@@ -15,8 +15,9 @@ human labels (validity) and against itself (reliability), and maps where the
 cheap keyword detector and the expensive judge disagree.
 
 Why this is publishable: the *finding* is the contribution, not the tool. Even a
-result of "the judge agrees with humans 88% of the time but systematically
-over-flags creative-writing refusals" is a useful, citable contribution.
+carefully measured result showing systematic judge errors on creative-writing
+refusals would be a useful, citable contribution; the result must come from the
+completed protocol rather than being assumed in advance.
 
 ---
 

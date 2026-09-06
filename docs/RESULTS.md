@@ -18,14 +18,18 @@ of the judge study.
 
 ## Frozen judge study snapshot
 
-The committed research artifacts contain:
+The historical local research snapshot contained the following artifacts. Raw
+responses, judge transcripts, and labels are intentionally excluded from the
+public tree because they can contain sensitive model output and annotator
+notes; the counts below are retained as provenance for the development
+snapshot, not as a public evidence release:
 
 - 49 frozen responses from `llama-3.1-8b-instant`;
 - 530 judge rows across two judge models, two temperatures, and repeated runs;
 - 17 primary human labels; and
 - 5 recorded judge API failures, excluded from reliability statistics.
 
-The canonical corpus digest reported by `research.validate` is
+The canonical corpus digest recorded for that local snapshot was
 `e29b471f4d5cb201dbce9d8c12f13fb958b3c516b5075b5aa6aa12e5ab49418c`.
 The executable protocol manifest is `research/study_manifest.json`; its
 current SHA-256 is
@@ -38,7 +42,8 @@ the historical judge rows predate that provenance field and the corpus digest
 field; they must be regenerated before publication. The 17 historical label
 rows likewise lack corpus binding and cannot be reused after regeneration.
 
-The current analysis uses complete modal repeat groups for Fleiss' κ:
+The last local analysis of that snapshot used complete modal repeat groups for
+Fleiss' κ:
 
 | Judge | Temperature | Complete items | k | Self-agreement | Fleiss' κ |
 |---|---:|---:|---:|---:|---:|
@@ -50,7 +55,7 @@ The current analysis uses complete modal repeat groups for Fleiss' κ:
 The 70B/0.7 condition has 5 failed calls and 21 incomplete response groups;
 the exclusions are shown by `research.analyze` rather than silently filled.
 With the configured 70B judge at temperature 0.0, the keyword-vs-judge raw
-agreement is **0.449**, and the keyword stage makes a decisive call on **5/49
+agreement was **0.449**, and the keyword stage made a decisive call on **5/49
 (10.2%)** responses.
 
 The analysis command also emits an RQ4 proxy-error-overlap result on the 17
@@ -58,8 +63,8 @@ human-labeled items. It compares weak-judge errors with keyword-stage errors,
 but treats keyword output as a target-behavior proxy—not independent ground
 truth—so it is directional evidence only.
 
-Validity is still preliminary because only 17 responses have human labels. The
-current Cohen's κ values against those labels are -0.007 (8B/0.0), 0.040
+Validity was still preliminary because only 17 responses had human labels. The
+snapshot's Cohen's κ values against those labels were -0.007 (8B/0.0), 0.040
 (8B/0.7), -0.054 (70B/0.0), and -0.172 (70B/0.7). These numbers are evidence
 that the labeling and judge protocol needs more ground truth, not a basis for a
 general claim about model quality.
@@ -85,7 +90,9 @@ python -m research.export --results /tmp/agentprobe-results.json \
 
 ## Publication gate
 
-Before calling the study publication-ready, complete all 49 primary labels,
+The public repository currently contains no raw response corpus or completed
+label release, so the historical snapshot cannot be reproduced from a clean
+clone alone. Before calling a new study publication-ready, complete all 49 primary labels,
 obtain a blinded independent second labeler on a preregistered subset, and rerun
 every judge condition with the intended fixed `k` and no unexplained missing
 groups. The software now reports deterministic bootstrap intervals for validity

@@ -25,7 +25,7 @@ The `research/` track measures exactly that, against two standards:
 - **Validity** — does the judge agree with a *human*? (Cohen's κ against hand labels.)
 - **Reliability** — does the judge agree with *itself* across repeated runs? (Fleiss' κ over k repeats.)
 
-The method is simple and honest: freeze a corpus of real model responses once, judge it many times with different judges and temperatures, hand-label the responses to build human ground truth, and report where the cheap keyword stage and the expensive judge disagree. A result like *"the judge agrees with humans 88% of the time but systematically over-flags creative-writing refusals"* is a real, citable finding — the contribution is the measurement, not the tool.
+The method is simple and honest: freeze a corpus of real model responses once, judge it many times with different judges and temperatures, hand-label the responses to build human ground truth, and report where the cheap keyword stage and the expensive judge disagree. A carefully measured finding about judge validity, reliability, or systematic error is citable — the contribution is the measurement, not the tool.
 
 ---
 

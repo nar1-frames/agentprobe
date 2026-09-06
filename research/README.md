@@ -38,6 +38,11 @@ human labels something stable to attach to.
 
 ## The four data files
 
+These are local working artifacts, not files committed to the public
+repository. Raw model responses, judge transcripts, labels, and derived
+results must be reviewed for sensitive content and provenance before any
+publication or data release.
+
 Everything keys on a deterministic `response_id = sha1(category|attack_index|target_model)`,
 so the corpus, the judge runs, and the human labels all line up without a shared
 counter.

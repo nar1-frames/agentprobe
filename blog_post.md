@@ -1,6 +1,10 @@
-# I Fired 49 Attack Prompts at an AI. 29 of Them Worked.
+# I Fired 49 Attack Prompts at an AI. 29 Were Flagged in One Pilot.
 
 *By Naren Ranjith*
+
+> Draft note: this post describes one dated engineering pilot, not a
+> publication-ready estimate of attack success. The study that evaluates the
+> detector and its LLM judge is still incomplete.
 
 ---
 
@@ -57,7 +61,8 @@ Finally, it calculates a **finding severity** and generates a timestamped report
 
 ## What It Found
 
-49 prompts. 29 findings. 59% attack success rate.
+49 prompts. 29 findings in one pilot: a 59% scanner finding rate, not a
+validated attack-success estimate.
 
 Here are the results that stood out.
 

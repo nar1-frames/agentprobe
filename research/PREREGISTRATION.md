@@ -1,8 +1,9 @@
 # AgentProbe judge-validity study protocol
 
 **Status:** draft protocol v1.1 — freeze and register before collecting the
-remaining labels or rerunning the judge conditions. The current checked-in
-corpus is a historical snapshot and does not satisfy every v1.1 requirement.
+remaining labels or rerunning the judge conditions. An earlier local corpus was
+a historical snapshot and did not satisfy every v1.1 requirement; raw study
+artifacts are intentionally excluded from the public repository.
 
 This protocol is the analysis contract for the frozen 49-response study. It is
 not a claim that the current checked-in snapshot satisfies the protocol; the

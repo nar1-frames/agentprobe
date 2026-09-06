@@ -8,10 +8,10 @@
 
 > **Status: historical engineering pilot; not a publication-ready empirical result.** Numbers below are the dated v1.1 scan (July 14, 2026; local report: `reports/scan_llama_3.1_8b_instant_v11_20260714.html`). That artifact reported **29/49 findings (59%), 10 CRITICAL / 15 HIGH / 4 MEDIUM** for this one target/provider run. These figures are retained as an engineering baseline, not as a general estimate of model vulnerability or a validated attack-success rate.
 
-> **Provenance note:** this is the historical engineering pilot. The frozen
-> judge-reliability snapshot now in `data/` is a separate experiment with
-> repeated judges and only 17 human labels; see [`docs/RESULTS.md`](RESULTS.md)
-> before making a publication claim.
+> **Provenance note:** this is the historical engineering pilot. A separate
+> local judge-reliability snapshot used repeated judges and only 17 human
+> labels; its raw artifacts are intentionally not in the public tree. See
+> [`docs/RESULTS.md`](RESULTS.md) before making a publication claim.
 
 ---
 
