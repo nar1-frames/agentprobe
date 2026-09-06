@@ -58,6 +58,14 @@ data/judgements_errors_pilot.jsonl
 data/results_pilot.json
 data/*.errors.jsonl
 
+# Empirical-study artifacts contain raw model outputs and human labels. Keep
+# the working copies local until the protocol is complete and disclosure is
+# explicitly reviewed; publish a sanitized release separately if appropriate.
+data/corpus.jsonl
+data/judgements.jsonl
+data/labels.csv
+data/results.json
+
 # Blinded human-label packets contain raw model responses; keep them local.
 *.label-packet.csv
 *.label-packet.csv.key.json
