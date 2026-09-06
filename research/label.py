@@ -33,6 +33,8 @@
 #   python -m research.label --labeler ren
 #   python -m research.label --labeler friend --subset 0.3 --seed 42
 #   python -m research.label --show-hits              # reveal keyword hits (bias risk!)
+#   python -m research.label --labeler friend --export-packet /tmp/friend.csv
+#   python -m research.label --import-packet /tmp/friend.csv
 #
 # labels.csv columns:
 #   response_id, labeler, label, note, category, target_model, corpus_sha256
@@ -49,6 +51,11 @@ from research.protocol import (
     DEFAULT_MANIFEST_PATH,
     expected_second_label_ids,
     load_manifest,
+)
+from research.label_packet import (
+    append_imported_labels,
+    export_packet,
+    read_packet_answers,
 )
 
 LABEL_KEYS = {"c": "COMPLIED", "p": "PARTIAL", "r": "REFUSED"}
@@ -163,7 +170,28 @@ def main():
     ap.add_argument("--seed", type=int, default=None, help="subset sampling seed")
     ap.add_argument("--show-hits", action="store_true",
                     help="reveal keyword hits — convenient but biases your label")
+    ap.add_argument(
+        "--export-packet", default=None, metavar="PATH",
+        help="write a blinded CSV packet for an independent annotator",
+    )
+    ap.add_argument(
+        "--import-packet", default=None, metavar="PATH",
+        help="import completed answers from a blinded packet",
+    )
+    ap.add_argument(
+        "--packet-key", default=None, metavar="PATH",
+        help="private packet key (default: PACKET_PATH.key.json)",
+    )
+    ap.add_argument(
+        "--overwrite-packet", action="store_true",
+        help="replace existing packet/key files during export",
+    )
     args = ap.parse_args()
+
+    if args.export_packet and args.import_packet:
+        raise SystemExit("--export-packet and --import-packet are mutually exclusive")
+    if args.overwrite_packet and not args.export_packet:
+        raise SystemExit("--overwrite-packet requires --export-packet")
 
     manifest = None
     if args.manifest and os.path.exists(args.manifest):
@@ -172,6 +200,24 @@ def main():
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise SystemExit(f"Invalid study manifest: {exc}")
     manifest_labels = (manifest or {}).get("labels", {})
+
+    if args.import_packet:
+        try:
+            corpus = read_jsonl(args.corpus)
+            if not corpus:
+                raise ValueError(f"No corpus at {args.corpus}. Run gen_corpus first.")
+            corpus_sha256 = canonical_digest(corpus)
+            key_path = args.packet_key or f"{args.import_packet}.key.json"
+            packet_rows = read_packet_answers(
+                args.import_packet, key_path, corpus_sha256, labeler=args.labeler,
+                corpus=corpus,
+            )
+            count = append_imported_labels(args.out, packet_rows, corpus_sha256)
+        except (OSError, ValueError, csv.Error, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Cannot import label packet: {exc}")
+        print(f"Imported {count} labels into {args.out}.")
+        return
+
     labeler = args.labeler or manifest_labels.get("primary", "primary")
     try:
         validate_labeling_options(args, manifest, labeler)
@@ -196,6 +242,20 @@ def main():
     if not corpus:
         raise SystemExit(f"No corpus at {args.corpus}. Run gen_corpus first.")
     corpus_sha256 = canonical_digest(corpus)
+
+    if args.export_packet:
+        key_path = args.packet_key or f"{args.export_packet}.key.json"
+        try:
+            packet_path, key_path, count = export_packet(
+                args.export_packet, key_path, corpus, corpus_sha256, labeler,
+                manifest=manifest, subset=subset, seed=seed,
+                overwrite=args.overwrite_packet,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            raise SystemExit(f"Cannot export label packet: {exc}")
+        print(f"Wrote blinded label packet ({count} items) to {packet_path}")
+        print(f"Keep the private key separate: {key_path}")
+        return
 
     target_errors = sum(1 for row in corpus if row.get("error"))
     corpus = [row for row in corpus if not row.get("error")]

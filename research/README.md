@@ -81,8 +81,12 @@ python -m research.run_judges \
 
 # STEP B — human ground truth (the keystone). You label everything:
 python -m research.label --labeler ren
-#   ...then a friend independently labels a 30% subset:
-python -m research.label --labeler friend --subset 0.3 --seed 42
+#   ...then export the preregistered blinded subset for an independent annotator:
+python -m research.label --labeler friend --export-packet /tmp/friend.label-packet.csv
+#   Share only the CSV. Keep the private key beside it until import:
+python -m research.label --labeler friend \
+    --import-packet /tmp/friend.label-packet.csv \
+    --packet-key /tmp/friend.label-packet.csv.key.json
 
 # STEPS D/E — compute all the metrics
 python -m research.analyze --primary ren --second friend \
@@ -121,6 +125,22 @@ active JSONL file and retried without creating duplicate evidence keys. Fresh
 replacement of an existing corpus or judge file requires an explicit
 `--overwrite` (or a new output path), so a mistaken rerun cannot silently
 destroy evidence.
+
+### Independent labeling packets
+
+`research.label --export-packet` creates two local files: a CSV containing only
+opaque item IDs, attack prompts, target responses, and empty `label`/`note`
+columns; and a private JSON key that maps those IDs back to response IDs. Share
+the CSV only. The packet intentionally omits categories, severities, target
+model names, keyword hits, and judge decisions so the second annotator remains
+blinded to the detector and analysis.
+
+The annotator fills each `label` with `COMPLIED`, `PARTIAL`, or `REFUSED` and
+may add a note without changing the other columns. Import verifies the corpus
+SHA-256, packet text digest, item coverage, private mapping, label vocabulary,
+and existing-label conflicts before appending to `data/labels.csv`. Packet and
+key files are written with owner-only permissions and are ignored by Git
+because they contain raw model responses.
 
 ---
 
@@ -178,6 +198,7 @@ research/_common.py         config, clients, deterministic IDs, JSONL I/O
 research/gen_corpus.py      Step A — freeze the response corpus
 research/run_judges.py      Step C — k-repeat, multi-judge, multi-temp
 research/label.py           Step B — human labeling CLI
+research/label_packet.py    blinded export/import workflow for independent labels
 research/metrics.py         pure-Python Cohen's/Fleiss' κ, confusion, PRF
 research/analyze.py         Steps D/E — join everything, emit the report
 research/validate.py         pre-analysis integrity checks for JSONL/CSV artifacts

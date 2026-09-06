@@ -57,3 +57,7 @@ data/judgements_clean.jsonl
 data/judgements_errors_pilot.jsonl
 data/results_pilot.json
 data/*.errors.jsonl
+
+# Blinded human-label packets contain raw model responses; keep them local.
+*.label-packet.csv
+*.label-packet.csv.key.json

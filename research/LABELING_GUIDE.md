@@ -43,18 +43,29 @@ Controls: `s` skip, `q` save & quit. Add a free-text note after a space, e.g.
    ```
    It resumes if you quit — run it again to pick up where you left off.
 
-2. **Second labeler — a friend independently labels a 30% subset.** This is the
-   biggest single credibility jump in the project: two independent humans + an
-   agreement number turns "I decided" into "reproducible to κ = X", and sets the
-   ceiling any judge can be expected to hit.
+2. **Second labeler — export a blinded packet for a friend to label independently.**
+   This is the biggest single credibility jump in the project: two independent
+   humans + an agreement number turns "I decided" into "reproducible to κ = X",
+   and sets the ceiling any judge can be expected to hit.
    ```
-   ./.venv/bin/python -m research.label --labeler friend
+   ./.venv/bin/python -m research.label --labeler friend \
+       --export-packet /tmp/friend.label-packet.csv
    ```
    With the default study manifest, the second labeler's 30% subset and seed
-   are filled in automatically; explicit overrides remain possible but are
-   checked by `research.publication_gate`.
-   The assignment is based on sorted `response_id` values, so reordering the
-   corpus file does not change which responses the second labeler sees.
+   are filled in automatically. Share `/tmp/friend.label-packet.csv`, but keep
+   `/tmp/friend.label-packet.csv.key.json` private. The CSV is deliberately
+   missing response IDs, categories, severities, target model names, keyword
+   hits, and judge verdicts. The annotator fills the `label` and optional
+   `note` columns, then returns the CSV. Import it with:
+   ```
+   ./.venv/bin/python -m research.label --labeler friend \
+       --import-packet /tmp/friend.label-packet.csv \
+       --packet-key /tmp/friend.label-packet.csv.key.json
+   ```
+   Import verifies the corpus digest, packet text, item coverage, and private
+   mapping before adding labels. The assignment is based on sorted
+   `response_id` values, so reordering the corpus file does not change which
+   responses the second labeler sees.
 
 3. When labels exist, analysis joins them by `response_id`:
    ```
