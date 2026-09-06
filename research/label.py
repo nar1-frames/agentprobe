@@ -40,11 +40,13 @@
 
 import argparse
 import csv
+import json
 import os
 import random
 import textwrap
 
 from research._common import read_jsonl
+from research.protocol import DEFAULT_MANIFEST_PATH, load_manifest
 
 LABEL_KEYS = {"c": "COMPLIED", "p": "PARTIAL", "r": "REFUSED"}
 CSV_FIELDS = ["response_id", "labeler", "label", "note", "category", "target_model"]
@@ -57,13 +59,13 @@ def load_existing(path, labeler):
     done = set()
     with open(path, newline="") as f:
         for row in csv.DictReader(f):
-            if row["labeler"] == labeler:
+            if row.get("labeler") == labeler and row.get("response_id"):
                 done.add(row["response_id"])
     return done
 
 
 def append_label(path, row):
-    exists = os.path.exists(path)
+    exists = os.path.exists(path) and os.path.getsize(path) > 0
     with open(path, "a", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         if not exists:
@@ -107,25 +109,56 @@ def main():
     ap = argparse.ArgumentParser(description="Human labeling harness (Step B).")
     ap.add_argument("--corpus", default="data/corpus.jsonl")
     ap.add_argument("--out", default="data/labels.csv")
-    ap.add_argument("--labeler", default="primary")
+    ap.add_argument("--labeler", default=None)
+    ap.add_argument(
+        "--manifest", default=DEFAULT_MANIFEST_PATH,
+        help="study protocol used for the default primary labeler",
+    )
     ap.add_argument("--subset", type=float, default=None,
                     help="label a random fraction (e.g. 0.3 for the second labeler)")
-    ap.add_argument("--seed", type=int, default=42, help="subset sampling seed")
+    ap.add_argument("--seed", type=int, default=None, help="subset sampling seed")
     ap.add_argument("--show-hits", action="store_true",
                     help="reveal keyword hits — convenient but biases your label")
     args = ap.parse_args()
+
+    manifest = None
+    if args.manifest and os.path.exists(args.manifest):
+        try:
+            manifest = load_manifest(args.manifest)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Invalid study manifest: {exc}")
+    manifest_labels = (manifest or {}).get("labels", {})
+    labeler = args.labeler or manifest_labels.get("primary", "primary")
+    subset = args.subset
+    seed = args.seed
+    if manifest and labeler == manifest_labels.get("second"):
+        if subset is None:
+            subset = manifest_labels["second_overlap_fraction"]
+        if seed is None:
+            seed = manifest_labels["second_subset_seed"]
+    if seed is None:
+        seed = 42
+
+    if not labeler.strip():
+        raise SystemExit("--labeler must be a non-empty name")
+    if subset is not None and not 0 < subset <= 1:
+        raise SystemExit("--subset must be greater than 0 and at most 1")
 
     corpus = read_jsonl(args.corpus)
     if not corpus:
         raise SystemExit(f"No corpus at {args.corpus}. Run gen_corpus first.")
 
-    corpus = pick_subset(corpus, args.subset, args.seed)
-    done = load_existing(args.out, args.labeler)
+    target_errors = sum(1 for row in corpus if row.get("error"))
+    corpus = [row for row in corpus if not row.get("error")]
+    corpus = pick_subset(corpus, subset, seed)
+    done = load_existing(args.out, labeler)
     todo = [r for r in corpus if r["response_id"] not in done]
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    print(f"Labeler '{args.labeler}': {len(done)} done, {len(todo)} to go "
+    print(f"Labeler '{labeler}': {len(done)} done, {len(todo)} to go "
           f"(of {len(corpus)} in scope).\n")
+    if target_errors:
+        print(f"Excluded {target_errors} target API failures; repair the corpus before labeling.\n")
 
     for i, row in enumerate(todo, 1):
         print(render(row, i, len(todo), args.show_hits))
@@ -143,7 +176,7 @@ def main():
             if key in LABEL_KEYS:
                 append_label(args.out, {
                     "response_id": row["response_id"],
-                    "labeler": args.labeler,
+                    "labeler": labeler,
                     "label": LABEL_KEYS[key],
                     "note": note,
                     "category": row["category"],
@@ -152,7 +185,7 @@ def main():
                 break
             print("  (use c / p / r / s / q)")
 
-    print(f"\nAll done for '{args.labeler}'. Labels in {args.out}.")
+    print(f"\nAll done for '{labeler}'. Labels in {args.out}.")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentprobe"
+version = "1.3.0"
+description = "A lightweight prompt-injection scanner and agent security research harness"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "Naren Ranjith"}]
+dependencies = [
+  "groq>=0.11.0",
+  "openai>=1.0.0",
+  "python-dotenv>=1.0.0",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+agentprobe = "agentprobe.cli:main"
+
+[tool.setuptools]
+py-modules = ["agentprobe_v11", "agentprobe_v12", "report_html_v11", "disclosure_cli", "mitigations"]
+
+[tool.setuptools.packages.find]
+include = ["agentprobe*", "attacks*", "disclosure*", "research*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--ignore-glob='* 2.py'"

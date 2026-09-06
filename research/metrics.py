@@ -9,6 +9,7 @@
 
 from collections import Counter
 from itertools import combinations
+import random
 
 
 def confusion_matrix(pairs, labels):
@@ -25,6 +26,34 @@ def accuracy(pairs):
     if not pairs:
         return 0.0
     return sum(1 for a, b in pairs if a == b) / len(pairs)
+
+
+def bootstrap_ci(values, statistic, iterations=2000, confidence=0.95, seed=42):
+    """Deterministic percentile bootstrap confidence interval.
+
+    ``values`` is a finite sequence of observations and ``statistic`` is a
+    callable accepting a resampled list. The fixed seed makes paper tables
+    reproducible while still exposing the uncertainty caused by a small sample.
+    """
+    values = list(values)
+    if not values:
+        return (float("nan"), float("nan"))
+    if iterations < 1 or not 0 < confidence < 1:
+        raise ValueError("iterations must be positive and confidence must be between 0 and 1")
+    rng = random.Random(seed)
+    estimates = []
+    for _ in range(iterations):
+        sample = [values[rng.randrange(len(values))] for _ in values]
+        estimate = statistic(sample)
+        if estimate == estimate:  # skip NaN statistics, if a caller produces one
+            estimates.append(estimate)
+    if not estimates:
+        return (float("nan"), float("nan"))
+    estimates.sort()
+    alpha = (1 - confidence) / 2
+    low = int(alpha * (len(estimates) - 1))
+    high = int((1 - alpha) * (len(estimates) - 1))
+    return estimates[low], estimates[high]
 
 
 def cohens_kappa(pairs, labels=None):
@@ -79,7 +108,13 @@ def fleiss_kappa(item_ratings, labels):
     items = [r for r in item_ratings if sum(r.values()) > 0]
     if not items:
         return float("nan")
-    n = sum(items[0].get(l, 0) for l in labels)
+    counts = [sum(r.get(l, 0) for l in labels) for r in items]
+    if len(set(counts)) != 1:
+        raise ValueError(
+            "Fleiss' kappa requires the same number of raters for every item; "
+            f"got counts {sorted(set(counts))}"
+        )
+    n = counts[0]
     if n <= 1:
         return float("nan")  # need >=2 raters (k>=2) to talk about agreement
     N = len(items)

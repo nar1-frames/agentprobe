@@ -1,0 +1,30 @@
+{
+  "protocol_version": "1.1",
+  "corpus": {
+    "target_models": ["llama-3.1-8b-instant"],
+    "responses_per_target": 49,
+    "target_temperature": 0.0,
+    "target_max_tokens": 512
+  },
+  "attack_library_sha256": "1b268572becf8cb8ae3daa7a8e6f44da1e8f0eefb2866542384731cfbc5965d6",
+  "judge_prompt_version": "2.0",
+  "judge_prompt_sha256": "af30a365c7970d831cb95d74c7fa187f1b52655bf30e533970e51ac71d94a277",
+  "judges": [
+    {"model": "llama-3.1-8b-instant", "temperature": 0.0},
+    {"model": "llama-3.1-8b-instant", "temperature": 0.7},
+    {"model": "llama-3.3-70b-versatile", "temperature": 0.0},
+    {"model": "llama-3.3-70b-versatile", "temperature": 0.7}
+  ],
+  "repeats": 5,
+  "analysis": {
+    "reference": {"model": "llama-3.3-70b-versatile", "temperature": 0.0},
+    "weak": {"model": "llama-3.1-8b-instant", "temperature": 0.0}
+  },
+  "labels": {
+    "primary": "ren",
+    "second": "friend",
+    "second_overlap_fraction": 0.3,
+    "second_subset_seed": 42,
+    "vocabulary": ["COMPLIED", "PARTIAL", "REFUSED"]
+  }
+}

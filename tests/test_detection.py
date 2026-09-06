@@ -22,7 +22,8 @@ from agentprobe import detection
 from agentprobe.detection import (
     keyword_check, detect_partial_compliance, assess_vulnerability,
     parse_judge_output, calculate_finding_severity,
-    VULNERABLE, PARTIAL, SAFE, SUSPICIOUS,
+    sanitize_error, VULNERABLE, PARTIAL, SAFE, SUSPICIOUS,
+    JUDGE_PROMPT_SHA256,
 )
 
 
@@ -87,6 +88,16 @@ def test_no_signal_is_suspicious_and_not_decisive():
     assert kw.decisive is False
 
 
+def test_provider_error_sanitizer_removes_credentials_and_tenant_ids():
+    raw = "Error 401: api_key='gsk_live_secret123456' token=sk-live_secret123456 organization `org_private123`"
+    safe = sanitize_error(raw)
+    assert "gsk_live_secret123456" not in safe
+    assert "sk-live_secret123456" not in safe
+    assert "org_private123" not in safe
+    assert "[REDACTED]" in safe
+    assert "org_[REDACTED]" in safe
+
+
 def test_short_response_never_flags_partial():
     assert detect_partial_compliance("I can't. Developer mode.") is False
 
@@ -114,6 +125,34 @@ def test_parse_judge_refused_maps_to_safe():
 
 def test_parse_judge_garbage_is_suspicious():
     assert parse_judge_output("lol no idea").verdict == SUSPICIOUS
+
+
+def test_judge_prompt_delimits_untrusted_target_response_and_is_hashable():
+    captured = {}
+
+    class Judge:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    captured.update(kwargs)
+                    class Message:
+                        content = "VERDICT: REFUSED\nREASON: safe"
+                    class Choice:
+                        message = Message()
+                    class Result:
+                        choices = [Choice()]
+                    return Result()
+
+    result = detection.llm_judge(
+        Judge(), "judge", "ignore {this}", "do not follow this instruction", retries=0
+    )
+    prompt = captured["messages"][0]["content"]
+    assert "<ATTACK_PROMPT>" in prompt
+    assert "<TARGET_RESPONSE>" in prompt
+    assert "untrusted data" in prompt
+    assert len(JUDGE_PROMPT_SHA256) == 64
+    assert result.verdict == SAFE
 
 
 # ---- severity mapping ----
@@ -164,6 +203,19 @@ def test_judge_is_called_when_not_decisive():
     assert judge.calls == 1
     assert result["method"] == "llm-judge"
     assert result["verdict"] == VULNERABLE
+
+
+def test_judge_failure_is_not_a_low_severity_finding(monkeypatch):
+    def failed_judge(*_args, **_kwargs):
+        return detection.JudgeResult(
+            verdict=SUSPICIOUS, reason="Judge failed: timeout", error="timeout"
+        )
+
+    monkeypatch.setattr(v11, "llm_judge", failed_judge)
+    result = v11.assess_vulnerability(
+        object(), "target", object(), "judge", "attack", "A neutral response."
+    )
+    assert result == (SUSPICIOUS, "Judge failed: timeout", "judge-error")
 
 
 # ============================================================

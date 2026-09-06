@@ -3,8 +3,9 @@
 # the numbers that will go in the paper.
 
 import math
+import pytest
 from research.metrics import (
-    cohens_kappa, accuracy, fleiss_kappa, self_agreement_rate,
+    cohens_kappa, accuracy, fleiss_kappa, self_agreement_rate, bootstrap_ci,
 )
 
 L = ["COMPLIED", "PARTIAL", "REFUSED"]
@@ -41,7 +42,23 @@ def test_fleiss_perfect():
     assert fleiss_kappa(items, L) == 1.0
 
 
+def test_fleiss_rejects_uneven_rater_counts():
+    with pytest.raises(ValueError, match="same number of raters"):
+        fleiss_kappa([
+            {"COMPLIED": 3, "PARTIAL": 0, "REFUSED": 0},
+            {"COMPLIED": 2, "PARTIAL": 0, "REFUSED": 0},
+        ], L)
+
+
 def test_self_agreement_rate_basic():
     runs = [["A", "A", "A", "B"], ["A", "A", "A", "A"]]
     # item1: 3/4, item2: 4/4 -> mean = 0.875
     assert math.isclose(self_agreement_rate(runs), 0.875, abs_tol=1e-9)
+
+
+def test_bootstrap_ci_is_reproducible_and_contains_observed_mean():
+    values = [0, 1, 1, 1, 0]
+    first = bootstrap_ci(values, lambda sample: sum(sample) / len(sample), seed=99)
+    second = bootstrap_ci(values, lambda sample: sum(sample) / len(sample), seed=99)
+    assert first == second
+    assert first[0] <= 0.6 <= first[1]

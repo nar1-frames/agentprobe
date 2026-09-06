@@ -1,0 +1,405 @@
+"""Publication-readiness checks for the empirical judge study."""
+
+import argparse
+import csv
+import json
+import math
+import os
+from collections import defaultdict
+
+from attacks.library import ATTACK_LIBRARY
+from research._common import read_jsonl
+from research.protocol import (
+    DEFAULT_MANIFEST_PATH,
+    attack_library_digest,
+    expected_configs,
+    expected_second_label_ids,
+    load_manifest,
+    manifest_digest,
+)
+from research.validate import VALID_HUMAN_LABELS, VALID_INTERNAL_VERDICTS
+
+
+def _run_index(value):
+    if isinstance(value, bool):
+        raise ValueError("run_idx must be a non-negative integer")
+    number = float(value)
+    if not math.isfinite(number) or number != int(number) or int(number) < 0:
+        raise ValueError("run_idx must be a non-negative integer")
+    return int(number)
+
+
+def _normalize_configs(configs):
+    normalized = []
+    for config in configs or ():
+        if isinstance(config, str):
+            try:
+                model, temperature = config.rsplit("@", 1)
+                config = (model, float(temperature))
+            except (ValueError, TypeError):
+                raise ValueError(
+                    f"expected judge config must be MODEL@TEMP, got {config!r}"
+                )
+        if len(config) != 2:
+            raise ValueError(f"expected judge config must contain model and temperature: {config!r}")
+        model = str(config[0]).strip()
+        temperature = float(config[1])
+        if not model or not math.isfinite(temperature):
+            raise ValueError(f"expected judge config must contain a model and finite temperature: {config!r}")
+        normalized.append((model, temperature))
+    return tuple(normalized)
+
+
+def check_readiness(corpus, judgements, labels, primary="ren", second=None,
+                    expected_k=5, expected_configs=None,
+                    expected_target_models=None, expected_corpus_rows=None,
+                    expected_attack_library_sha256=None,
+                    expected_judge_prompt_version=None,
+                    expected_judge_prompt_sha256=None,
+                    expected_target_temperature=None,
+                    expected_target_max_tokens=None,
+                    expected_second_overlap_fraction=None,
+                    expected_second_subset_seed=None):
+    """Return explicit blocking reasons; do not silently grade incomplete data."""
+
+    if not isinstance(expected_k, int) or isinstance(expected_k, bool) or expected_k < 1:
+        raise ValueError("expected_k must be a positive integer")
+
+    blocking = []
+    corpus = list(corpus or [])
+    judgements = list(judgements or [])
+    labels = list(labels or [])
+    corpus_ids = set()
+    for index, row in enumerate(corpus, start=1):
+        if not isinstance(row, dict) or not isinstance(row.get("response_id"), str) or not row["response_id"].strip():
+            blocking.append(f"corpus row {index} is missing a non-empty response_id")
+            continue
+        corpus_ids.add(row["response_id"])
+    if len(corpus_ids) != len(corpus):
+        blocking.append("corpus contains duplicate or malformed response_id rows")
+    if not corpus_ids:
+        blocking.append("corpus is empty")
+    if expected_corpus_rows is not None and len(corpus) != expected_corpus_rows:
+        blocking.append(
+            f"corpus contains {len(corpus)} rows; manifest requires {expected_corpus_rows}"
+        )
+    if expected_target_models is not None:
+        observed_targets = {
+            row.get("target_model") for row in corpus
+            if isinstance(row, dict) and isinstance(row.get("target_model"), str)
+        }
+        expected_targets = set(expected_target_models)
+        if observed_targets != expected_targets:
+            blocking.append(
+                f"corpus target models {sorted(observed_targets, key=str)} do not match "
+                f"manifest {sorted(expected_targets)}"
+            )
+    if expected_target_temperature is not None:
+        raw_temperatures = [
+            row.get("target_temperature") if isinstance(row, dict) else None
+            for row in corpus
+        ]
+        try:
+            observed_temperatures = [float(value) for value in raw_temperatures]
+        except (TypeError, ValueError):
+            observed_temperatures = []
+        if (len(observed_temperatures) != len(corpus)
+                or set(observed_temperatures) != {float(expected_target_temperature)}):
+            blocking.append(
+                "corpus target_temperature metadata does not match the manifest "
+                f"({len(observed_temperatures)}/{len(corpus)} rows present, expected "
+                f"{float(expected_target_temperature):g})"
+            )
+    if expected_target_max_tokens is not None:
+        observed_max_tokens = [
+            row.get("max_tokens") if isinstance(row, dict) else None
+            for row in corpus
+        ]
+        if (len(observed_max_tokens) != len(corpus)
+                or set(observed_max_tokens) != {expected_target_max_tokens}):
+            blocking.append(
+                "corpus max_tokens metadata does not match the manifest "
+                f"({sorted(set(observed_max_tokens), key=str)!r} observed, "
+                f"expected {expected_target_max_tokens})"
+            )
+    if expected_attack_library_sha256 is not None:
+        actual_attack_digest = attack_library_digest(ATTACK_LIBRARY)
+        if actual_attack_digest != expected_attack_library_sha256:
+            blocking.append("attack library does not match the study manifest digest")
+    if expected_judge_prompt_version is not None or expected_judge_prompt_sha256 is not None:
+        prompt_versions = [
+            row.get("judge_prompt_version") for row in judgements
+            if isinstance(row, dict)
+        ]
+        prompt_digests = [
+            row.get("judge_prompt_sha256") for row in judgements
+            if isinstance(row, dict)
+        ]
+        if (expected_judge_prompt_version is not None
+                and (len(prompt_versions) != len(judgements)
+                     or set(prompt_versions) != {expected_judge_prompt_version})):
+            blocking.append(
+                "judge prompt version metadata does not match the study manifest "
+                f"(expected {expected_judge_prompt_version})"
+            )
+        if (expected_judge_prompt_sha256 is not None
+                and (len(prompt_digests) != len(judgements)
+                     or set(prompt_digests) != {expected_judge_prompt_sha256})):
+            blocking.append(
+                "judge prompt digest metadata does not match the study manifest"
+            )
+
+    primary_rows = [row for row in labels
+                    if isinstance(row, dict) and row.get("labeler") == primary]
+    primary_ids = {
+        row.get("response_id") for row in primary_rows
+        if isinstance(row.get("response_id"), str)
+    }
+    target_errors = sum(
+        1 for row in corpus if isinstance(row, dict) and row.get("error")
+    )
+    if target_errors:
+        blocking.append(f"{target_errors} target API errors remain in the corpus")
+    if primary_ids != corpus_ids:
+        blocking.append(
+            f"primary labels cover {len(primary_ids)}/{len(corpus_ids)} corpus responses"
+        )
+    if len(primary_rows) != len(primary_ids):
+        blocking.append(f"primary label set contains duplicate response rows ({len(primary_rows)} rows)")
+
+    required_label_fields = {"response_id", "labeler", "label"}
+    for index, row in enumerate(labels, start=1):
+        if not isinstance(row, dict):
+            blocking.append(f"label row {index} is not an object")
+            continue
+        missing = sorted(required_label_fields - row.keys())
+        if missing:
+            blocking.append(f"label row {index} is missing {', '.join(missing)}")
+    label_keys = []
+    for row in labels:
+        if not isinstance(row, dict):
+            continue
+        response_id = row.get("response_id")
+        labeler = row.get("labeler")
+        if isinstance(response_id, str) and isinstance(labeler, str):
+            label_keys.append((response_id, labeler))
+    if len(label_keys) != len(set(label_keys)):
+        blocking.append("label set contains duplicate response_id/labeler keys")
+    invalid_labels = [
+        row.get("label") for row in labels
+        if isinstance(row, dict)
+        and (not isinstance(row.get("label"), str)
+             or row.get("label") not in VALID_HUMAN_LABELS)
+    ]
+    if invalid_labels:
+        blocking.append(
+            f"label set contains invalid labels: {sorted({repr(label) for label in invalid_labels})}"
+        )
+    orphan_labels = [row.get("response_id") for row in labels if isinstance(row, dict)
+                     if row.get("response_id") not in corpus_ids]
+    if orphan_labels:
+        blocking.append(f"label set contains {len(orphan_labels)} orphan response rows")
+
+    if not second:
+        blocking.append("an independent second labeler has not been specified")
+    else:
+        second_ids = {
+            row.get("response_id") for row in labels
+            if isinstance(row, dict)
+            and row.get("labeler") == second
+            and isinstance(row.get("response_id"), str)
+        }
+        overlap = primary_ids & second_ids
+        if expected_second_overlap_fraction is not None and expected_second_subset_seed is not None:
+            expected_ids = expected_second_label_ids(
+                corpus, expected_second_overlap_fraction, expected_second_subset_seed
+            )
+            if second_ids != expected_ids:
+                blocking.append(
+                    f"second-label subset does not match the manifest assignment "
+                    f"({len(second_ids)} observed, {len(expected_ids)} expected)"
+                )
+        elif not overlap:
+            blocking.append(f"labelers '{primary}' and '{second}' have no overlapping responses")
+        elif len(overlap) < max(1, round(len(corpus_ids) * 0.3)):
+            blocking.append(
+                f"independent-label overlap is {len(overlap)} responses; "
+                f"at least {max(1, round(len(corpus_ids) * 0.3))} are required"
+            )
+
+    configs = defaultdict(lambda: defaultdict(list))
+    operational_errors = 0
+    judgement_keys = []
+    required_judgement_fields = {
+        "response_id", "judge_model", "temperature", "run_idx", "verdict"
+    }
+    for index, row in enumerate(judgements, start=1):
+        if not isinstance(row, dict):
+            blocking.append(f"judge row {index} is not an object")
+            continue
+        missing = sorted(required_judgement_fields - row.keys())
+        if missing:
+            blocking.append(f"judge row {index} is missing {', '.join(missing)}")
+            continue
+        rid = row.get("response_id")
+        model = row.get("judge_model")
+        if not isinstance(rid, str) or not rid.strip() or not isinstance(model, str) or not model.strip():
+            blocking.append(f"judge row {index} has an empty response_id or judge_model")
+            continue
+        try:
+            temp = float(row.get("temperature", 0.0))
+        except (TypeError, ValueError):
+            blocking.append(f"judge row has invalid temperature: {row.get('temperature')!r}")
+            continue
+        if not math.isfinite(temp):
+            blocking.append(f"judge row has non-finite temperature: {row.get('temperature')!r}")
+            continue
+        try:
+            run_idx = _run_index(row.get("run_idx"))
+        except (TypeError, ValueError):
+            blocking.append(f"judge row has invalid run_idx: {row.get('run_idx')!r}")
+            continue
+        judgement_keys.append((rid, model, temp, run_idx))
+        if rid not in corpus_ids:
+            blocking.append(f"judge set contains orphan response_id {rid}")
+        verdict = row.get("verdict")
+        if not row.get("error") and (
+            not isinstance(verdict, str) or verdict not in VALID_INTERNAL_VERDICTS
+        ):
+            blocking.append(f"judge set contains invalid verdict {row.get('verdict')!r}")
+        key = (model, temp)
+        if row.get("error"):
+            operational_errors += 1
+            continue
+        configs[key][row["response_id"]].append(row)
+    if len(judgement_keys) != len(set(judgement_keys)):
+        blocking.append("judge set contains duplicate response_id/judge/temperature/run keys")
+    if operational_errors:
+        blocking.append(f"{operational_errors} operational judge errors remain")
+    observed_configs = set(configs)
+    required_configs = set(_normalize_configs(expected_configs)) or observed_configs
+    unexpected_configs = observed_configs - required_configs if expected_configs else set()
+    if unexpected_configs:
+        rendered = ", ".join(
+            f"{model}@{temp:g}" for model, temp in sorted(unexpected_configs)
+        )
+        blocking.append(f"unexpected judge configurations present: {rendered}")
+    for (model, temp) in sorted(required_configs | observed_configs):
+        by_response = configs.get((model, temp), {})
+        if (model, temp) not in observed_configs:
+            blocking.append(f"missing judge configuration {model}@{temp}")
+        counts = {rid: len(rows) for rid, rows in by_response.items()}
+        missing = len(corpus_ids - set(counts))
+        complete = sum(1 for rid in corpus_ids if counts.get(rid, 0) == expected_k)
+        incomplete = len(corpus_ids) - complete
+        if missing or incomplete:
+            blocking.append(
+                f"{model}@{temp}: {complete}/{len(corpus_ids)} items have exactly "
+                f"k={expected_k} ({incomplete} incomplete)"
+            )
+    if not configs:
+        blocking.append("no judge configurations are present")
+
+    return {
+        "ready": not blocking,
+        "blocking_reasons": blocking,
+        "corpus_responses": len(corpus_ids),
+        "target_errors": target_errors,
+        "primary_labels": len(primary_ids),
+        "judge_configurations": len(configs),
+        "expected_judge_configurations": len(required_configs),
+        "expected_k": expected_k,
+        "expected_target_models": list(expected_target_models) if expected_target_models is not None else None,
+        "expected_corpus_rows": expected_corpus_rows,
+        "expected_attack_library_sha256": expected_attack_library_sha256,
+        "expected_judge_prompt_version": expected_judge_prompt_version,
+        "expected_judge_prompt_sha256": expected_judge_prompt_sha256,
+        "expected_target_temperature": expected_target_temperature,
+        "expected_target_max_tokens": expected_target_max_tokens,
+    }
+
+
+def _read_labels(path):
+    if not os.path.exists(path):
+        return []
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Check whether the study can be published.")
+    ap.add_argument("--corpus", default="data/corpus.jsonl")
+    ap.add_argument("--judgements", default="data/judgements.jsonl")
+    ap.add_argument("--labels", default="data/labels.csv")
+    ap.add_argument("--primary", default=None)
+    ap.add_argument("--second", default=None)
+    ap.add_argument("--k", type=int, default=None)
+    ap.add_argument(
+        "--manifest", default=DEFAULT_MANIFEST_PATH,
+        help="machine-readable study protocol used for default gate requirements",
+    )
+    ap.add_argument(
+        "--expected-config",
+        action="append",
+        default=None,
+        metavar="MODEL@TEMP",
+        help="required judge condition; repeat for every preregistered condition",
+    )
+    ap.add_argument("--json", default=None)
+    args = ap.parse_args()
+    corpus = read_jsonl(args.corpus) if os.path.exists(args.corpus) else []
+    judgements = read_jsonl(args.judgements) if os.path.exists(args.judgements) else []
+    manifest = None
+    if args.manifest and os.path.exists(args.manifest):
+        try:
+            manifest = load_manifest(args.manifest)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            ap.error(f"invalid study manifest: {exc}")
+    primary = args.primary or (manifest or {}).get("labels", {}).get("primary", "ren")
+    second = args.second
+    if second is None and manifest:
+        second = manifest["labels"]["second"]
+    expected_k = args.k if args.k is not None else (manifest or {}).get("repeats", 5)
+    required_configs = args.expected_config
+    if required_configs is None and manifest:
+        required_configs = expected_configs(manifest)
+    expected_targets = (manifest or {}).get("corpus", {}).get("target_models")
+    expected_rows = None
+    if manifest:
+        expected_rows = (
+            len(expected_targets) * manifest["corpus"]["responses_per_target"]
+        )
+    expected_attack_digest = (manifest or {}).get("attack_library_sha256")
+    expected_judge_prompt_version = (manifest or {}).get("judge_prompt_version")
+    expected_judge_prompt_sha256 = (manifest or {}).get("judge_prompt_sha256")
+    expected_target_temperature = (manifest or {}).get("corpus", {}).get("target_temperature")
+    expected_target_max_tokens = (manifest or {}).get("corpus", {}).get("target_max_tokens")
+    try:
+        report = check_readiness(
+            corpus, judgements, _read_labels(args.labels), primary, second,
+            expected_k, required_configs, expected_targets, expected_rows,
+            expected_attack_digest,
+            expected_judge_prompt_version, expected_judge_prompt_sha256,
+            expected_target_temperature, expected_target_max_tokens,
+            (manifest or {}).get("labels", {}).get("second_overlap_fraction"),
+            (manifest or {}).get("labels", {}).get("second_subset_seed"),
+        )
+    except ValueError as exc:
+        ap.error(str(exc))
+    if manifest:
+        report["protocol_manifest"] = {
+            "path": args.manifest,
+            "sha256": manifest_digest(manifest),
+        }
+    print("READY" if report["ready"] else "NOT READY")
+    for reason in report["blocking_reasons"]:
+        print(f"BLOCKED: {reason}")
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
+            f.write("\n")
+    return 0 if report["ready"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

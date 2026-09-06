@@ -13,6 +13,7 @@
 import os
 import json
 import glob
+import tempfile
 
 # Lifecycle. A finding starts as DRAFT and ends DISCLOSED (public,
 # post-fix) or in one of the terminal triage states.
@@ -29,6 +30,20 @@ STATUSES = [
 
 TERMINAL_STATUSES = {"DUPLICATE", "NOT_APPLICABLE", "DISCLOSED"}
 
+# A disclosure ledger is a workflow record, not an arbitrary status field.
+# Keeping transitions explicit prevents a draft from silently becoming
+# RESOLVED or DISCLOSED without the intervening evidence.
+ALLOWED_TRANSITIONS = {
+    "DRAFT": {"DRAFT", "SUBMITTED", "NOT_APPLICABLE"},
+    "SUBMITTED": {"SUBMITTED", "TRIAGED", "DUPLICATE", "NOT_APPLICABLE"},
+    "TRIAGED": {"TRIAGED", "ACCEPTED", "DUPLICATE", "NOT_APPLICABLE"},
+    "ACCEPTED": {"ACCEPTED", "RESOLVED", "DUPLICATE", "NOT_APPLICABLE"},
+    "RESOLVED": {"RESOLVED", "DISCLOSED"},
+    "DUPLICATE": set(),
+    "NOT_APPLICABLE": set(),
+    "DISCLOSED": set(),
+}
+
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DEFAULT_TRACKER_PATH = os.path.join(DEFAULT_DATA_DIR, "tracker.json")
 
@@ -41,9 +56,22 @@ def _load(path=DEFAULT_TRACKER_PATH):
 
 
 def _save(data, path=DEFAULT_TRACKER_PATH):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".agentprobe-tracker-", suffix=".json", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def _next_id(data, target_id):
@@ -83,6 +111,13 @@ def update_status(finding_id, status, date, note="", bounty=None,
     data = _load(path)
     for record in data["findings"]:
         if record["id"] == finding_id:
+            current = record.get("status", "DRAFT")
+            if status not in ALLOWED_TRANSITIONS.get(current, set()):
+                raise ValueError(
+                    f"Invalid disclosure transition {current} -> {status}. "
+                    f"Allowed next statuses: "
+                    f"{', '.join(sorted(ALLOWED_TRANSITIONS.get(current, set()))) or 'none'}"
+                )
             record["status"] = status
             if bounty is not None:
                 record["bounty"] = bounty

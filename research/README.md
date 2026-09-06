@@ -44,7 +44,7 @@ counter.
 
 | File | Made by | One row is |
 |------|---------|------------|
-| `data/corpus.jsonl` | `gen_corpus` | one target response to one attack, + its keyword verdict |
+| `data/corpus.jsonl` | `gen_corpus` | one frozen target response to one attack, + keyword verdict and generation settings |
 | `data/judgements.jsonl` | `run_judges` | one judge run (of k) for one response, under one (model, temp) |
 | `data/labels.csv` | `label` | one human's COMPLIED/PARTIAL/REFUSED call on one response |
 | `data/results.json` | `analyze` | the machine-readable summary of all metrics |
@@ -56,8 +56,11 @@ counter.
 ```bash
 # 0. one-time: pip install pyyaml groq openai python-dotenv ; set GROQ_API_KEY in .env
 
-# STEP A — freeze the response corpus across several target models
-python -m research.gen_corpus --models llama-3.1-8b-instant,gemma2-9b-it,qwen-2.5-7b
+# STEP A — freeze the preregistered 49-response corpus
+python -m research.gen_corpus \
+    --models llama-3.1-8b-instant \
+    --target-temperature 0.0 --max-tokens 512 \
+    --out data/corpus.jsonl --overwrite
 
 # STEP C — judge the frozen corpus: strong + weak judge, two temps, k=5 each
 python -m research.run_judges \
@@ -70,11 +73,33 @@ python -m research.label --labeler ren
 python -m research.label --labeler friend --subset 0.3 --seed 42
 
 # STEPS D/E — compute all the metrics
-python -m research.analyze --primary ren --second friend --json data/results.json
+python -m research.analyze --primary ren --second friend \
+    --reference-judge llama-3.3-70b-versatile --reference-temperature 0.0 \
+    --weak-judge llama-3.1-8b-instant --weak-temperature 0.0 \
+    --json data/results.json
+
+# Optional integrity gate before analysis
+python -m research.validate
+
+# Publication gate (intentionally fails until the empirical requirements are met)
+# With no --manifest/--expected-config flags, the checked-in study manifest
+# supplies the target scope, labelers, exact judge matrix, and k=5 requirement;
+# it also verifies the deterministic 30% second-label subset.
+python -m research.publication_gate --primary ren --second friend --k 5 \
+  --expected-config llama-3.1-8b-instant@0.0 \
+  --expected-config llama-3.1-8b-instant@0.7 \
+  --expected-config llama-3.3-70b-versatile@0.0 \
+  --expected-config llama-3.3-70b-versatile@0.7
 ```
 
-`run_judges` and `label` both support `--resume` / resuming, so a dropped
-connection or a coffee break doesn't cost you the run.
+`run_judges` supports `--resume`, `gen_corpus` uses atomic checkpoints when
+called with `--append`, and `label` automatically resumes from existing rows,
+so a dropped connection or a coffee break doesn't cost you the run. If judge
+rows contain provider failures, use `run_judges --resume --repair-errors`; failed rows are
+archived beside the active JSONL file and retried without creating duplicate
+evidence keys. Fresh replacement of an existing corpus or judge file requires
+an explicit `--overwrite` (or a new output path), so a mistaken rerun cannot
+silently destroy evidence.
 
 ---
 
@@ -83,8 +108,11 @@ connection or a coffee break doesn't cost you the run.
 - **RQ1 — Validity.** Judge-majority vs human primary label: Cohen's κ, per-class
   precision/recall, 3×3 confusion. *Needs corpus + judgements + labels.*
 - **RQ2 — Reliability.** The k repeats of each judge config: self-agreement rate,
-  Fleiss' κ, and how many items ever flipped. *Needs judgements only* — you can
-  run this the moment `run_judges` finishes, before any labeling.
+  Fleiss' κ, and how many items ever flipped. Failed judge calls are excluded;
+  if a resumed/interrupted run leaves an uneven number of repeats, Fleiss' κ is
+  computed only on the complete modal k and the exclusions are reported. *Needs
+  judgements only* — you can run this the moment `run_judges` finishes, before
+  any labeling.
 - **RQ3 — Keyword vs judge.** The corpus already stores each response's keyword
   verdict; `analyze` joins it against the judge majority and also reports the
   **keyword-decisive rate** — how often the free path decides on its own. *Needs
@@ -92,8 +120,9 @@ connection or a coffee break doesn't cost you the run.
 - **RQ4 — Judge strength.** Put a strong judge (`llama-3.3-70b`) and a
   weak/same-family judge (the 8B target itself) in `--judges`; RQ1 is reported
   **per judge config**, so you compare κ(strong, human) vs κ(weak, human)
-  directly. The correlated-error test — do the weak judge's mistakes line up with
-  the target's own mistakes — is the one analysis still to add.
+  directly. `analyze` also reports a cautious proxy-error-overlap statistic for
+  weak-judge versus keyword-stage errors on human-labeled items. Because keyword
+  output is not independent ground truth, this is directional evidence only.
 
 ### Why Cohen's κ and not raw accuracy
 If 70% of responses are REFUSED, a lazy judge that *always* says REFUSED scores
@@ -130,12 +159,21 @@ research/run_judges.py      Step C — k-repeat, multi-judge, multi-temp
 research/label.py           Step B — human labeling CLI
 research/metrics.py         pure-Python Cohen's/Fleiss' κ, confusion, PRF
 research/analyze.py         Steps D/E — join everything, emit the report
+research/validate.py         pre-analysis integrity checks for JSONL/CSV artifacts
+research/export.py           deterministic Markdown publication-table export
+research/publication_gate.py explicit gate for labels, independent raters, and fixed-k runs
+research/PREREGISTRATION.md  protocol to freeze before the final empirical run
+research/study_manifest.json executable target/judge/label/repeat-count protocol
+research/protocol.py         manifest validation and default study requirements
 tests/                      pytest over the detector and the metrics
 ```
 
 ## Still to build (next PRs)
-1. **Correlated-error analysis for RQ4** — join weak-judge errors against target
-   errors on the same items.
-2. **Figure export** — turn `results.json` into the paper's tables/plots.
-3. **Repoint the scanner** — make `agentprobe_v11.py` import from
-   `agentprobe.detection` so there is exactly one detector in the repo.
+1. **Complete ground truth** — finish primary labels and add an independent
+   second labeler before making population-level claims.
+2. **Broader live scenario coverage** — connect more real agent frameworks to
+   the OpenAI-compatible adapter while preserving the fixture-only regression
+   suite.
+3. **Protocol execution** — freeze/register manifest v1.1, regenerate the
+   historical corpus with explicit target settings, then collect the remaining
+   human labels and judge repetitions without changing the manifest.

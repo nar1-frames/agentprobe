@@ -77,7 +77,7 @@ def cmd_report(args):
         finding = json.load(f)
     md = generate_disclosure_report(finding, auth, reporter_handle=args.reporter)
     if args.out:
-        os.makedirs(os.path.dirname(args.out), exist_ok=True)
+        os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
         with open(args.out, "w") as f:
             f.write(md)
         print(f"Disclosure report written to: {args.out}")

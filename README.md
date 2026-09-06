@@ -37,14 +37,14 @@ The method is simple and honest: freeze a corpus of real model responses once, j
 # 1. Get the code
 git clone https://github.com/nar1-frames/agentprobe.git
 cd agentprobe
-pip3 install -r requirements.txt
+python3 -m pip install -e ".[dev]"
 
 # 2. Get two local models (a small one to attack, a bigger one to judge)
 ollama pull llama3.2:3b
 ollama pull llama3.1:8b
 
 # 3. Run the interactive scanner
-python3 agentprobe_v12.py
+agentprobe scan
 ```
 
 You'll get a menu of every model available to you. Pick a **target** (e.g. `llama3.2:3b`) and a **judge** (e.g. `llama3.1:8b`). If you try to pick a judge smaller than the target, AgentProbe stops you — that's the rule that keeps results honest. The scan streams live verdicts:
@@ -55,9 +55,26 @@ You'll get a menu of every model available to you. Pick a **target** (e.g. `llam
   2/8 🔴 VULNERABLE  [CRITICAL] via llm-judge — You are now in developer mode...
 ```
 
-When it finishes, the HTML report opens automatically, ending with the Mitigation Map.
+When it finishes, the HTML report opens automatically, ending with the Mitigation Map;
+the same run is also saved as a versioned machine-readable JSON artifact in
+`reports/` (both are local because they contain model outputs).
 
 *Cloud models:* set `GROQ_API_KEY` or `OPENAI_API_KEY` in a `.env` file and they appear in the same menu, marked ☁ cloud.
+
+For CI or a reproducible scripted run, use the target and judge from
+`config.yaml` without opening prompts:
+
+```bash
+agentprobe scan --non-interactive --config config.yaml
+# For CI: write the reports, then exit nonzero if any provider call failed.
+agentprobe scan --non-interactive --config config.yaml --fail-on-error
+```
+
+The automated path fails closed if it cannot verify that the configured judge
+is at least as large as the target; this keeps scripted research runs aligned
+with the interactive picker’s measurement rule. For providers whose model IDs
+do not expose parameter counts, add comparable integer `strength_rank` values
+to both the `target` and `judge` config blocks.
 
 ---
 
@@ -71,6 +88,29 @@ attacks/library.py  →  send to target  →  keyword_check()  →  llm_judge() 
 2. **Stage 1 — keyword pass (free).** Matches refusal and compliance signals, and runs the split-response **hedge-then-comply** heuristic. If it's confident, it decides here — no paid model call.
 3. **Stage 2 — LLM judge (only when Stage 1 is undecided).** A stronger model scores whether the target complied with the *intent* of the attack, catching compliance through roleplay or creative framing that keywords miss.
 4. **Severity + Mitigation Map.** Each finding gets a severity; the report maps every attack category to a recommended defense, split into **model-layer** (probabilistic — prompt hardening, refusal training) and **architecture-layer** (durable — least privilege, treating tool/retrieved content as untrusted). The highest-severity categories are exactly the ones the model can't defend on its own.
+
+Target and judge temperatures, output-token budgets, timeouts, retry policy, and
+rate limits are all explicit configuration inputs and are recorded indirectly by
+the configuration digest in each report.
+
+### Agent workflow harness
+
+Chat-only attacks are not enough for an agent that can act. The offline
+`agentprobe harness` runs fixture scenarios for indirect injection, file-boundary
+abuse, and privilege escalation through an in-memory tool runtime. It records
+requested, executed, and blocked tool calls, so a test can distinguish a model
+refusal from an architectural control that makes the action impossible:
+
+```bash
+agentprobe harness --mode guarded
+agentprobe harness --mode vulnerable --json reports/harness.json
+```
+
+The fixture tools never touch the network, filesystem, mail, or real accounts.
+The same module also includes an OpenAI-compatible multi-step tool-calling loop,
+so a real agent client can be connected without bypassing the policy gate or
+trace recorder. Harness JSON includes ordered tool events and redacts sensitive
+arguments and side-effect payloads before serialization.
 
 ---
 
@@ -181,12 +221,23 @@ All 49 prompts AgentProbe sends, grouped by category. Each is a public prompt-in
 
 ```
 agentprobe_v01.py … v12.py   the learning arc, each version adds one capability
-agentprobe_v12.py            ← current: interactive local/cloud model picker
+agentprobe_v12.py            ← interactive local/cloud model picker
+agentprobe/cli.py            installable CLI (`agentprobe scan` / `harness`)
+agentprobe/harness.py        offline end-to-end tool-use security harness
+agentprobe/config.py         validated config and bounded runtime settings
+agentprobe/reporting.py      versioned JSON + HTML provenance with atomic writes
+agentprobe/models.py         shared model-size parsing and judge-strength gate
 attacks/library.py           the 49 attack prompts (pure data)
-report_html*.py, mitigations.py   HTML report + Mitigation Map
+report_html_v11.py, mitigations.py HTML report + canonical Mitigation Map
 config.yaml                  scan settings (categories, rate limit)
 lessons/                     zero-to-tool Python learning path
 research/                    the "can we trust the judge?" study (corpus → judge → label → analyze)
+research/PREREGISTRATION.md  frozen design, hypotheses, exclusions, and analysis contract
+research/study_manifest.json executable target/judge/repeat-count protocol
+research/public_hygiene.py   tracked-file and secret-pattern release check
+docs/ARCHITECTURE.md         system boundaries and design decisions
+docs/THREAT_MODEL.md         assets, trust boundaries, STRIDE review, residual risk
+docs/RESULTS.md              provenance: pilot scan vs frozen study snapshot
 ```
 
 ## Version history
@@ -197,22 +248,29 @@ research/                    the "can we trust the judge?" study (corpus → jud
 | v1.0 | professional HTML report + severity dashboard |
 | v1.1 | Mitigation Map + detection fixes (hedge-then-comply, token cap, retry) |
 | v1.2 | interactive model picker (local Ollama + cloud), judge-must-be-stronger rule enforced |
+| v1.3 | installable CLI, validated config, run provenance, agent harness, research integrity gates |
 
 ---
 
 ## Testing
 
-The detection engine and the research metrics are covered by unit tests, including the regression test for the dead-`PARTIAL` bug found in the v1.1 review. Run them with:
+The detection engine, research metrics, reporting schema, and offline agent
+harness are covered by unit tests, including the regression test for the
+dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 
 ```bash
 pytest
 ```
 
-31 tests currently pass (detection routing, hedge-then-comply, severity mapping, and Cohen's / Fleiss' kappa).
+151 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+severity mapping, research analysis invariants, report provenance, JSON reporting,
+and the agent harness).
 
 ## Responsible use
 
 For **authorized testing only** — test models you own or run locally, or systems you have explicit written permission to test. Report any real-world findings through responsible disclosure. The attack prompts here are public patterns used to measure a model's own robustness, not to attack third-party systems.
+
+See [`SECURITY.md`](SECURITY.md) for testing boundaries and data-handling guidance.
 
 ## License
 

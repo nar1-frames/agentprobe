@@ -30,7 +30,6 @@
 # ============================================================
 
 import os
-import re
 import sys
 import json
 import time
@@ -40,9 +39,12 @@ import webbrowser
 # Reuse the v1.1 engine and report — one source of truth.
 from agentprobe_v11 import (
     build_client, filter_attacks, load_config,
-    send_prompt, assess_vulnerability, calculate_finding_severity,
+    send_prompt, is_error_response, assess_vulnerability, calculate_finding_severity,
 )
 from report_html_v11 import generate_html_report, save_html_report
+from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
+from agentprobe.models import parse_model_size_b
+from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
@@ -58,19 +60,8 @@ VERDICT_EMOJI = {
 # ============================================================
 
 def parse_size_b(text):
-    """Pull a parameter count in billions out of a string.
-
-    Understands '8b', 'llama3.1:8b', '70B', '7.0B', 'qwen2.5-14b-instant'.
-    Returns a float (billions) or None if it can't tell.
-    """
-    if not text:
-        return None
-    m = re.search(r"(\d+(?:\.\d+)?)\s*[bB]\b", text)
-    if m:
-        return float(m.group(1))
-    # bare number followed by 'b' with no boundary, e.g. '8b-instant'
-    m = re.search(r"(\d+(?:\.\d+)?)b", text.lower())
-    return float(m.group(1)) if m else None
+    """Backwards-compatible picker alias for the canonical model parser."""
+    return parse_model_size_b(text)
 
 
 # ============================================================
@@ -114,6 +105,8 @@ def discover_cloud():
             data = _http_get_json("https://api.groq.com/openai/v1/models", groq_key)
             for m in data.get("data", []):
                 mid = m.get("id")
+                if not isinstance(mid, str) or not mid.strip():
+                    continue
                 models.append({
                     "label": mid, "model": mid, "provider": "groq",
                     "api_key_env": "GROQ_API_KEY", "base_url": None,
@@ -127,6 +120,8 @@ def discover_cloud():
             data = _http_get_json("https://api.openai.com/v1/models", openai_key)
             for m in data.get("data", []):
                 mid = m.get("id")
+                if not isinstance(mid, str) or not mid.strip():
+                    continue
                 if mid.startswith(("gpt-", "o1", "o3", "o4")):  # skip embeddings/audio/etc
                     models.append({
                         "label": mid, "model": mid, "provider": "openai",
@@ -197,7 +192,10 @@ def pick_target_and_judge(models):
 # SCAN LOOP (pretty console + same result shape as v1.1)
 # ============================================================
 
-def run_scan(target, judge, attack_library, rate_limit, max_tokens):
+def run_scan(target, judge, attack_library, rate_limit, max_tokens,
+             retries=2, retry_delay=3, target_temperature=0.0,
+             judge_temperature=0.1,
+             judge_max_tokens=120):
     target_client = build_client(target)
     judge_client = build_client(judge)
     total = sum(len(v) for v in attack_library.values())
@@ -214,11 +212,23 @@ def run_scan(target, judge, attack_library, rate_limit, max_tokens):
         rows = []
         for i, attack in enumerate(attacks):
             prompt, severity = attack["prompt"], attack["severity"]
-            response = send_prompt(target_client, target["model"], prompt, max_tokens=max_tokens)
-            verdict, reason, method = assess_vulnerability(
-                target_client, target["model"], judge_client, judge["model"], prompt, response
+            response = send_prompt(
+                target_client, target["model"], prompt, max_tokens=max_tokens,
+                temperature=target_temperature,
+                retries=retries, delay=retry_delay,
             )
-            finding = calculate_finding_severity(severity, verdict)
+            if is_error_response(response):
+                verdict = "SUSPICIOUS"
+                reason = response
+                method = "target-error"
+                finding = None
+            else:
+                verdict, reason, method = assess_vulnerability(
+                    target_client, target["model"], judge_client, judge["model"], prompt, response,
+                    judge_retries=retries, judge_retry_delay=retry_delay,
+                    judge_temperature=judge_temperature, judge_max_tokens=judge_max_tokens,
+                )
+                finding = None if method == "judge-error" else calculate_finding_severity(severity, verdict)
             rows.append((attack, response, verdict, finding, reason, method))
 
             emoji = VERDICT_EMOJI.get(verdict, "⚪")
@@ -254,27 +264,69 @@ def main():
 
     # Scan settings come from config.yaml (categories, rate limit); the
     # target/judge you just picked override whatever it says.
-    config = load_config("config.yaml") if os.path.exists("config.yaml") else {"scan": {}, "output": {}}
+    try:
+        config = load_config("config.yaml") if os.path.exists("config.yaml") else {"scan": {}, "output": {}}
+    except (OSError, KeyError, ValueError) as exc:
+        print(f"\n[ERROR] {exc}")
+        raise SystemExit(1)
     attack_library = filter_attacks(config) if config.get("scan") is not None else None
     if not attack_library:
         from attacks.library import ATTACK_LIBRARY
         attack_library = ATTACK_LIBRARY
     rate_limit = config.get("scan", {}).get("rate_limit_seconds", 1)
+    retries = config.get("scan", {}).get("retries", 2)
+    retry_delay = config.get("scan", {}).get("retry_delay_seconds", 3)
     max_tokens = config.get("target", {}).get("max_tokens", 512)
+    target_temperature = config.get("target", {}).get("temperature", 0.0)
+    judge_temperature = config.get("judge", {}).get("temperature", 0.1)
     report_dir = config.get("output", {}).get("report_dir", "reports")
+    report_format = config.get("output", {}).get("report_format", "both")
 
-    results = run_scan(target, judge, attack_library, rate_limit, max_tokens)
+    results = run_scan(
+        target, judge, attack_library, rate_limit, max_tokens,
+        retries=retries, retry_delay=retry_delay,
+        target_temperature=target_temperature,
+        judge_temperature=judge_temperature,
+        judge_max_tokens=judge.get("max_tokens", 120),
+    )
 
-    print("\nGenerating HTML report (with Mitigation Map)...")
-    html = generate_html_report(results, target["label"], judge["label"])
-    saved = save_html_report(html, target["label"].replace("/", "_"), report_dir)
-    print(f"Report saved to: {saved}")
+    saved = None
+    json_saved = None
+    report_metadata = build_run_metadata(
+        target["model"], judge["model"],
+        target_provider=target.get("provider"),
+        judge_provider=judge.get("provider"),
+        config=config, attack_library=attack_library,
+        judge_prompt_version=JUDGE_PROMPT_VERSION,
+        judge_prompt_sha256=JUDGE_PROMPT_SHA256,
+    )
+    json_report = build_json_report(
+        results, target["label"], judge["label"], metadata=report_metadata
+    )
+    run_id = json_report["run"]["run_id"]
+    if report_format in {"html", "both"}:
+        print("\nGenerating HTML report (with Mitigation Map)...")
+        html = generate_html_report(
+            results, target["label"], judge["label"], metadata=report_metadata
+        )
+        saved = save_html_report(
+            html, target["label"].replace("/", "_"), report_dir, run_id=run_id
+        )
+        print(f"Report saved to: {saved}")
+    if report_format in {"json", "both"}:
+        json_saved = save_json_report(
+            json_report,
+            target["label"].replace("/", "_"),
+            report_dir,
+        )
+        print(f"JSON report saved to: {json_saved}")
 
     # Auto-open it in the browser.
-    try:
-        webbrowser.open("file://" + os.path.abspath(saved))
-    except Exception:
-        print(f"Open it yourself: open {saved}")
+    if saved:
+        try:
+            webbrowser.open("file://" + os.path.abspath(saved))
+        except Exception:
+            print(f"Open it yourself: open {saved}")
 
 
 if __name__ == "__main__":

@@ -25,6 +25,8 @@
 # ============================================================
 import os
 import glob
+import math
+from datetime import date
 import yaml
 from dataclasses import dataclass, field
 
@@ -61,6 +63,30 @@ class AuthorizationError(Exception):
     """Raised when a scan is not permitted against a target."""
 
 
+def _strict_bool(value, name, default):
+    """Accept YAML booleans only; never treat a string as truthy permission."""
+
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise AuthorizationError(f"{name} must be a YAML boolean (true or false)")
+    return value
+
+
+def _required_string(value, name):
+    if not isinstance(value, str) or not value.strip():
+        raise AuthorizationError(f"{name} must be a non-empty string")
+    return value.strip()
+
+
+def _scope_list(value, name):
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise AuthorizationError(f"{name} must be a list")
+    return value
+
+
 @dataclass
 class Authorization:
     target_id: str
@@ -82,25 +108,63 @@ class Authorization:
 
 def load_authorization(path):
     """Parse a single authorization YAML file into an Authorization."""
-    with open(path, "r") as f:
-        data = yaml.safe_load(f) or {}
-    scope = data.get("scope", {}) or {}
-    rules = data.get("rules", {}) or {}
-    auth = data.get("authorization", {}) or {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        raise AuthorizationError(f"Could not read authorization record {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise AuthorizationError("authorization record must be a YAML mapping")
+    try:
+        scope = data.get("scope", {}) or {}
+        rules = data.get("rules", {}) or {}
+        auth = data.get("authorization", {}) or {}
+        if not isinstance(scope, dict) or not isinstance(rules, dict) or not isinstance(auth, dict):
+            raise AuthorizationError("scope, rules, and authorization must be YAML mappings")
+        target_id = _required_string(data.get("target_id"), "target_id")
+        program_name = _required_string(data.get("program_name"), "program_name")
+        program_url = _required_string(data.get("program_url"), "program_url")
+        platform = _required_string(data.get("platform"), "platform")
+        min_reproducibility = float(rules.get("min_reproducibility", 0.5))
+        if not math.isfinite(min_reproducibility) or not 0 <= min_reproducibility <= 1:
+            raise AuthorizationError("rules.min_reproducibility must be between 0 and 1")
+        authorized_by = auth.get("authorized_by", "") or ""
+        authorized_date = auth.get("authorized_date", "") or ""
+        if not isinstance(authorized_by, str):
+            raise AuthorizationError("authorization.authorized_by must be a string")
+        if isinstance(authorized_date, date):
+            authorized_date = authorized_date.isoformat()
+        elif not isinstance(authorized_date, str):
+            raise AuthorizationError(
+                "authorization.authorized_date must be an ISO date string"
+            )
+        confirmed = _strict_bool(auth.get("confirmed"), "authorization.confirmed", False)
+        if confirmed and (not authorized_by.strip() or not authorized_date.strip()):
+            raise AuthorizationError(
+                "confirmed authorization requires authorization.authorized_by and "
+                "authorization.authorized_date"
+            )
+    except (TypeError, ValueError) as exc:
+        raise AuthorizationError(f"Invalid authorization record {path}: {exc}") from exc
     return Authorization(
-        target_id=data.get("target_id", ""),
-        program_name=data.get("program_name", ""),
-        program_url=data.get("program_url", ""),
-        platform=data.get("platform", ""),
-        in_scope=scope.get("in_scope", []) or [],
-        out_of_scope=scope.get("out_of_scope", []) or [],
-        automated_testing_permitted=bool(rules.get("automated_testing_permitted", False)),
-        min_reproducibility=float(rules.get("min_reproducibility", 0.5)),
-        test_account_required=bool(rules.get("test_account_required", True)),
-        safe_harbor=bool(rules.get("safe_harbor", False)),
-        confirmed=bool(auth.get("confirmed", False)),
-        authorized_by=auth.get("authorized_by", "") or "",
-        authorized_date=auth.get("authorized_date", "") or "",
+        target_id=target_id,
+        program_name=program_name,
+        program_url=program_url,
+        platform=platform,
+        in_scope=_scope_list(scope.get("in_scope"), "scope.in_scope"),
+        out_of_scope=_scope_list(scope.get("out_of_scope"), "scope.out_of_scope"),
+        automated_testing_permitted=_strict_bool(
+            rules.get("automated_testing_permitted"),
+            "rules.automated_testing_permitted", False,
+        ),
+        min_reproducibility=min_reproducibility,
+        test_account_required=_strict_bool(
+            rules.get("test_account_required"), "rules.test_account_required", True
+        ),
+        safe_harbor=_strict_bool(rules.get("safe_harbor"), "rules.safe_harbor", False),
+        confirmed=confirmed,
+        authorized_by=authorized_by.strip(),
+        authorized_date=authorized_date.strip(),
         notes=auth.get("notes", "") or "",
         raw=data,
     )
@@ -133,6 +197,13 @@ def require_authorization(target_id, mode=MODE_AUTOMATED, auth_dir=DEFAULT_AUTH_
       3. If mode is 'automated', the record must explicitly permit automated
          testing. If it doesn't, the caller is directed to the manual path.
     """
+    if not isinstance(target_id, str) or not target_id.strip():
+        raise AuthorizationError("target_id must be a non-empty string")
+    if mode not in {MODE_AUTOMATED, MODE_MANUAL}:
+        raise AuthorizationError(
+            f"Unknown testing mode '{mode}'. Use '{MODE_AUTOMATED}' or '{MODE_MANUAL}'."
+        )
+
     path = find_authorization(target_id, auth_dir)
     if path is None:
         raise AuthorizationError(
@@ -175,7 +246,13 @@ def classify_finding(category, crossed_trust_boundary, reproducibility, auth):
     OUT_OF_SCOPE   content-class findings (jailbreaks, policy bypasses) or an
                    impact-class finding with no actual boundary crossing.
     """
-    if category in IMPACT_CLASS_CATEGORIES and crossed_trust_boundary:
+    try:
+        reproducibility = float(reproducibility)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("reproducibility must be numeric") from exc
+    if not math.isfinite(reproducibility) or not 0 <= reproducibility <= 1:
+        raise ValueError("reproducibility must be between 0 and 1")
+    if category in IMPACT_CLASS_CATEGORIES and crossed_trust_boundary is True:
         if reproducibility >= auth.min_reproducibility:
             return PAYABLE
         return INFORMATIONAL

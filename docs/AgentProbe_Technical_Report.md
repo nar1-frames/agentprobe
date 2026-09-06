@@ -1,18 +1,23 @@
-# AgentProbe: A Lightweight Open-Source Scanner for Prompt-Injection Resistance in LLMs
+# AgentProbe: Historical Engineering Pilot Report
 
 **Author:** Naren Ranjith
 **Date:** 2026
 **Repository:** https://github.com/nar1-frames/agentprobe
 **DOI:** https://doi.org/10.5281/zenodo.21410386
-**Contact:** [add email]
+**Contact:** Open an issue in the repository
 
-> **DRAFT for publication (Zenodo / arXiv-cs.CR / workshop).** Numbers below are the canonical v1.1 scan (July 14, 2026; report: `reports/scan_llama_3.1_8b_instant_v11_20260714.html`). All external mentions (resume, activities, blog) have been reconciled to these figures: **29/49 findings (59% ASR), 10 CRITICAL / 15 HIGH / 4 MEDIUM.**
+> **Status: historical engineering pilot; not a publication-ready empirical result.** Numbers below are the dated v1.1 scan (July 14, 2026; local report: `reports/scan_llama_3.1_8b_instant_v11_20260714.html`). That artifact reported **29/49 findings (59%), 10 CRITICAL / 15 HIGH / 4 MEDIUM** for this one target/provider run. These figures are retained as an engineering baseline, not as a general estimate of model vulnerability or a validated attack-success rate.
+
+> **Provenance note:** this is the historical engineering pilot. The frozen
+> judge-reliability snapshot now in `data/` is a separate experiment with
+> repeated judges and only 17 human labels; see [`docs/RESULTS.md`](RESULTS.md)
+> before making a publication claim.
 
 ---
 
 ## Abstract
 
-Prompt injection is the top-ranked risk in the OWASP Top 10 for Large Language Model Applications, yet practitioners lack a lightweight, open-source way to quickly assess how a given model resists common attack categories. We present **AgentProbe**, an automated scanner that fires a structured library of 49 attack prompts spanning 8 categories at any chat-completions API, classifies each response with a two-stage detection pipeline (fast keyword screening followed by LLM-as-judge adjudication of ambiguous cases), assigns severity, and generates a self-contained HTML security report. Run against `llama-3.1-8b-instant`, AgentProbe found that **29 of 49 attacks (59%) produced vulnerable behavior, including 10 CRITICAL-severity findings**. Findings are mapped to the OWASP LLM Top 10 and the MITRE ATLAS adversarial-ML matrix. We discuss a notable "hedge-then-comply" failure mode in which a model issues a surface refusal immediately followed by harmful content, which naive keyword detectors miss.
+Prompt injection is the top-ranked risk in the OWASP Top 10 for Large Language Model Applications, yet practitioners lack a lightweight, open-source way to quickly assess how a given model resists common attack categories. This report describes **AgentProbe**, an automated scanner that fires a structured library of 49 attack prompts spanning 8 categories at a chat-completions API, classifies each response with a two-stage detection pipeline (fast keyword screening followed by LLM-as-judge adjudication of ambiguous cases), assigns severity, and generates a self-contained HTML security report. In one dated engineering run against `llama-3.1-8b-instant`, the scanner reported **29 of 49 responses as vulnerable or partial, including 10 CRITICAL-severity findings**. Because the run used one target/provider snapshot and its labels were not fully validated against human ground truth, the result is descriptive rather than a population-level claim. The report also documents a possible "hedge-then-comply" failure mode in which a model issues a surface refusal immediately followed by harmful content, which naive keyword detectors can miss.
 
 ---
 
@@ -56,7 +61,7 @@ Each response is classified in two stages:
 
 This routing keeps cost low while catching nuanced failures a keyword filter alone would misclassify. Each finding is assigned a severity (CRITICAL / HIGH / MEDIUM / LOW).
 
-## 5. Results (v1.0 scan)
+## 5. Results (historical v1.1 engineering scan)
 
 **Target:** `llama-3.1-8b-instant` (Groq) · **Judge:** `llama-3.3-70b-versatile`
 
@@ -71,7 +76,7 @@ This routing keeps cost low while catching nuanced failures a keyword filter alo
 | Context Manipulation | 3 | 5 | 60% | HIGH |
 | Tool Misuse | 2 | 5 | 40% | CRITICAL |
 
-**Overall: 29/49 prompts produced vulnerable behavior (59% attack success rate) — 27 fully vulnerable + 2 partial.**
+**Overall: 29/49 prompts were classified as vulnerable or partial (59% of this scan's responses) — 27 fully vulnerable + 2 partial.** This is a descriptive result for the dated run, not a validated attack-success estimate.
 
 **Severity:** 10 CRITICAL, 15 HIGH, 4 MEDIUM, 0 LOW.
 
@@ -96,14 +101,15 @@ AgentProbe is for authorized testing only. The repository includes a disclosure 
 
 ## 8. Limitations & Future Work
 
-- Single target model in v1.0; multi-model comparison is the obvious next step.
+- Single target/provider snapshot in this pilot; multi-model comparison is the obvious next step.
 - Attack library is English-only and static; adaptive/multi-turn attacks are future work.
-- LLM-as-judge introduces its own model dependence; inter-judge agreement should be measured.
+- LLM-as-judge introduces its own model dependence; inter-judge agreement and agreement with human labels must be measured before making a publication claim.
 - A harder indirect-injection set is planned for v2.
+- The frozen judge study is incomplete: only 17 of 49 primary human labels are currently present, and the publication gate remains blocked. See [`docs/RESULTS.md`](RESULTS.md).
 
 ## 9. Conclusion
 
-AgentProbe demonstrates that a lightweight, structured, open-source scanner can surface serious prompt-injection vulnerabilities — a 59% attack-success rate with 10 CRITICAL findings on a widely used model — in minutes, and can catch nuanced failure modes (hedge-then-comply) that naive detectors miss. The tool lowers the barrier to first-pass LLM security assessment for developers who are not security specialists.
+This pilot shows that a lightweight, structured, open-source scanner can produce a useful first-pass security artifact quickly and can surface responses that merit manual review, including possible hedge-then-comply behavior. The 29/49 pilot figure should not be generalized beyond this dated run. Completing the frozen human-label and repeated-judge protocol is required before concluding how well the detector measures prompt-injection resistance.
 
 ---
 

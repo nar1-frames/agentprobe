@@ -7,8 +7,9 @@ import json
 import os
 import sys
 import hashlib
+import tempfile
 
-import yaml
+from agentprobe.config import load_config as _load_validated_config
 
 # Make the repo root importable whether you run `python research/foo.py`
 # or `python -m research.foo`.
@@ -46,8 +47,7 @@ load_env()
 
 
 def load_config(path="config.yaml"):
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+    return _load_validated_config(path)
 
 
 def build_client(provider_config):
@@ -60,13 +60,21 @@ def build_client(provider_config):
     base_url = provider_config.get("base_url")
     key_env = provider_config.get("api_key_env")
     api_key = os.environ.get(key_env) if key_env else "ollama"
+    timeout = provider_config.get("timeout_seconds", 60)
+    # Keep retry accounting in the explicit research loop rather than letting
+    # the SDK silently add another retry layer.
+    client_options = {"timeout": float(timeout), "max_retries": 0}
 
     if provider == "groq":
         from groq import Groq
-        return Groq(api_key=api_key)
+        if not api_key:
+            raise ValueError("Missing API key for groq provider")
+        return Groq(api_key=api_key, **client_options)
     elif provider in ("openai", "ollama", "custom"):
         from openai import OpenAI
-        kwargs = {"api_key": api_key or "ollama"}
+        if provider == "openai" and not api_key:
+            raise ValueError("Missing API key for openai provider")
+        kwargs = {"api_key": api_key or "ollama", **client_options}
         if base_url:
             kwargs["base_url"] = base_url
         elif provider == "ollama":
@@ -86,22 +94,56 @@ def response_id(category, attack_index, target_model):
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
 
+def canonical_digest(records):
+    """SHA-256 of JSON records in response-id order for artifact provenance."""
+
+    canonical = json.dumps(
+        sorted(
+            records,
+            key=lambda row: row.get("response_id", "")
+            if isinstance(row, dict) else "",
+        ),
+        sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def write_jsonl(path, records):
-    with open(path, "w") as f:
-        for r in records:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".agentprobe-jsonl-", suffix=".jsonl", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            for record in records:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def append_jsonl(path, record):
-    with open(path, "a") as f:
+    with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
 
 
 def read_jsonl(path):
     out = []
-    with open(path, "r") as f:
-        for line in f:
+    with open(path, "r", encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
             line = line.strip()
             if line:
-                out.append(json.loads(line))
+                try:
+                    out.append(json.loads(line))
+                except json.JSONDecodeError as exc:
+                    raise ValueError(
+                        f"{path}:{line_number}: invalid JSONL record: {exc.msg}"
+                    ) from exc
     return out

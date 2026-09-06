@@ -34,6 +34,7 @@ MITIGATIONS = {
             "classifier for known jailbreak patterns, and rely on refusal "
             "fine-tuning. Model-layer only — treat as probabilistic, not a guarantee."
         ),
+        "owasp": "LLM01",
     },
     "data_extraction": {
         "layer": "Design",
@@ -43,6 +44,7 @@ MITIGATIONS = {
             "rules out of it entirely. Redact or rewrite outputs that echo "
             "configuration. The best defense is having nothing worth extracting."
         ),
+        "owasp": "LLM06",
     },
     "privilege_escalation": {
         "layer": "Architecture",
@@ -52,6 +54,7 @@ MITIGATIONS = {
             "authorization in application code and ignore any role, permission, or "
             "'admin/root' claim made inside the conversation."
         ),
+        "owasp": "LLM01",
     },
     "social_engineering": {
         "layer": "Model + Policy",
@@ -61,6 +64,7 @@ MITIGATIONS = {
             "refusal training with a policy that privileged actions require "
             "out-of-band verification, not a convincing message."
         ),
+        "owasp": "LLM01",
     },
     "role_confusion": {
         "layer": "Model",
@@ -70,6 +74,7 @@ MITIGATIONS = {
             "it. Empirically the highest-success category — measure it every release "
             "and gate deployment on the result rather than assuming it is fixed."
         ),
+        "owasp": "LLM01",
     },
     "indirect_injection": {
         "layer": "Architecture",
@@ -80,6 +85,7 @@ MITIGATIONS = {
             "embedded directives, and track provenance. The most dangerous real-world "
             "vector for tool-using agents."
         ),
+        "owasp": "LLM02",
     },
     "context_manipulation": {
         "layer": "App",
@@ -89,6 +95,7 @@ MITIGATIONS = {
             "'reset / forget everything / your instructions expired' claims — the "
             "model should not manage its own guardrail lifecycle."
         ),
+        "owasp": "LLM01",
     },
     "tool_misuse": {
         "layer": "Architecture",
@@ -98,6 +105,7 @@ MITIGATIONS = {
             "execution, and require human-in-the-loop for consequential calls. Model "
             "refusals are unreliable — put the guardrail at the tool layer, not the prompt."
         ),
+        "owasp": "LLM08",
     },
 }
 
