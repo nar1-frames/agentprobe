@@ -8,7 +8,6 @@ inside the package gives automation one supported execution path.
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Any, Mapping, Optional, Sequence
 
@@ -24,56 +23,14 @@ from agentprobe.detection import (
     sanitize_error,
 )
 from agentprobe.models import validate_judge_strength
+from agentprobe.providers import build_client
 from agentprobe.reliability import is_retryable_error
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from report_html_v11 import generate_html_report, save_html_report
 
 
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - dependency is declared, fallback aids vendoring
-    load_dotenv = None
-
-if load_dotenv is not None:
-    load_dotenv()
-
-
 SEVERITY_LADDER = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 ERROR_METHODS = frozenset({"target-error", "judge-error"})
-
-
-def build_client(provider_config: Mapping[str, Any]):
-    """Build an OpenAI-compatible client with SDK retries disabled.
-
-    Retry accounting belongs to the scanner loop so the configured attempt
-    budget is visible in the trace and cannot be multiplied by SDK defaults.
-    """
-
-    provider = provider_config.get("provider", "groq")
-    base_url = provider_config.get("base_url")
-    key_env = provider_config.get("api_key_env")
-    api_key = os.environ.get(key_env) if key_env else "ollama"
-    timeout = provider_config.get("timeout_seconds", 60)
-    client_options = {"timeout": float(timeout), "max_retries": 0}
-
-    if provider == "groq":
-        from groq import Groq
-
-        if not api_key:
-            raise ValueError("Missing API key for groq provider")
-        return Groq(api_key=api_key, **client_options)
-    if provider in ("openai", "ollama", "custom"):
-        from openai import OpenAI
-
-        if provider == "openai" and not api_key:
-            raise ValueError("Missing API key for openai provider")
-        kwargs = {"api_key": api_key or "ollama", **client_options}
-        if base_url:
-            kwargs["base_url"] = base_url
-        elif provider == "ollama":
-            kwargs["base_url"] = "http://localhost:11434/v1"
-        return OpenAI(**kwargs)
-    raise ValueError(f"Unknown provider: '{provider}'")
 
 
 def filter_attacks(config: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]]:

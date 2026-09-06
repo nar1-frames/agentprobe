@@ -10,6 +10,7 @@ from copy import deepcopy
 import math
 import os
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 import yaml
 
@@ -73,8 +74,15 @@ def _validate_model_block(config: Mapping[str, Any], name: str) -> float:
     if key_env is not None and (not isinstance(key_env, str) or not key_env.strip()):
         raise ValueError(f"{name}.api_key_env must be a non-empty string or null")
     base_url = block.get("base_url")
-    if base_url is not None and (not isinstance(base_url, str) or not base_url.strip()):
-        raise ValueError(f"{name}.base_url must be a non-empty URL or null")
+    if base_url is None:
+        if provider == "custom":
+            raise ValueError(f"{name}.base_url is required for custom provider")
+    elif not isinstance(base_url, str) or not base_url.strip():
+        raise ValueError(f"{name}.base_url must be a non-empty HTTP(S) URL")
+    else:
+        parsed_url = urlparse(base_url)
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            raise ValueError(f"{name}.base_url must be a non-empty HTTP(S) URL")
     timeout = _positive_number(
         block.get("timeout_seconds", 60), f"{name}.timeout_seconds", 3600
     )

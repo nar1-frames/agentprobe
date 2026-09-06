@@ -40,6 +40,10 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
 - **One detector implementation.** `agentprobe/detection.py` is the canonical
   keyword/judge implementation used by the package scanner and compatibility
   scripts.
+- **One provider boundary.** `agentprobe/providers.py` constructs the
+  OpenAI-compatible clients used by the scanner and research collection,
+  disables hidden SDK retries, and rejects malformed or missing custom
+  endpoints before credentials or network calls are used.
 - **Failed calls are not verdicts.** Target failures are marked
   `status=error` / `method=target-error` in JSON and are never sent to the
   judge; judge failures use `method=judge-error` and are excluded from

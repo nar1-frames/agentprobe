@@ -240,6 +240,7 @@ agentprobe_v01.py … v12.py   the learning arc, each version adds one capabilit
 agentprobe_v12.py            ← interactive local/cloud model picker
 agentprobe/cli.py            installable CLI (`agentprobe scan` / `harness`)
 agentprobe/scanner.py        package scanner path used by automation and CI
+agentprobe/providers.py      shared provider clients and endpoint validation
 agentprobe/harness.py        offline end-to-end tool-use security harness
 agentprobe/config.py         validated config and bounded runtime settings
 agentprobe/reporting.py      versioned JSON + HTML provenance with atomic writes
@@ -280,7 +281,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-190 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+191 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 

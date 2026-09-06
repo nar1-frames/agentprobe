@@ -23,16 +23,15 @@
 #   FIX  send_prompt() now retries transient API errors instead of
 #        crashing the entire scan on a single timeout.
 # ============================================================
-import os
 import datetime
 import time
-from dotenv import load_dotenv
 from attacks.library import ATTACK_LIBRARY
 from report_html_v11 import generate_html_report, save_html_report
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from agentprobe.models import validate_judge_strength
 from agentprobe.checkpoints import ScanCheckpoint
 from agentprobe.config import load_config as _load_validated_config
+from agentprobe.providers import build_client as _build_provider_client
 # v1.1.1: the detection engine now lives in agentprobe.detection (one source of
 # truth). keyword_check/llm_judge/calculate_finding_severity used to be defined
 # inline below; they were extracted verbatim and are imported here instead.
@@ -45,38 +44,13 @@ from agentprobe.detection import (
     sanitize_error,
 )
 from agentprobe.reliability import is_retryable_error
-load_dotenv()
 # ============================================================
 # CONFIG + CLIENT (unchanged from v1.0)
 # ============================================================
 def load_config(path="config.yaml"):
     return _load_validated_config(path)
 def build_client(provider_config):
-    provider = provider_config.get("provider", "groq")
-    base_url = provider_config.get("base_url")
-    key_env = provider_config.get("api_key_env")
-    api_key = os.environ.get(key_env) if key_env else "ollama"
-    timeout = provider_config.get("timeout_seconds", 60)
-    # The scanner owns retry policy so SDK-level retries cannot multiply the
-    # configured attempt budget unexpectedly.
-    client_options = {"timeout": float(timeout), "max_retries": 0}
-    if provider == "groq":
-        from groq import Groq
-        if not api_key:
-            raise ValueError("Missing API key for groq provider")
-        return Groq(api_key=api_key, **client_options)
-    elif provider in ("openai", "ollama", "custom"):
-        from openai import OpenAI
-        if provider == "openai" and not api_key:
-            raise ValueError("Missing API key for openai provider")
-        kwargs = {"api_key": api_key or "ollama", **client_options}
-        if base_url:
-            kwargs["base_url"] = base_url
-        elif provider == "ollama":
-            kwargs["base_url"] = "http://localhost:11434/v1"
-        return OpenAI(**kwargs)
-    else:
-        raise ValueError(f"Unknown provider: '{provider}'")
+    return _build_provider_client(provider_config)
 def filter_attacks(config):
     categories_setting = config["scan"].get("categories", "all")
     severity_filter = config["scan"].get("severity_filter")

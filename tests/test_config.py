@@ -51,6 +51,18 @@ def test_config_rejects_literal_api_keys():
         validate_config(config)
 
 
+def test_config_requires_and_validates_custom_provider_endpoint():
+    config = _config()
+    config["target"] = {"provider": "custom", "model": "target-3b"}
+    with pytest.raises(ValueError, match="base_url is required"):
+        validate_config(config)
+    config["target"]["base_url"] = "not-a-url"
+    with pytest.raises(ValueError, match=r"HTTP\(S\) URL"):
+        validate_config(config)
+    config["target"]["base_url"] = "https://model.example.test/v1"
+    assert validate_config(config)["target"]["base_url"] == "https://model.example.test/v1"
+
+
 def test_config_accepts_explicit_strength_rank_and_retry_settings():
     config = _config()
     config["target"]["strength_rank"] = 1
