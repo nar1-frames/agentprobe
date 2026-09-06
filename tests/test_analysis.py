@@ -1,7 +1,7 @@
 import math
 
 from research.analyze import (
-    choose_reference_config, judge_majority, rq2_reliability,
+    _json_safe, choose_reference_config, judge_majority, rq2_reliability,
     rq4_proxy_error_overlap,
 )
 
@@ -86,3 +86,11 @@ def test_proxy_error_overlap_is_explicitly_labeled():
     assert result["joint_errors"] == 0
     assert "proxy" in result["interpretation"]
     assert len(result["error_overlap_rate_ci_95"]) == 2
+
+
+def test_analysis_artifact_converts_undefined_metrics_to_strict_json_null():
+    import json
+
+    artifact = _json_safe({"undefined": float("nan"), "nested": [float("inf")]})
+    assert artifact == {"undefined": None, "nested": [None]}
+    json.dumps(artifact, allow_nan=False)

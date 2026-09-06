@@ -120,7 +120,7 @@ def _write_jsonl_atomic(path, records):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             for record in records:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                f.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
             f.flush()
             os.fsync(f.fileno())
         os.replace(temporary, path)

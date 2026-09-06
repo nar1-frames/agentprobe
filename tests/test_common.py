@@ -53,3 +53,16 @@ def test_jsonl_reader_reports_the_corrupt_line(tmp_path):
     path.write_text(json.dumps({"id": 1}) + "\nnot-json\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"records\.jsonl:2: invalid JSONL record"):
         read_jsonl(str(path))
+
+
+def test_jsonl_reader_rejects_nonstandard_numeric_constants(tmp_path):
+    path = tmp_path / "records.jsonl"
+    path.write_text('{"value": NaN}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match=r"non-standard JSON constant NaN"):
+        read_jsonl(str(path))
+
+
+def test_jsonl_writer_rejects_nonfinite_values(tmp_path):
+    path = tmp_path / "records.jsonl"
+    with pytest.raises(ValueError, match="Out of range float values"):
+        write_jsonl(str(path), [{"value": float("nan")}])

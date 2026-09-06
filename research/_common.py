@@ -19,6 +19,10 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 
+def _reject_json_constant(value):
+    raise ValueError(f"non-standard JSON constant {value}")
+
+
 def load_env(path=None):
     """Load KEY=VALUE pairs from a .env file into os.environ.
 
@@ -104,6 +108,7 @@ def canonical_digest(records):
             if isinstance(row, dict) else "",
         ),
         sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+        allow_nan=False,
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -115,7 +120,7 @@ def write_jsonl(path, records):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             for record in records:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                f.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
             f.flush()
             os.fsync(f.fileno())
         os.replace(temporary, path)
@@ -129,7 +134,7 @@ def write_jsonl(path, records):
 
 def append_jsonl(path, record):
     with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        f.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
         f.flush()
         os.fsync(f.fileno())
 
@@ -141,9 +146,12 @@ def read_jsonl(path):
             line = line.strip()
             if line:
                 try:
-                    out.append(json.loads(line))
-                except json.JSONDecodeError as exc:
+                    out.append(json.loads(
+                        line,
+                        parse_constant=_reject_json_constant,
+                    ))
+                except (json.JSONDecodeError, ValueError) as exc:
                     raise ValueError(
-                        f"{path}:{line_number}: invalid JSONL record: {exc.msg}"
+                        f"{path}:{line_number}: invalid JSONL record: {exc}"
                     ) from exc
     return out

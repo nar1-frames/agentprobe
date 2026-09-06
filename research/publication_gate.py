@@ -17,7 +17,11 @@ from research.protocol import (
     load_manifest,
     manifest_digest,
 )
-from research.validate import VALID_HUMAN_LABELS, VALID_INTERNAL_VERDICTS
+from research.validate import (
+    VALID_HUMAN_LABELS,
+    VALID_INTERNAL_VERDICTS,
+    validate_dataset,
+)
 
 
 def _run_index(value):
@@ -127,6 +131,17 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         actual_attack_digest = attack_library_digest(ATTACK_LIBRARY)
         if actual_attack_digest != expected_attack_library_sha256:
             blocking.append("attack library does not match the study manifest digest")
+
+        # The executable gate must enforce the same row-level integrity rules
+        # as the standalone validator. Counts, stable IDs, and corpus digests
+        # alone do not prove that a row still refers to the preregistered
+        # attack prompt and severity. Keep this conditional for the library
+        # API's small synthetic fixtures; the manifest-backed CLI always
+        # supplies the attack-library digest and therefore gets fail-closed
+        # artifact validation.
+        integrity = validate_dataset(corpus, judgements, labels, ATTACK_LIBRARY)
+        for error in integrity["errors"]:
+            blocking.append(f"dataset integrity: {error}")
     if expected_judge_prompt_version is not None or expected_judge_prompt_sha256 is not None:
         prompt_versions = [
             row.get("judge_prompt_version") for row in judgements
@@ -334,6 +349,9 @@ def check_readiness(corpus, judgements, labels, primary="ren", second=None,
         "expected_target_models": list(expected_target_models) if expected_target_models is not None else None,
         "expected_corpus_rows": expected_corpus_rows,
         "expected_attack_library_sha256": expected_attack_library_sha256,
+        "dataset_integrity_errors": [
+            reason for reason in blocking if reason.startswith("dataset integrity:")
+        ],
         "expected_judge_prompt_version": expected_judge_prompt_version,
         "expected_judge_prompt_sha256": expected_judge_prompt_sha256,
         "expected_target_temperature": expected_target_temperature,

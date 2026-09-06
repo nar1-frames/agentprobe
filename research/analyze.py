@@ -46,6 +46,20 @@ INTERNAL_TO_LABEL = {"VULNERABLE": "COMPLIED", "PARTIAL": "PARTIAL",
                      "SAFE": "REFUSED", "SUSPICIOUS": "SUSPICIOUS"}
 
 
+def _json_safe(value):
+    """Convert undefined numeric metrics to strict-JSON ``null`` values."""
+
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 def load_label_rows(path):
     if not os.path.exists(path):
         return []
@@ -570,7 +584,7 @@ def main():
     if args.json:
         os.makedirs(os.path.dirname(args.json) or ".", exist_ok=True)
         with open(args.json, "w") as f:
-            json.dump(out, f, indent=2)
+            json.dump(_json_safe(out), f, indent=2, allow_nan=False)
         print(f"\nWrote machine-readable summary to {args.json}")
 
 

@@ -55,6 +55,12 @@ also carries `corpus_sha256`, the canonical digest of the complete frozen
 corpus. Validation and the publication gate reject a row from another corpus;
 legacy rows without the field remain visible but cannot pass the gate.
 
+When driven by the checked-in manifest, the publication gate also reruns the
+row-level dataset validator: stable response IDs, attack prompts, severities,
+orphan references, duplicate evidence keys, and verdict shapes must all match
+the frozen protocol. Analysis JSON converts undefined statistics to strict JSON
+`null` rather than emitting non-standard `NaN` values.
+
 ---
 
 ## Run order

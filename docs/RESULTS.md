@@ -92,4 +92,6 @@ groups. The software now reports deterministic bootstrap intervals for validity
 and reliability; the remaining analysis work is to preregister and execute the
 correlated-error analysis on the completed data. The `research.publication_gate`
 command encodes the data-completeness requirements and exits nonzero until they
-are satisfied.
+are satisfied. With the manifest-backed defaults it also validates every
+corpus, judge, and label row against the frozen attack library and evidence
+keys before returning `READY`.

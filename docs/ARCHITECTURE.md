@@ -54,7 +54,8 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   response rather than silently sampling a replacement.
 - **The empirical protocol is executable.** `research/study_manifest.json`
   pins the target scope, attack-library digest, judge matrix, repeat count, and
-  labeler rules; the publication gate checks those requirements by default.
+  labeler rules; the publication gate checks those requirements by default and
+  reruns row-level dataset integrity validation before declaring readiness.
 - **Judge statistics are conservative.** Failed judge calls are excluded;
   Fleiss' κ is only computed for complete, fixed-k item groups. Ties are
   `SUSPICIOUS`, not row-order-dependent majorities.

@@ -1,8 +1,9 @@
 import pytest
 
-from research._common import canonical_digest
+from research._common import canonical_digest, response_id
 from research.publication_gate import check_readiness
-from research.protocol import expected_second_label_ids
+from research.protocol import attack_library_digest, expected_second_label_ids
+from attacks.library import ATTACK_LIBRARY
 
 
 def _corpus():
@@ -190,4 +191,43 @@ def test_publication_gate_rejects_evidence_from_a_different_corpus():
     assert any("judge evidence is not bound" in reason
                for reason in report["blocking_reasons"])
     assert any("human labels are not bound" in reason
+               for reason in report["blocking_reasons"])
+
+
+def test_manifest_backed_gate_rejects_forged_attack_metadata():
+    category = next(iter(ATTACK_LIBRARY))
+    attack = ATTACK_LIBRARY[category][0]
+    corpus = [{
+        "response_id": response_id(category, 0, "target-8b"),
+        "category": category,
+        "attack_index": 0,
+        "severity": attack["severity"],
+        "attack_prompt": "forged prompt",
+        "target_model": "target-8b",
+        "target_temperature": 0.0,
+        "max_tokens": 512,
+        "response": "refused",
+    }]
+    digest = canonical_digest(corpus)
+    judgements = [{
+        "response_id": corpus[0]["response_id"], "judge_model": "judge-70b",
+        "temperature": 0.0, "run_idx": 0, "verdict": "SAFE",
+        "corpus_sha256": digest,
+    }]
+    labels = [
+        {"response_id": corpus[0]["response_id"], "labeler": labeler,
+         "label": "REFUSED", "corpus_sha256": digest}
+        for labeler in ("ren", "friend")
+    ]
+    report = check_readiness(
+        corpus, judgements, labels, "ren", "friend", 1,
+        expected_configs=["judge-70b@0"],
+        expected_target_models=["target-8b"],
+        expected_corpus_rows=1,
+        expected_attack_library_sha256=attack_library_digest(ATTACK_LIBRARY),
+        expected_target_temperature=0.0,
+        expected_target_max_tokens=512,
+    )
+    assert report["ready"] is False
+    assert any("attack prompt differs from library" in reason
                for reason in report["blocking_reasons"])
