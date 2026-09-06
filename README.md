@@ -293,7 +293,7 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-232 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
+236 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
 severity mapping, research analysis invariants, report provenance, JSON reporting,
 and the agent harness).
 
