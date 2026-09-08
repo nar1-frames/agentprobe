@@ -1,12 +1,42 @@
 # AgentProbe
 
-**A prompt-injection scanner for AI models — and a study of whether we can trust the AI that grades the results.**
+[![CI](https://github.com/nar1-frames/agentprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/nar1-frames/agentprobe/actions/workflows/ci.yml)
+[![Security](https://github.com/nar1-frames/agentprobe/actions/workflows/security.yml/badge.svg)](https://github.com/nar1-frames/agentprobe/actions/workflows/security.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-AgentProbe fires 49 structured attack prompts at a target language model, uses a two-stage detector to decide whether the model complied, scores each finding by severity, and generates a self-contained HTML report that ends with a **Mitigation Map** — a plan for what to actually do about each weakness.
+**An open-source security evaluation and enforcement harness for LLM-powered agents.**
 
-It runs against **local models** (via [Ollama](https://ollama.com), free, on your own machine) or **cloud models** (Groq, OpenAI). You pick the target and the judge from a menu; the one rule the tool enforces in code is that **the judge must be at least as large as the target**, so the model grading the attack can actually out-reason it.
+AgentProbe tests whether models resist prompt injection, whether agent policies
+block unsafe tool use, and whether the evidence used to grade those results is
+trustworthy. It runs locally by default, records requested/allowed/blocked/
+executed actions separately, and produces versioned artifacts for review.
 
-> Built from scratch as a self-directed security research project, starting from zero coding experience. The `lessons/` folder and the `v01 → v12` version history are that learning curve, kept on purpose.
+The project has two connected surfaces:
+
+- **Scanner:** 49 structured attack prompts, two-stage detection, severity
+  scoring, and HTML/JSON reports with a Mitigation Map.
+- **Agent harness:** controlled tool-use scenarios for indirect injection,
+  filesystem boundaries, privilege escalation, and sensitive-data exfiltration.
+
+The default harness is offline and side-effect-free. Provider-backed scans are
+opt-in. AgentProbe is an evaluation and control-testing tool, not a guarantee
+that an agent is safe.
+
+> **Project status:** active early-stage open source. The engineering surface is
+> usable today; the preregistered judge study is still being completed, so no
+> population-level research claims should be inferred from this repository yet.
+
+## Start here
+
+- [Five-minute quickstart](#quickstart)
+- [Project goals](GOALS.md)
+- [Roadmap](ROADMAP.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Threat model](docs/THREAT_MODEL.md)
+- [Research protocol](research/README.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Preserved drafts and working notes](writeups/README.md)
 
 ---
 
@@ -31,19 +61,21 @@ The method is simple and honest: freeze a corpus of real model responses once, j
 
 ## Quickstart
 
-**Prerequisites:** Python 3.10+, and [Ollama](https://ollama.com) if you want to run local models (recommended — it's free).
+**Prerequisites:** Python 3.10+. Ollama is optional and is only needed for
+local model-backed scans.
 
 ```bash
-# 1. Get the code
+# 1. Get the code and install the development CLI
 git clone https://github.com/nar1-frames/agentprobe.git
 cd agentprobe
 python3 -m pip install -e ".[dev]"
 
-# 2. Get two local models (a small one to attack, a bigger one to judge)
+# 2. Run the deterministic, credential-free security harness
+agentprobe harness --mode guarded
+
+# 3. Optional: install two local models for a full scan
 ollama pull llama3.2:3b
 ollama pull llama3.1:8b
-
-# 3. Run the interactive scanner
 agentprobe scan
 ```
 
@@ -80,11 +112,11 @@ agentprobe scan --non-interactive --config config.yaml \
   --checkpoint reports/scan.checkpoint.json --resume --repair-errors
 ```
 
-The automated path fails closed if it cannot verify that the configured judge
-is at least as large as the target; this keeps scripted research runs aligned
-with the interactive picker’s measurement rule. For providers whose model IDs
-do not expose parameter counts, add comparable integer `strength_rank` values
-to both the `target` and `judge` config blocks.
+The automated path fails closed if it cannot verify that the configured judge is
+at least as strong as the target according to the configured model metadata.
+This is an operational heuristic, not proof that the judge is correct. For
+providers whose model IDs do not expose comparable metadata, add explicit
+integer `strength_rank` values to both the `target` and `judge` config blocks.
 
 ---
 
@@ -244,8 +276,6 @@ All 49 prompts AgentProbe sends, grouped by category. Each is a public prompt-in
 ## Project layout
 
 ```
-agentprobe_v01.py … v12.py   the learning arc, each version adds one capability
-agentprobe_v12.py            ← interactive local/cloud model picker
 agentprobe/cli.py            installable CLI (`agentprobe scan` / `harness`)
 agentprobe/scanner.py        package scanner path used by automation and CI
 agentprobe/providers.py      shared provider clients and endpoint validation
@@ -265,7 +295,22 @@ research/public_hygiene.py   tracked-file and secret-pattern release check
 docs/ARCHITECTURE.md         system boundaries and design decisions
 docs/THREAT_MODEL.md         assets, trust boundaries, STRIDE review, residual risk
 docs/RESULTS.md              provenance: pilot scan vs frozen study snapshot
+GOALS.md                     product, engineering, and research goals
+ROADMAP.md                  prioritized delivery roadmap
+CONTRIBUTING.md             development and review standards
+writeups/                   preserved drafts and historical working notes
 ```
+
+The historical `agentprobe_v01.py`–`agentprobe_v12.py` files and `lessons/`
+directory remain available for project history. They are not the supported
+automation boundary; use the installable `agentprobe` package.
+
+## Project direction
+
+The current delivery priorities are documented in [GOALS.md](GOALS.md) and
+[ROADMAP.md](ROADMAP.md). The next major milestone is a reproducible,
+developer-grade agent security harness with stable event schemas, CI-friendly
+reports, and completed study evidence.
 
 ## Version history
 
