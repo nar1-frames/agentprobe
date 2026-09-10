@@ -1,33 +1,3 @@
-# ============================================================
-# AGENTPROBE v1.2 — Interactive model picker (local + cloud)
-# ============================================================
-# What's new vs v1.1:
-#
-#   NEW  Model menu. On startup AgentProbe discovers every model
-#        you can actually run — local models via Ollama first,
-#        plus cloud models (Groq / OpenAI) if their API keys are
-#        set — and lets you pick the TARGET and the JUDGE from a
-#        numbered list. No more editing config.yaml by hand, and no
-#        more "model does not exist" surprises when a cloud provider
-#        retires a model.
-#
-#   NEW  The one rule, enforced in code: the JUDGE must be at least
-#        as smart as the TARGET. AgentProbe reads each model's size
-#        (the "3b / 8b / 70b" in its name or metadata) and refuses
-#        to let you pick a judge weaker than the target. A judge
-#        that shares the target's blind spots can't catch the
-#        target's subtle failures — so this isn't a nag, it's the
-#        thing that keeps your results honest.
-#
-#   KEEP The parts you liked: the 🔴 VULNERABLE / 🟢 SAFE console
-#        verdicts, the severity labels, the Mitigation Map, and the
-#        self-contained HTML report — all still here, and the report
-#        auto-opens when the scan finishes.
-#
-# Everything below reuses the v1.1 engine (attacks, detection,
-# report) so there is one source of truth for how a response is
-# judged. This file only adds the picker + the judge-strength rule.
-# ============================================================
 
 import os
 import sys
