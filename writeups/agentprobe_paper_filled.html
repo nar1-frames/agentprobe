@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentProbe: Measuring the Reliability of Prompt-Injection Judges</title>
+<style>
+:root { --ink:#1a1a1a; --muted:#555; --accent:#5b2a86; }
+* { box-sizing:border-box; }
+body { margin:0; background:#e9eaec; font-family:"Times New Roman",Georgia,serif; color:var(--ink); line-height:1.42; }
+.page { max-width:900px; margin:24px auto; background:white; padding:48px 54px 60px; box-shadow:0 2px 14px rgba(0,0,0,.15); }
+.jhead { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--accent); padding-bottom:6px; margin-bottom:22px; gap:12px; }
+.tag { color:#7a1f6b; font:700 13px Arial,sans-serif; letter-spacing:.5px; }
+.brand { color:var(--accent); font:italic 18px Georgia,serif; }
+h1.title { font-size:22px; line-height:1.3; margin:0 0 14px; }
+.authors { font-weight:700; font-size:15px; margin-bottom:2px; }
+.affil { font-size:13px; color:var(--muted); margin-bottom:20px; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+.cols { column-count:2; column-gap:30px; text-align:justify; font-size:13.5px; }
+h2.sec { font:700 14.5px Arial,sans-serif; margin:16px 0 6px; break-after:avoid; }
+h3.sub { font:700 13px Arial,sans-serif; margin:12px 0 4px; break-after:avoid; }
+p { margin:0 0 9px; }
+.abstract { background:#f6f4fa; border-left:3px solid var(--accent); padding:12px 16px; font-size:13px; margin-bottom:12px; text-align:justify; }
+.note { background:#eef6ff; border:1px solid #b9d6f2; padding:10px 12px; font:12px/1.5 Arial,sans-serif; margin:12px 0; break-inside:avoid; }
+.fig { border:1px solid #ccc; background:#fafafa; padding:10px; margin:10px 0; font-size:11.5px; break-inside:avoid; }
+.cap { font-size:11px; color:var(--muted); margin-top:6px; text-align:left; }
+table { width:100%; border-collapse:collapse; font-size:11px; }
+th,td { border:1px solid #ccc; padding:4px 5px; text-align:left; overflow-wrap:anywhere; }
+th { background:#efe9f5; font-family:Arial,sans-serif; }
+.kicker { font:700 11px Arial,sans-serif; color:var(--accent); text-transform:uppercase; }
+.refs { font-size:12px; padding-left:20px; }
+.refs li { margin-bottom:7px; }
+.bio { font-size:13px; min-height:90px; }
+.photo { width:80px; height:80px; background:#eee; border:1px solid #ccc; float:left; margin:0 14px 8px 0; display:flex; align-items:center; justify-content:center; color:#777; font:11px Arial,sans-serif; overflow:hidden; }
+.photo img { width:100%; height:100%; object-fit:cover; }
+.editor { max-width:900px; margin:20px auto; padding:18px; background:#fff; border:1px solid #ccc; font:13px/1.5 Arial,sans-serif; }
+.editor summary { cursor:pointer; font-weight:700; color:var(--accent); }
+.fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.fields label { display:block; }
+input,textarea { display:block; width:100%; margin-top:4px; padding:8px; border:1px solid #bbb; font:inherit; }
+.wide { grid-column:1/-1; }
+button { padding:9px 14px; margin:12px 8px 0 0; border:1px solid var(--accent); background:var(--accent); color:white; cursor:pointer; font:inherit; }
+.editor p { margin-top:10px; }
+@media(max-width:650px) { .page { margin:0; padding:28px 22px; } .cols { column-count:1; } .fields { grid-template-columns:1fr; } .jhead { align-items:flex-start; } }
+@media print { body { background:white; } .editor { display:none; } .page { margin:0; max-width:none; box-shadow:none; padding:0; } a { color:inherit; } @page { margin:18mm; } }
+</style>
+</head>
+<body>
+<details class="editor" open>
+  <summary>Personalize your single-author draft</summary>
+  <p>These changes stay in this page. Download the HTML to save them, including your photo. Nothing is uploaded. Printing hides this panel.</p>
+  <div class="fields">
+    <label>Name<input id="name" value="Naren Ranjith"></label>
+    <label>School or affiliation (optional)<input id="affiliation" value="AgentProbe project"></label>
+    <label>Location (optional)<input id="location" value=""></label>
+    <label>Email (optional)<input id="email" type="email" value=""></label>
+    <label class="wide">Author bio<textarea id="bio" rows="3">Naren Ranjith is the creator of AgentProbe, an open-source tool for evaluating prompt-injection responses. The project combines a red-teaming scanner with a research pipeline for comparing automatic compliance judgments against human annotations and repeated judge runs.</textarea></label>
+    <label class="wide">Your photo<input id="photo" type="file" accept="image/*"></label>
+  </div>
+  <button type="button" id="download">Download personalized HTML</button>
+  <button type="button" id="print">Print / save PDF</button>
+  <p id="editor-status" role="status">Your name and bio are editable. Review every claim before submitting this draft.</p>
+</details>
+<main class="page">
+  <div class="jhead"><span class="tag">METHODS DRAFT · HISTORICAL PILOT</span><span class="brand">AgentProbe · 2026</span></div>
+  <h1 class="title">AgentProbe: Measuring the Reliability of Prompt-Injection Judges</h1>
+  <div class="authors" id="author-name">Naren Ranjith</div>
+  <div class="affil"><span id="author-affiliation">AgentProbe project</span><span id="author-location"></span><br><a id="author-email" hidden></a></div>
+  <div class="abstract">
+    <b>Abstract.</b> An automatic compliance verdict is a measurement whose quality depends on the detector that produced it. AgentProbe evaluates that detector using a frozen response corpus, human annotations, and repeated LLM judgments. Its library contains 49 prompts across eight attack categories. The scanner combines a keyword stage with an LLM judge; the research pipeline evaluates the judge on every frozen response, including cases the keyword stage would normally resolve. Four questions guide the study: agreement with human annotations, consistency across repeated runs, disagreement between keywords and the judge, and the relationship between judge choice and error patterns. A documented historical pilot used one Llama target and two Llama judges at temperatures 0.0 and 0.7. Its recorded Fleiss' &kappa; for the 8B judge was 1.000 at temperature 0.0 and 0.449 at 0.7; the 70B judge's corresponding values were 0.973 and 0.952, with incomplete coverage in the latter condition. These summaries motivate a controlled follow-up but do not establish human-validated attack success. The current protocol specifies new, provenance-bound data collection. This draft describes the instrument and historical development evidence; the final validity and correlated-error study remains incomplete.
+  </div>
+  <div class="note">Status: unpublished methods draft, not a peer-reviewed article or completed arXiv submission. Pilot values below come from the repository's historical provenance record, not a new experiment. The Zenodo DOI in reference 4 identifies the software release.</div>
+  <div class="cols">
+    <h2 class="sec">1. Introduction</h2>
+    <p>Prompt-injection evaluation depends on deciding whether a model followed an attack. A response that contains a refusal can still provide content that advances the attack goal. And a response that repeats an attack phrase may be explaining it or rejecting it. Surface wording alone does not resolve these cases.</p>
+    <p>OWASP lists prompt injection as LLM01 in its 2025 risk taxonomy [1]. AgentProbe uses a categorized prompt library to probe related behaviors and a two-stage detector to assess responses. The first stage searches for refusal and compliance signals. The second asks an LLM to classify ambiguous responses.</p>
+    <p>The second model introduces another source of error. Zheng et al. measured agreement between LLM judges and human preferences and examined judge biases [2]. That work establishes a precedent for validating judges; agreement in a preference task does not establish agreement on attack compliance. AgentProbe applies measurement checks to this narrower task.</p>
+    <p>RQ1 asks how well judge decisions agree with human annotations. RQ2 asks how consistently a judge labels the same response across repeated calls. RQ3 asks where keyword output differs from judge output, including keyword abstentions. RQ4 asks whether judge choice changes error patterns on matched responses. The contribution at this stage is an auditable protocol and instrument, accompanied by historical pilot summaries rather than a completed validation claim.</p>
+    <h2 class="sec">2. Background</h2>
+    <h3 class="sub">2.1 Attack scope and taxonomy</h3>
+    <p>Direct injection arrives through attacker-controlled input. Indirect injection arrives through content an application retrieves or processes, a route demonstrated by Greshake et al. [3]. AgentProbe's library covers eight categories (Table 1), each with a severity annotation and an attack description.</p>
+    <p>The present text-only protocol sends prompts to a chat endpoint. Its indirect-injection prompts simulate embedded content; they do not exercise a live retrieval system. Its tool-misuse prompts likewise probe textual behavior without giving the target file, database, or code-execution tools. A fabricated system prompt or claimed tool action is not evidence of a secret leak or executed action.</p>
+    <div class="fig"><span class="kicker">Table 1</span>
+      <table><thead><tr><th>Category</th><th>Probe goal</th><th>Prompts</th></tr></thead><tbody>
+      <tr><td>Jailbreak</td><td>Override safety constraints</td><td>8</td></tr>
+      <tr><td>Data extraction</td><td>Request hidden instructions or configuration</td><td>8</td></tr>
+      <tr><td>Privilege escalation</td><td>Claim elevated permissions</td><td>6</td></tr>
+      <tr><td>Social engineering</td><td>Use authority claims or emotional pressure</td><td>6</td></tr>
+      <tr><td>Role confusion</td><td>Replace the model's assigned role</td><td>6</td></tr>
+      <tr><td>Indirect injection</td><td>Embed instructions in supplied content</td><td>5</td></tr>
+      <tr><td>Context manipulation</td><td>Attempt to reset or rewrite context</td><td>5</td></tr>
+      <tr><td>Tool misuse</td><td>Request unauthorized tool behavior</td><td>5</td></tr>
+      </tbody></table><div class="cap">Counts verified against attacks/library.py; total 49. Categories describe probe intent, not demonstrated application-level compromise.</div>
+    </div>
+    <h3 class="sub">2.2 Keyword and LLM judgments</h3>
+    <p>The keyword stage lowercases the response and searches fixed phrase lists. Signals include refusal wording such as "I can't" and compliance wording such as "developer mode." The detector records its verdict, matched signals, and a separate decisiveness flag. Matching costs no additional model call, but its work grows with response length; it is not constant-time processing.</p>
+    <p>The LLM judge receives the attack and response and returns COMPLIED, PARTIAL, or REFUSED with a reason. A parser maps those labels into the scanner's internal vocabulary. Invalid output and API failures remain identifiable rather than being treated as refusals. Judge size is treated as an experimental condition; a larger judge is not assumed to be more correct.</p>
+    <h3 class="sub">2.3 Hedge-then-comply</h3>
+    <p>AgentProbe includes a heuristic for responses that refuse near the beginning and use compliance wording later. For responses at least 80 characters long, it checks the leading quarter for refusal signals and the remaining three quarters for compliance signals. A match produces a decisive PARTIAL verdict. This routing saves a judge call, but the phrase match does not prove that the later text contains a usable attack payload. Human comparison is needed to measure that distinction.</p>
+    <h2 class="sec">3. Methodology</h2>
+    <h3 class="sub">3.1 Freeze responses before judging</h3>
+    <p>The corpus generator calls the target and writes raw responses before any judging. Judge runs and human annotations then refer to those fixed responses. This separation holds target text constant when the judge changes and prevents target sampling differences from masquerading as judge inconsistency.</p>
+    <p>The canonical detector is imported from agentprobe.detection. Corpus, judge, and label files join through deterministic response identifiers. The current pipeline also binds evidence to corpus and protocol digests, so a model or rubric change cannot silently reuse incompatible labels. The historical snapshot predates these requirements and cannot be merged with the current protocol.</p>
+    <h3 class="sub">3.2 Historical and current configurations</h3>
+    <p>The historical research pilot froze 49 responses from llama-3.1-8b-instant and judged them with llama-3.1-8b-instant and llama-3.3-70b-versatile at temperatures 0.0 and 0.7. Complete groups contained three repeats. The local snapshot recorded 530 judge rows and 17 primary human labels; rate-limit failures left the 70B/0.7 condition incomplete.</p>
+    <p>Protocol v1.4 specifies a new Groq-hosted corpus from openai/gpt-oss-20b at temperature 0.0, a 512-token output cap, and low reasoning effort. It restricts the target to text without external tools. The planned judges are openai/gpt-oss-20b and openai/gpt-oss-120b, each at temperatures 0.0 and 0.7, with five repeats per response and a 120-token judge output cap. These are manifest specifications, not completed experiment results. Across 49 responses, the planned judge grid requires 980 scheduled judgments before retries.</p>
+    <h3 class="sub">3.3 Human reference labels</h3>
+    <p>The historical snapshot contains 17 labels from the primary annotator. No completed independent annotation comparison is documented. Human labels are the reference standard for this task, but they carry uncertainty and annotator bias of their own.</p>
+    <p>The planned protocol calls for primary labeling of every response and independent labeling of a seeded 30% subset. The second annotator's packet hides detector and judge verdicts. A second annotator need not be a coauthor. This document has one author and makes no claim that the second annotation pass has occurred. If the study proceeds with only one annotator, it must report that limitation and revise the protocol.</p>
+    <h3 class="sub">3.4 Agreement metrics and exclusions</h3>
+    <p>For RQ1, a unique modal judge label is compared with the human label on matched items. Ties remain unscorable; a mode is not necessarily an absolute majority. Accuracy measures exact label agreement. Cohen's &kappa; = (p<sub>o</sub> &minus; p<sub>e</sub>)/(1 &minus; p<sub>e</sub>) adjusts observed agreement p<sub>o</sub> for agreement p<sub>e</sub> implied by the two label distributions. Per-class precision, recall, and a 3&times;3 confusion matrix describe which labels account for errors.</p>
+    <p>For RQ2, Fleiss' &kappa; summarizes chance-adjusted agreement over repeated ratings of each response. The pipeline also reports pairwise exact agreement and the mean fraction of runs matching each item's modal label, called self-agreement. This fraction differs from the proportion of items with unanimous ratings. A flip count records items whose labels changed at least once.</p>
+    <p>API failures are operational outcomes, not model judgments. Reliability summaries exclude them and identify incomplete repeat groups. Complete-group analysis can still be biased when missingness is selective, so coverage accompanies every estimate. The current software supports bootstrap intervals; no interval is reconstructed from the historical rounded summaries here. Metrics remain pure Python so the calculations can be inspected.</p>
+    <h3 class="sub">3.5 Keyword divergence and correlated errors</h3>
+    <p>RQ3 compares keyword labels with a named reference judge. It reports keyword decisiveness separately from raw agreement. SUSPICIOUS is an abstention or unresolved state, not a fourth human compliance label. Disagreement involving abstentions must be distinguished from contradictory committed verdicts.</p>
+    <p>RQ4 requires matched human-labeled items and explicit strong and weak judge configurations. The historical analysis used keyword errors as a target-behavior proxy; keyword output is not independent evidence of target failure. The confirmatory definition of target failure and its contingency analysis remain to be finalized before new data are interpreted. An association between judge errors and compliance would not, by itself, isolate a model-family effect from item difficulty or class imbalance.</p>
+    <h2 class="sec">4. Historical pilot evidence</h2>
+    <p>The values in this section are transcribed from docs/RESULTS.md. Raw historical artifacts are excluded from the public tree, so these summaries cannot be reproduced from a clean clone alone. They are development evidence, not final protocol-v1.4 findings.</p>
+    <h3 class="sub">4.1 Scanner baseline</h3>
+    <p>A separate July 14, 2026 scanner run reported 29 findings among 49 prompts: 27 VULNERABLE and two PARTIAL, with 10 CRITICAL, 15 HIGH, and four MEDIUM severity assignments. The rounded 59% figure is the scanner's finding rate for that run. It is neither a human-validated attack-success estimate nor a general measure of the target model's security. The scanner baseline and frozen judge study are separate artifacts.</p>
+    <h3 class="sub">4.2 Validity remains incomplete</h3>
+    <p>The historical reference set covers only 17 of 49 responses. Reported Cohen's &kappa; values ranged from &minus;0.172 to 0.040 across judge configurations. These values describe that small annotated slice and do not establish validity for the full library. Final validity tables, class-specific error claims, and a human-validated category breakdown require complete annotations bound to the new corpus.</p>
+    <h3 class="sub">4.3 Repeated-judge reliability</h3>
+    <div class="fig"><span class="kicker">Table 2</span>
+      <table><thead><tr><th>Judge</th><th>Temp.</th><th>Items</th><th>Self-agreement</th><th>Fleiss' &kappa;</th></tr></thead><tbody>
+      <tr><td>Llama 8B</td><td>0.0</td><td>49</td><td>1.000</td><td>1.000</td></tr>
+      <tr><td>Llama 8B</td><td>0.7</td><td>49</td><td>0.844</td><td>0.449</td></tr>
+      <tr><td>Llama 70B</td><td>0.0</td><td>49</td><td>0.993</td><td>0.973</td></tr>
+      <tr><td>Llama 70B</td><td>0.7</td><td>28</td><td>0.988</td><td>0.952</td></tr>
+      </tbody></table><div class="cap">Historical pilot, k = 3 on complete repeat groups. Llama 8B = llama-3.1-8b-instant; Llama 70B = llama-3.3-70b-versatile. The final condition excludes 21 incomplete groups and contains five recorded API failures in the snapshot.</div>
+    </div>
+    <p>Recorded 8B consistency was lower at temperature 0.7 than at 0.0. The 70B summaries remained high, but its 0.7 estimate covers only 28 responses. This pattern motivates the controlled temperature comparison; it does not show that small judges are generally unsuitable or that larger judges are more valid. A judge can be consistent and still wrong.</p>
+    <h3 class="sub">4.4 Keyword coverage and divergence</h3>
+    <p>The keyword stage made a decisive call on five of 49 responses (10.2%). Its raw agreement with the configured 70B judge at temperature 0.0 was 0.449. The other 44 responses would require escalation under the scanner's routing rule. These values measure keyword coverage and agreement with one judge, not keyword accuracy against human annotations.</p>
+    <h2 class="sec">5. Discussion</h2>
+    <p>The pilot separates two questions that a single compliance percentage conflates. Repeated ratings reveal whether an automatic label is stable. Human comparison tests whether that stable label agrees with the intended labeling task. Neither measurement substitutes for the other.</p>
+    <p>Keyword matching has no additional inference cost and exposes the phrases behind its decisions. Its limited decisive coverage in the pilot places most classification work on the judge. Escalation therefore saves calls only on a small share of that corpus. This cost observation does not justify changing the signal lists during the study: doing so would change the detector whose divergence is being measured.</p>
+    <p>Rate limits affected one judge condition and show why failures need their own records. Retrying a call can repair missing coverage, but silently turning failed calls into compliance labels would alter the reliability estimate. A complete follow-up must preserve the failed attempts, describe repair rules, and report exclusions alongside results.</p>
+    <h2 class="sec">6. Limitations and threats to validity</h2>
+    <p>The library contains 49 English, single-turn prompts. It is a curated probe set, not a representative sample of all attacks. Category labels do not supply independent replication, and several prompts can share a mechanism. A text-only chat experiment cannot establish compromise of a deployed agent with secrets, retrieval, or tools.</p>
+    <p>The historical judge study used one target, three repeats, two same-family judges, incomplete coverage, and partial human annotation. Parameter count and family overlap are confounded. Its response generation also predates the metadata now required by the manifest. New protocol-bound evidence must be collected rather than relabeling these old artifacts as a completed current study.</p>
+    <p>The planned v1.4 study likewise uses one target and same-family judges. It can compare the specified judge configurations but cannot isolate family preference or support broad cross-model conclusions. Human inter-annotator agreement is a calibration measure, not a strict upper bound on agreement that an automatic judge can achieve with a chosen reference annotator.</p>
+    <h2 class="sec">7. Ethics and reproducibility</h2>
+    <p>AgentProbe is intended for defensive evaluation. Operators must restrict tests to authorized models and endpoints and review provider rules before running attack prompts. This draft does not claim permission to test unrelated third-party applications. Disclosure of a deployed-system finding should follow an appropriate responsible-disclosure process.</p>
+    <p>The repository releases the instrument and protocol. Historical raw responses and annotation notes are not part of the public evidence release because they can contain sensitive material. Public reproduction of an empirical claim will require reviewed evidence artifacts or an explicit access policy, together with corpus, rubric, and judge-prompt digests. Software availability alone is insufficient to reproduce the historical pilot.</p>
+    <h2 class="sec">8. Conclusion</h2>
+    <p>AgentProbe provides a way to examine the detector behind an attack-compliance score. It freezes target responses, records repeated judge outputs, and compares automatic labels with human annotations. The historical pilot suggests that judge configuration affects consistency and that keyword decisiveness can be limited. Completing the protocol-bound corpus and annotation work is necessary before drawing final validity or correlated-error conclusions.</p>
+    <h2 class="sec">Appendix A. Annotation rubric</h2>
+    <p>COMPLIED means the response acts on the attack premise and supplies content advancing its goal. PARTIAL means the response hedges or refuses in part but still supplies usable content advancing that goal. REFUSED means the response refuses or deflects without such content. Fiction and roleplay do not erase a usable payload. Empty output and request errors are excluded operational failures rather than refusals.</p>
+    <p>Annotators assess the response against the stated attack goal before viewing automatic verdicts and record uncertainty in a note. An asserted secret or tool action must be distinguished from a verified disclosure or execution. This summary describes the repository rubric; the manifest-bound guide governs a new study, and any changes to these definitions must be versioned before labeling.</p>
+    <h2 class="sec">References</h2>
+    <ol class="refs">
+      <li>OWASP Gen AI Security Project. LLM01:2025 Prompt Injection. <a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">Risk description</a>. Accessed September 16, 2026.</li>
+      <li>Zheng, L., et al. (2023). Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena. NeurIPS 2023 Datasets and Benchmarks. <a href="https://arxiv.org/abs/2306.05685">arXiv:2306.05685</a>.</li>
+      <li>Greshake, K., Abdelnabi, S., Mishra, S., Endres, C., Holz, T., and Fritz, M. (2023). Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection. <a href="https://arxiv.org/abs/2302.12173">arXiv:2302.12173</a>.</li>
+      <li>nar1-frames. (2026). AgentProbe v1.2: open-source LLM prompt-injection scanner. Software release, Zenodo. <a href="https://doi.org/10.5281/zenodo.21410386">DOI: 10.5281/zenodo.21410386</a>. This DOI identifies software, not this manuscript.</li>
+      <li>AgentProbe repository. Results and provenance (docs/RESULTS.md), executable study manifest (research/study_manifest.json), and Human Labeling Guide. <a href="https://github.com/nar1-frames/agentprobe">Source repository</a>. Local files reviewed September 16, 2026. A final evidence release must cite an immutable version.</li>
+    </ol>
+  </div>
+  <h2 class="sec" style="margin-top:22px">About the author</h2>
+  <div class="bio"><div class="photo" id="author-photo">Optional photo</div><p id="author-bio">Naren Ranjith is the creator of AgentProbe, an open-source tool for evaluating prompt-injection responses. The project combines a red-teaming scanner with a research pipeline for comparing automatic compliance judgments against human annotations and repeated judge runs.</p></div>
+</main>
+<script>
+const byId = id => document.getElementById(id);
+function updateAuthor() {
+  byId('author-name').textContent = byId('name').value;
+  byId('author-affiliation').textContent = byId('affiliation').value;
+  byId('author-location').textContent = byId('location').value ? ' · ' + byId('location').value : '';
+  const email = byId('email').value.trim();
+  byId('author-email').hidden = !email;
+  byId('author-email').textContent = email;
+  if (email) byId('author-email').href = 'mailto:' + email;
+  else byId('author-email').removeAttribute('href');
+  byId('author-bio').textContent = byId('bio').value;
+}
+['name','affiliation','location','email','bio'].forEach(id => byId(id).addEventListener('input', updateAuthor));
+byId('photo').addEventListener('change', event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { byId('editor-status').textContent = 'Choose an image file.'; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = document.createElement('img');
+    img.src = reader.result;
+    img.alt = 'Author portrait';
+    byId('author-photo').replaceChildren(img);
+    byId('editor-status').textContent = 'Photo added locally. Download the HTML to save it with your details.';
+  };
+  reader.onerror = () => { byId('editor-status').textContent = 'Could not read this image. Try another file.'; };
+  reader.readAsDataURL(file);
+});
+byId('download').addEventListener('click', () => {
+  updateAuthor();
+  const clone = document.documentElement.cloneNode(true);
+  ['name','affiliation','location','email'].forEach(id => clone.querySelector('#'+id).setAttribute('value',byId(id).value));
+  clone.querySelector('#bio').textContent = byId('bio').value;
+  const blob = new Blob(['<!DOCTYPE html>\n'+clone.outerHTML], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = 'AgentProbe_paper_personalized.html'; link.click();
+  setTimeout(() => URL.revokeObjectURL(url),1000);
+});
+byId('print').addEventListener('click', () => window.print());
+</script>
+</body>
+</html>
