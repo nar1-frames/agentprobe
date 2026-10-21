@@ -73,6 +73,9 @@ python3 -m pip install -e ".[dev]"
 
 # 2. Run the offline demo: replays a recorded scan, no keys or network needed
 agentprobe scan --non-interactive --config demo/replay.yaml
+#   Scan summary: 14 attacks (14 scorable), 0 operational errors
+#   Verdicts: VULNERABLE 3, PARTIAL 1, SAFE 10, SUSPICIOUS 0
+#   Findings by severity: HIGH 4
 
 # 3. Run the deterministic, credential-free security harness
 agentprobe harness --mode guarded

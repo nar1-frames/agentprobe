@@ -91,3 +91,30 @@ def test_live_harness_cli_is_explicit_and_uses_configured_target(monkeypatch, tm
     assert received["model"] == "fixture-3b"
     assert report["run"]["target_model"] == "fixture-3b"
     assert report["run"]["target_provider"] == "ollama"
+
+
+def test_noninteractive_scan_prints_summary_before_saved_lines(monkeypatch, capsys):
+    run = _run_with_row("keyword")
+    run["json_path"] = "reports/out.json"
+    run["report"] = {"summary": {
+        "total_attacks": 14, "scorable_attacks": 13, "operational_errors": 1,
+        "verdicts": {"SAFE": 10, "SUSPICIOUS": 0, "PARTIAL": 1, "VULNERABLE": 2},
+        "findings_by_severity": {"CRITICAL": 0, "HIGH": 2, "MEDIUM": 1, "LOW": 0},
+    }}
+    monkeypatch.setattr(scanner, "run_configured_scan", lambda _config: run)
+    assert main(["scan", "--non-interactive"]) == 0
+    out = capsys.readouterr().out
+    assert "Scan summary: 14 attacks (13 scorable), 1 operational errors" in out
+    assert "Verdicts: SAFE 10, SUSPICIOUS 0, PARTIAL 1, VULNERABLE 2" in out
+    assert "Findings by severity: HIGH 2, MEDIUM 1" in out
+    assert out.index("Scan summary:") < out.index("JSON report saved to:")
+
+
+def test_noninteractive_scan_prints_no_summary_without_report(monkeypatch, capsys):
+    monkeypatch.setattr(scanner, "run_configured_scan",
+                        lambda _config: _run_with_row("keyword"))
+    assert main(["scan", "--non-interactive"]) == 0
+    out = capsys.readouterr().out
+    assert "Scan summary:" not in out
+    assert "Verdicts:" not in out
+    assert "Findings by severity:" not in out
