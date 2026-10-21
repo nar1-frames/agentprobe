@@ -81,12 +81,12 @@ def scan_content(relative_path, content, allow_test_fixtures=True):
     findings = []
     relative_path = Path(relative_path)
     if _forbidden_path(relative_path):
-        findings.append(f"{relative_path}: forbidden generated/private path")
+        findings.append(f"{relative_path.as_posix()}: forbidden generated/private path")
     if allow_test_fixtures and relative_path.parts and relative_path.parts[0] == "tests":
         return findings
     for label, pattern in _SECRET_PATTERNS:
         if pattern.search(content):
-            findings.append(f"{relative_path}: credential-like {label} pattern")
+            findings.append(f"{relative_path.as_posix()}: credential-like {label} pattern")
     return findings
 
 
@@ -103,7 +103,7 @@ def scan_public_tree(root=".", include_untracked=False):
         try:
             content = absolute_path.read_bytes()
         except OSError as exc:
-            findings.append(f"{relative_path}: cannot read tracked file ({exc})")
+            findings.append(f"{relative_path.as_posix()}: cannot read tracked file ({exc})")
             continue
         findings.extend(scan_content(relative_path, content))
     return findings

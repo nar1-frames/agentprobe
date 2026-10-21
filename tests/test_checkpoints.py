@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -31,7 +32,8 @@ def test_checkpoint_is_private_atomic_and_resumes_exact_rows(tmp_path):
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["status"] == "in_progress"
     assert len(payload["results"]) == 1
-    assert path.stat().st_mode & 0o077 == 0
+    if os.name != "nt":  # NTFS has no POSIX mode bits; chmod cannot express 0o600.
+        assert path.stat().st_mode & 0o077 == 0
 
     resumed = ScanCheckpoint(
         str(path), target_model="target-3b", judge_model="judge-8b",

@@ -1,4 +1,5 @@
 import json
+import os
 from types import SimpleNamespace
 import pytest
 
@@ -53,7 +54,8 @@ def test_harness_report_is_versioned_summarized_and_private(tmp_path):
     }
     path = save_harness_report(report, str(tmp_path / "harness.json"))
     assert json.loads(__import__("pathlib").Path(path).read_text())["schema_version"] == "1.3"
-    assert __import__("pathlib").Path(path).stat().st_mode & 0o077 == 0
+    if os.name != "nt":  # NTFS has no POSIX mode bits; chmod cannot express 0o600.
+        assert __import__("pathlib").Path(path).stat().st_mode & 0o077 == 0
 
 
 def test_json_report_preserves_library_index_after_filtering():

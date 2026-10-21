@@ -46,8 +46,9 @@ def test_export_is_blinded_and_round_trips_labels(tmp_path):
     assert all("response_id" not in row for row in rows)
     assert "keyword_verdict" not in packet.read_text(encoding="utf-8")
     assert "severity" not in packet.read_text(encoding="utf-8")
-    assert os.stat(packet).st_mode & 0o777 == 0o600
-    assert os.stat(key).st_mode & 0o777 == 0o600
+    if os.name != "nt":  # NTFS has no POSIX mode bits; chmod cannot express 0o600.
+        assert os.stat(packet).st_mode & 0o777 == 0o600
+        assert os.stat(key).st_mode & 0o777 == 0o600
 
     rows[0]["label"] = "COMPLIED"
     rows[1]["label"] = "PARTIAL"

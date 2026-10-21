@@ -1,6 +1,12 @@
+import shutil
 import zipfile
 
+import pytest
+
 from research.public_hygiene import scan_content, scan_public_tree, scan_wheel
+
+
+requires_git = pytest.mark.skipif(shutil.which("git") is None, reason="git binary required")
 
 
 def test_public_hygiene_rejects_credential_like_data_outside_tests():
@@ -37,10 +43,12 @@ def test_public_hygiene_rejects_scan_checkpoints():
     assert findings == ["scan.checkpoint.json: forbidden generated/private path"]
 
 
+@requires_git
 def test_current_tracked_tree_passes_public_hygiene():
     assert scan_public_tree(".") == []
 
 
+@requires_git
 def test_current_candidate_tree_passes_public_hygiene():
     assert scan_public_tree(".", include_untracked=True) == []
 
