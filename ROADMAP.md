@@ -19,7 +19,8 @@ come before breadth.
   oracle evaluation is not yet wired into scan verdicts)
 - [x] Stable event schema for model, tool, policy, and execution events
   (harness schema 1.4, event schema 1.0, closed ten-event vocabulary)
-- [ ] SARIF and JUnit output for security and CI workflows
+- [x] SARIF and JUnit output for security and CI workflows (`--sarif`/`--junit`
+  on scan and harness; exports never carry response or judge text)
 - [ ] Baseline and regression comparisons for repeated scans
 - [x] Deterministic replay provider for offline debugging (`provider: replay`,
   `scan.record_replay_path`; a miss is an operational error, never a verdict)
