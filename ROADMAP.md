@@ -21,7 +21,8 @@ come before breadth.
   (harness schema 1.4, event schema 1.0, closed ten-event vocabulary)
 - [ ] SARIF and JUnit output for security and CI workflows
 - [ ] Baseline and regression comparisons for repeated scans
-- [ ] Deterministic replay provider for offline debugging
+- [x] Deterministic replay provider for offline debugging (`provider: replay`,
+  `scan.record_replay_path`; a miss is an operational error, never a verdict)
 - [ ] Policy tests for data sinks, filesystem boundaries, network destinations,
   approvals, and tool-chain depth
 
