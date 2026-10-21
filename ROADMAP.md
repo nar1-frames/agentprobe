@@ -11,7 +11,7 @@ come before breadth.
 - [x] Threat model, security policy, CI, and public-tree hygiene checks
 - [x] Research manifest, blinded label packets, and publication gate
 - [ ] Complete the v1.4 human labels and judge matrix
-- [ ] Publish a clean first-run demo and representative sanitized report
+- [x] Publish a clean first-run demo and representative sanitized report
 
 ## Next — developer-grade security harness
 
