@@ -103,6 +103,8 @@ agentprobe scan --non-interactive --config config.yaml --fail-on-error
 # CI exports omit model responses and judge reasoning; publish them as artifacts.
 agentprobe scan --non-interactive --config config.yaml --sarif reports/scan.sarif --junit reports/scan.junit.xml
 agentprobe harness --mode guarded --sarif reports/harness.sarif --junit reports/harness.junit.xml
+# Gate on regressions against a stored baseline report from the same attack library.
+agentprobe compare --baseline baseline.json --candidate reports/scan.json --fail-on-regression --fail-on-incomparable
 # For a long run: checkpoint each completed attack and resume after an
 # interruption. Checkpoints contain raw model responses; keep them local.
 agentprobe scan --non-interactive --config config.yaml \

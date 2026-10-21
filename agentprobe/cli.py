@@ -5,15 +5,53 @@ import json
 import sys
 from typing import Sequence
 
+from agentprobe.compare import compare_scan_reports, format_comparison_text
 from agentprobe.exports import (
     harness_report_to_junit, harness_report_to_sarif, scan_report_to_junit,
     scan_report_to_sarif, write_text_atomic,
 )
 from agentprobe.harness import run_fixture_suite
 from agentprobe.reporting import (
-    build_harness_provenance, build_harness_report, save_harness_report,
+    _write_json_atomic, build_harness_provenance, build_harness_report, save_harness_report,
 )
 from agentprobe import scanner
+
+
+def _load_report(path, label):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} {path} is not valid JSON: {exc}") from exc
+
+
+def _compare(args) -> int:
+    try:
+        result = compare_scan_reports(
+            _load_report(args.baseline, "baseline"), _load_report(args.candidate, "candidate"),
+        )
+    except (OSError, ValueError) as exc:
+        print(f"agentprobe: comparison input error: {exc}", file=sys.stderr)
+        return 2
+    out = sys.stderr if args.json == "-" else sys.stdout
+    print(format_comparison_text(result), end="", file=out)
+    if args.json == "-":
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.json:
+        try:
+            _write_json_atomic(args.json, result, ".agentprobe-compare-")
+        except (OSError, TypeError, ValueError) as exc:
+            print(f"agentprobe: comparison output error: {exc}", file=sys.stderr)
+            return 2
+        print(f"Wrote comparison to {args.json}", file=out)
+    # A regression across different attack libraries is meaningless, so an
+    # incomparable gate outranks the regression gate.
+    if args.fail_on_incomparable and not result["comparability"]["comparable"]:
+        return 4
+    summary = result["summary"]
+    if args.fail_on_regression and (summary["regressed"] or summary["newly_errored"]):
+        return 1
+    return 0
 
 
 def _write_exports(args, report, to_sarif, to_junit, out=None) -> None:
@@ -184,6 +222,22 @@ def build_parser() -> argparse.ArgumentParser:
     harness.add_argument("--temperature", type=float, default=0.0)
     _add_export_arguments(harness)
     harness.set_defaults(handler="harness")
+
+    compare = subparsers.add_parser(
+        "compare", help="compare a candidate scan report against a baseline report",
+    )
+    compare.add_argument("--baseline", required=True, metavar="PATH", help="baseline scan JSON report")
+    compare.add_argument("--candidate", required=True, metavar="PATH", help="candidate scan JSON report")
+    compare.add_argument("--json", metavar="PATH", help="write the comparison JSON, or '-' for stdout")
+    compare.add_argument(
+        "--fail-on-regression", action="store_true",
+        help="exit 1 if any attack regressed or newly errored",
+    )
+    compare.add_argument(
+        "--fail-on-incomparable", action="store_true",
+        help="exit 4 if the reports used different attack libraries or report schemas",
+    )
+    compare.set_defaults(handler="compare")
     return parser
 
 
@@ -195,6 +249,8 @@ def main(argv: Sequence[str] = None) -> int:
         return 0
     if args.handler == "harness":
         return _live_harness(args) if args.live else _harness(args)
+    if args.handler == "compare":
+        return _compare(args)
     if args.handler == "scan":
         if args.resume and not args.checkpoint:
             parser.error("--resume requires --checkpoint")

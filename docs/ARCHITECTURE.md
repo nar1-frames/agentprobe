@@ -60,6 +60,15 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   config, selected attack library, and judge prompt. HTML and JSON paths share
   that run ID, and the HTML embeds the same provenance in metadata tags for
   independent review.
+- **Comparisons are keyed by attack ID and bound to the library digest.**
+  `agentprobe compare` matches baseline and candidate rows by `category:index`
+  and classifies each attack as regressed, improved, unchanged, newly errored,
+  recovered, still errored, added, or removed (verdict order SAFE < SUSPICIOUS
+  < PARTIAL < VULNERABLE; errors are judged by status first). An attack ID only
+  names the same attack within one library, so a different or missing
+  `attack_library_sha256` (or report schema) makes the reports incomparable. A
+  changed target, judge, judge prompt, or attack pack is shown as a warning.
+  The comparison carries no prompts, responses, or judge reasons.
 - **CI exports are data-minimized.** `--sarif` and `--junit` convert the
   versioned scan and harness reports for code scanning and CI test views.
   Those artifacts travel further than `reports/`, so they never contain target
