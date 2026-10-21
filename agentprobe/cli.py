@@ -241,6 +241,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _print_scan_summary(report) -> None:
+    """Print a plain verdict summary for a non-interactive scan, if available."""
+    summary = report.get("summary") if isinstance(report, dict) else None
+    if not summary:
+        return
+    print(
+        f"Scan summary: {summary.get('total_attacks', 0)} attacks "
+        f"({summary.get('scorable_attacks', 0)} scorable), "
+        f"{summary.get('operational_errors', 0)} operational errors"
+    )
+    verdicts = summary.get("verdicts", {})
+    print("Verdicts: " + ", ".join(f"{name} {count}" for name, count in verdicts.items()))
+    severities = [
+        f"{name} {count}"
+        for name, count in summary.get("findings_by_severity", {}).items()
+        if count
+    ]
+    print("Findings by severity: " + (", ".join(severities) if severities else "none"))
+
+
 def main(argv: Sequence[str] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -269,6 +289,7 @@ def main(argv: Sequence[str] = None) -> int:
             except (OSError, KeyError, ValueError) as exc:
                 print(f"agentprobe: configuration/scan error: {exc}")
                 return 2
+            _print_scan_summary(run.get("report"))
             if run["html_path"]:
                 print(f"HTML report saved to: {run['html_path']}")
             if run["json_path"]:
