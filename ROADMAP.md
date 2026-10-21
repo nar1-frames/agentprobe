@@ -25,8 +25,10 @@ come before breadth.
   compare`, keyed by attack ID and bound to the library digest)
 - [x] Deterministic replay provider for offline debugging (`provider: replay`,
   `scan.record_replay_path`; a miss is an operational error, never a verdict)
-- [ ] Policy tests for data sinks, filesystem boundaries, network destinations,
-  approvals, and tool-chain depth
+- [x] Policy tests for data sinks, filesystem boundaries, network destinations,
+  approvals, and tool-chain depth (`ToolPolicy.max_executed_calls`, https host
+  allowlist for `http_fetch`, email recipient-domain allowlist; one neutral
+  network scenario added to the fixture suite)
 
 ## Then — realistic agent coverage
 

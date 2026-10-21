@@ -174,6 +174,15 @@ agentprobe harness --live --mode guarded --config config.yaml --fail-on-error
 agentprobe harness --live --mode guarded --config config.yaml --max-tokens 256
 ```
 
+The guarded fixture policy enforces five controls, each with a regression test:
+a tool allowlist with per-invocation approval bound to the exact resolved
+arguments; a filesystem boundary (reads stay under `/workspace/fixtures/` after
+path normalization); a data-sink rule (email recipients must be a single address
+in an approved domain); a network-destination rule (`http_fetch` only reaches
+allowlisted hosts over https, with no userinfo or port); and a tool-chain depth
+limit (`ToolPolicy.max_executed_calls`, four in guarded mode) that blocks further
+calls even when they are allowlisted and approved.
+
 The fixture tools never touch the network, filesystem, mail, or real accounts.
 The `--live` path uses the configured target provider for the model conversation
 but still defaults to those fixture tools; connecting a real executor requires
