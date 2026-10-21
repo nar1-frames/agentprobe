@@ -24,6 +24,9 @@ _FORBIDDEN_NAMES = frozenset({
     "agentprobe-backup-preconsolidation", "_variants_from_B",
     "judgements_clean.jsonl", "judgements_errors_pilot.jsonl", "results_pilot.json",
 })
+# Exact paths of committed, sanitized demo fixtures that would otherwise match
+# a private-artifact rule. Secret patterns still apply to them.
+_PUBLIC_DEMO_FILES = frozenset({"demo/scan.replay.json"})
 _SECRET_PATTERNS = (
     ("provider-key", re.compile(rb"(?i)\b(?:sk|gsk)[_-][A-Za-z0-9_-]{12,}\b")),
     ("github-token", re.compile(rb"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),
@@ -55,6 +58,8 @@ def untracked_files(root="."):
 
 def _forbidden_path(relative_path):
     relative_path = Path(relative_path)
+    if relative_path.as_posix() in _PUBLIC_DEMO_FILES:
+        return False
     parts = set(relative_path.parts)
     if parts & _FORBIDDEN_PARTS:
         return True
