@@ -7,8 +7,11 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from agentprobe.detection import sanitize_error
+from agentprobe.replay import ReplayClient
 
 
+# "replay" serves a local recording and never transmits content, so it is
+# deliberately absent here.
 EXTERNAL_PROVIDERS = frozenset({"groq", "openai", "custom"})
 
 
@@ -47,6 +50,8 @@ def build_client(provider_config: Mapping[str, Any]):
     if not isinstance(provider_config, Mapping):
         raise ValueError("provider configuration must be a mapping")
     provider = provider_config.get("provider", "groq")
+    if provider == "replay":
+        return ReplayClient(provider_config.get("replay_path"))
     base_url = provider_config.get("base_url")
     _validate_base_url(provider, base_url)
     key_env = provider_config.get("api_key_env")

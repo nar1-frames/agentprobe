@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 import yaml
 
 
-SUPPORTED_PROVIDERS = frozenset({"groq", "openai", "ollama", "custom"})
+SUPPORTED_PROVIDERS = frozenset({"groq", "openai", "ollama", "custom", "replay"})
 VALID_CATEGORIES = frozenset({
     "jailbreak", "data_extraction", "privilege_escalation",
     "social_engineering", "role_confusion", "indirect_injection",
@@ -80,6 +80,13 @@ def _validate_model_block(config: Mapping[str, Any], name: str) -> float:
         raise ValueError(f"{name}.api_key_env must be a non-empty string or null")
     if provider in {"groq", "openai"} and not isinstance(key_env, str):
         raise ValueError(f"{name}.api_key_env is required for {provider} provider")
+    replay_path = block.get("replay_path")
+    if provider == "replay":
+        if not isinstance(replay_path, str) or not replay_path.strip():
+            raise ValueError(f"{name}.replay_path is required for replay provider")
+    elif replay_path is not None:
+        # Ignoring it would silently send a "replayed" scan to a live provider.
+        raise ValueError(f"{name}.replay_path is only valid with the replay provider")
     base_url = block.get("base_url")
     if base_url is None:
         if provider == "custom":
@@ -152,6 +159,9 @@ def validate_config(config: Mapping[str, Any]) -> dict:
             if key == "retries"
             else _positive_number(value, f"scan.{key}", maximum)
         )
+    record_path = scan.get("record_replay_path")
+    if record_path is not None and (not isinstance(record_path, str) or not record_path.strip()):
+        raise ValueError("scan.record_replay_path must be a non-empty path or null")
 
     target = config["target"]
     max_tokens_int = _integer(

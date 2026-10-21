@@ -11,6 +11,8 @@ __pycache__/
 reports/
 *.checkpoint.json
 *.checkpoint.jsonl
+# Replay recordings hold raw prompts and model output.
+*.replay.json
 .DS_Store
 
 # Disclosure workflow (v1.2) — real engagements + unpatched vulns stay local.

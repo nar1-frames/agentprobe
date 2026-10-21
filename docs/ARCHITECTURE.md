@@ -44,6 +44,13 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   OpenAI-compatible clients used by the scanner and research collection,
   disables hidden SDK retries, and rejects malformed or missing custom
   endpoints before credentials or network calls are used.
+- **Replay never fabricates.** `scan.record_replay_path` records every
+  target and judge response under the SHA-256 of its canonical request, and
+  the `replay` provider serves that file with no network or credentials. A
+  request with no recorded entry raises `ReplayMiss`, which the scanner
+  records as a target or judge error rather than a verdict (and
+  `--fail-on-error` turns into a failing exit). A model missing from the
+  recording fails preflight before the first attack is sent.
 - **Failed calls are not verdicts.** Target failures are marked
   `status=error` / `method=target-error` in JSON and are never sent to the
   judge; judge failures use `method=judge-error` and are excluded from

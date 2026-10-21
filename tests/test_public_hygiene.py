@@ -41,6 +41,8 @@ def test_public_hygiene_rejects_derived_research_artifacts():
 def test_public_hygiene_rejects_scan_checkpoints():
     findings = scan_content("scan.checkpoint.json", b'{"response": "sensitive"}')
     assert findings == ["scan.checkpoint.json: forbidden generated/private path"]
+    findings = scan_content("scan.replay.json", b'{"entries": {}}')
+    assert findings == ["scan.replay.json: forbidden generated/private path"]
 
 
 @requires_git

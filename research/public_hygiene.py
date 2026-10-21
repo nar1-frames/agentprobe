@@ -64,7 +64,7 @@ def _forbidden_path(relative_path):
         return True
     if relative_path.name.endswith(".errors.jsonl"):
         return True
-    if relative_path.name.endswith((".checkpoint.json", ".checkpoint.jsonl")):
+    if relative_path.name.endswith((".checkpoint.json", ".checkpoint.jsonl", ".replay.json")):
         return True
     if relative_path.name.startswith(".env"):
         return True

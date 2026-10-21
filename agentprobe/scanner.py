@@ -26,6 +26,7 @@ from agentprobe.detection import (
 from agentprobe.models import validate_judge_strength
 from agentprobe.providers import build_client, preflight_model
 from agentprobe.reliability import is_retryable_error
+from agentprobe.replay import RecordingClient, ReplayRecording
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from report_html_v11 import generate_html_report, save_html_report
 
@@ -351,6 +352,12 @@ def run_configured_scan(
     # The checkpoint is validated before provider clients are constructed.
     target_client = build_client(target)
     judge_client = build_client(judge)
+    if scan.get("record_replay_path"):
+        # One shared file: target and judge requests differ by model, so
+        # their entries never collide.
+        recording = ReplayRecording(scan["record_replay_path"])
+        target_client = RecordingClient(target_client, recording)
+        judge_client = RecordingClient(judge_client, recording)
     results = run_full_scan(
         target_client,
         target["model"],

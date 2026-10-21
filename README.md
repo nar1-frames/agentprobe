@@ -112,6 +112,16 @@ agentprobe scan --non-interactive --config config.yaml \
   --checkpoint reports/scan.checkpoint.json --resume --repair-errors
 ```
 
+Replay a recorded scan offline, with no network or API keys. Recordings
+contain raw model responses; keep them local.
+
+```bash
+# Record: set scan.record_replay_path: reports/scan.replay.json in config.yaml.
+agentprobe scan --non-interactive --config config.yaml
+# Replay: set provider: replay and replay_path for both target and judge.
+agentprobe scan --non-interactive --config replay.yaml
+```
+
 The automated path fails closed if it cannot verify that the configured judge is
 at least as strong as the target according to the configured model metadata.
 This is an operational heuristic, not proof that the judge is correct. For
