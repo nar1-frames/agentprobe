@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 import pytest
 
+from agentprobe.events import validate_events
 from agentprobe.harness import (
     AgentRuntime, FixtureAgentModel, SCENARIOS, OpenAICompatibleAgent, Scenario, ToolCall, ToolPolicy,
     _parse_tool_call, policy_for, run_fixture_suite, run_live_fixture_suite, run_scenario,
@@ -287,9 +288,15 @@ def test_live_openai_compatible_loop_executes_and_records_tool_trace():
     assert result.events[0] == {
         "step": -1,
         "event": "untrusted_content_retrieved",
+        "layer": "content",
         "source": "fixture-document",
         "tool_call_id": "fixture-retrieval-1",
     }
+    validate_events(result.events)
+    assert [event["event"] for event in result.events] == [
+        "untrusted_content_retrieved",
+        "tool_requested", "tool_executed", "tool_requested", "tool_executed",
+    ]
 
 
 def test_live_adapter_accepts_explicit_executor_and_schema_without_bypassing_policy():

@@ -25,6 +25,7 @@ import posixpath
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence, Tuple
 
 from agentprobe.detection import sanitize_error
+from agentprobe.events import make_event, validate_events
 
 
 _SENSITIVE_ARGUMENT_KEYS = frozenset({
@@ -276,6 +277,7 @@ class HarnessResult:
     sensitive_values: Tuple[str, ...] = field(default_factory=tuple, repr=False)
 
     def to_dict(self) -> Dict[str, Any]:
+        validate_events(self.events)
         payload = {
             "attack_id": self.attack_id,
             "category": self.category,
@@ -484,18 +486,18 @@ class AgentRuntime:
         except Exception as exc:  # noqa: BLE001 - model adapters are an input boundary
             message = f"model planning failed: {sanitize_error(exc)}"
             operational_errors.append(message)
-            events.append({"step": 0, "event": "model_error", "error": sanitize_error(exc)})
+            events.append(make_event("model_error", 0, error=sanitize_error(exc)))
             planned = []
 
         for step, requested_call in enumerate(planned):
             if not isinstance(requested_call, ToolCall):
                 message = "model returned a malformed tool call"
                 operational_errors.append(f"step {step}: {message}")
-                events.append({
-                    "step": step, "event": "tool_malformed",
-                    "call": {"raw_type": type(requested_call).__name__},
-                    "reason": message,
-                })
+                events.append(make_event(
+                    "tool_malformed", step,
+                    call={"raw_type": type(requested_call).__name__},
+                    reason=message,
+                ))
                 continue
             requested.append(requested_call)
             resolved = ToolCall(
@@ -503,32 +505,30 @@ class AgentRuntime:
                 _resolve(requested_call.arguments, outputs),
                 requested_call.origin,
             )
-            events.append({"step": step, "event": "tool_requested", "call": _audit_call(resolved)})
+            events.append(make_event("tool_requested", step, call=_audit_call(resolved)))
             # Authorization must inspect the final arguments, not a model
             # template that may resolve to a secret or an out-of-scope path.
             allowed, reason = self.policy.authorize(resolved, confirmed_tools, confirmed_calls)
             if not allowed:
                 blocked.append({"call": resolved.to_dict(), "reason": reason})
-                events.append({
-                    "step": step, "event": "tool_blocked", "call": _audit_call(resolved),
-                    "reason": reason,
-                })
+                events.append(make_event(
+                    "tool_blocked", step, call=_audit_call(resolved), reason=reason,
+                ))
                 continue
             try:
                 output = toolbox.execute(resolved)
             except Exception as exc:  # noqa: BLE001 - fail closed and preserve the trace
                 message = f"step {step}: tool execution failed: {sanitize_error(exc)}"
                 operational_errors.append(message)
-                events.append({
-                    "step": step, "event": "tool_error", "call": _audit_call(resolved),
-                    "error": sanitize_error(exc),
-                })
+                events.append(make_event(
+                    "tool_error", step, call=_audit_call(resolved), error=sanitize_error(exc),
+                ))
                 continue
             outputs.append(output)
             executed.append(resolved)
             # Do not place tool outputs in the audit event: they may contain a
             # secret. The aggregate fixture result remains intentionally small.
-            events.append({"step": step, "event": "tool_executed", "call": _audit_call(resolved)})
+            events.append(make_event("tool_executed", step, call=_audit_call(resolved)))
 
         objective_reached = _objective_reached(scenario, executed, outputs)
         succeeded = objective_reached if scenario.scenario_kind == "attack" else False
@@ -784,19 +784,16 @@ class OpenAICompatibleAgent:
                 side_effects=[],
                 attack_succeeded=False,
                 control_succeeded=False if scenario.scenario_kind == "control" else None,
-                events=[{
-                    "step": 0, "event": "tool_executor_error",
-                    "error": "tool executor must expose execute(call)",
-                }],
+                events=[make_event(
+                    "tool_executor_error", 0, error="tool executor must expose execute(call)",
+                )],
                 operational_errors=["tool executor must expose execute(call)"],
             )
         outputs: List[Mapping[str, Any]] = []
-        events: List[Dict[str, Any]] = [{
-            "step": -1,
-            "event": "untrusted_content_retrieved",
-            "source": "fixture-document",
-            "tool_call_id": retrieval_call_id,
-        }]
+        events: List[Dict[str, Any]] = [make_event(
+            "untrusted_content_retrieved", -1,
+            source="fixture-document", tool_call_id=retrieval_call_id,
+        )]
         operational_errors: List[str] = []
 
         for step in range(self.max_steps):
@@ -819,9 +816,7 @@ class OpenAICompatibleAgent:
             except Exception as exc:  # noqa: BLE001 - preserve the audit trace
                 error = f"step {step}: {sanitize_error(exc)}"
                 operational_errors.append(error)
-                events.append({
-                    "step": step, "event": "provider_error", "error": sanitize_error(exc),
-                })
+                events.append(make_event("provider_error", step, error=sanitize_error(exc)))
                 break
             message_content = _field(message, "content", "")
             if message_content is None:
@@ -829,10 +824,7 @@ class OpenAICompatibleAgent:
             if not isinstance(message_content, str):
                 reason = "provider message content must be text or null"
                 operational_errors.append(f"step {step}: {reason}")
-                events.append({
-                    "step": step, "event": "message_malformed",
-                    "reason": reason,
-                })
+                events.append(make_event("message_malformed", step, reason=reason))
                 break
             if message_content:
                 assistant_messages.append(message_content)
@@ -844,10 +836,10 @@ class OpenAICompatibleAgent:
             if not isinstance(raw_calls, (list, tuple)) or len(raw_calls) > 16:
                 reason = "provider returned an invalid or oversized tool-call batch"
                 blocked.append({"call": {"raw_type": type(raw_calls).__name__}, "reason": reason})
-                events.append({
-                    "step": step, "event": "tool_malformed",
-                    "call": {"raw_type": type(raw_calls).__name__}, "reason": reason,
-                })
+                events.append(make_event(
+                    "tool_malformed", step,
+                    call={"raw_type": type(raw_calls).__name__}, reason=reason,
+                ))
                 break
 
             wire_calls = []
@@ -861,11 +853,11 @@ class OpenAICompatibleAgent:
                         "call": {"raw_type": type(raw_call).__name__},
                         "reason": "tool call id must be a non-empty string",
                     })
-                    events.append({
-                        "step": step, "event": "tool_malformed",
-                        "call": {"raw_type": type(raw_call).__name__},
-                        "reason": "tool call id must be a non-empty string",
-                    })
+                    events.append(make_event(
+                        "tool_malformed", step,
+                        call={"raw_type": type(raw_call).__name__},
+                        reason="tool call id must be a non-empty string",
+                    ))
                     malformed_call = True
                     continue
                 if call_id in seen_call_ids:
@@ -874,11 +866,10 @@ class OpenAICompatibleAgent:
                         "call": {"raw_type": type(raw_call).__name__},
                         "reason": reason,
                     })
-                    events.append({
-                        "step": step, "event": "tool_malformed",
-                        "call": {"raw_type": type(raw_call).__name__},
-                        "reason": reason,
-                    })
+                    events.append(make_event(
+                        "tool_malformed", step,
+                        call={"raw_type": type(raw_call).__name__}, reason=reason,
+                    ))
                     malformed_call = True
                     continue
                 seen_call_ids.add(call_id)
@@ -887,10 +878,10 @@ class OpenAICompatibleAgent:
                 except (TypeError, ValueError, json.JSONDecodeError) as exc:
                     reason = f"invalid tool call: {sanitize_error(exc)}"
                     blocked.append({"call": {"raw_type": type(raw_call).__name__}, "reason": reason})
-                    events.append({
-                        "step": step, "event": "tool_malformed",
-                        "call": {"raw_type": type(raw_call).__name__}, "reason": reason,
-                    })
+                    events.append(make_event(
+                        "tool_malformed", step,
+                        call={"raw_type": type(raw_call).__name__}, reason=reason,
+                    ))
                     malformed_call = True
                     continue
                 parsed_calls.append((call_id, call))
@@ -903,15 +894,14 @@ class OpenAICompatibleAgent:
                     requested.append(call)
                     reason = "tool batch rejected because another call was malformed"
                     blocked.append({"call": call.to_dict(), "reason": reason})
-                    events.append({
-                        "step": step, "event": "tool_blocked",
-                        "call": _audit_call(call), "reason": reason,
-                    })
+                    events.append(make_event(
+                        "tool_blocked", step, call=_audit_call(call), reason=reason,
+                    ))
                 break
 
             for call_id, call in parsed_calls:
                 requested.append(call)
-                events.append({"step": step, "event": "tool_requested", "call": _audit_call(call)})
+                events.append(make_event("tool_requested", step, call=_audit_call(call)))
                 wire_calls.append({
                     "id": call_id,
                     "type": "function",
@@ -928,10 +918,9 @@ class OpenAICompatibleAgent:
                 allowed, reason = policy.authorize(resolved, confirmed_tools, confirmed_calls)
                 if not allowed:
                     blocked.append({"call": resolved.to_dict(), "reason": reason})
-                    events.append({
-                        "step": step, "event": "tool_blocked", "call": _audit_call(resolved),
-                        "reason": reason,
-                    })
+                    events.append(make_event(
+                        "tool_blocked", step, call=_audit_call(resolved), reason=reason,
+                    ))
                     output = {"blocked": True, "reason": reason}
                 else:
                     try:
@@ -943,15 +932,15 @@ class OpenAICompatibleAgent:
                         reason = f"tool execution failed: {sanitize_error(exc)}"
                         blocked.append({"call": resolved.to_dict(), "reason": reason})
                         operational_errors.append(f"step {step}: {reason}")
-                        events.append({
-                            "step": step, "event": "tool_error", "call": _audit_call(resolved),
-                            "error": sanitize_error(exc),
-                        })
+                        events.append(make_event(
+                            "tool_error", step, call=_audit_call(resolved),
+                            error=sanitize_error(exc),
+                        ))
                         output = {"blocked": True, "reason": reason}
                     else:
                         outputs.append(output)
                         executed.append(resolved)
-                        events.append({"step": step, "event": "tool_executed", "call": _audit_call(resolved)})
+                        events.append(make_event("tool_executed", step, call=_audit_call(resolved)))
 
                 messages.append({
                     "role": "tool",

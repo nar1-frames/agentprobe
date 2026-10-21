@@ -16,9 +16,11 @@ import uuid
 from collections import Counter, defaultdict
 from typing import Any, Dict, Mapping
 
+from agentprobe.events import EVENT_SCHEMA_VERSION, validate_events
+
 
 SCHEMA_VERSION = "1.0"
-HARNESS_SCHEMA_VERSION = "1.3"
+HARNESS_SCHEMA_VERSION = "1.4"
 TOOL_VERSION = "1.7.0"
 VERDICTS = ("VULNERABLE", "PARTIAL", "SAFE", "SUSPICIOUS")
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
@@ -232,6 +234,13 @@ def build_harness_report(results, mode, generated_at=None, metadata=None):
             json.dumps(result, ensure_ascii=False, allow_nan=False)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"harness result is not JSON-serializable: {exc}") from exc
+        # The report stamps event_schema_version, so every trace it carries
+        # must conform, including results supplied as plain mappings.
+        if "events" in result:
+            try:
+                validate_events(result["events"])
+            except ValueError as exc:
+                raise ValueError(f"harness result has an invalid event trace: {exc}") from exc
         serialized.append(dict(result))
 
     attack_results = [row for row in serialized if row.get("scenario_kind") == "attack"]
@@ -244,6 +253,7 @@ def build_harness_report(results, mode, generated_at=None, metadata=None):
     run.setdefault("tool_version", TOOL_VERSION)
     return {
         "schema_version": HARNESS_SCHEMA_VERSION,
+        "event_schema_version": EVENT_SCHEMA_VERSION,
         "artifact_type": "agentprobe_harness",
         "tool": "agentprobe",
         "tool_version": TOOL_VERSION,

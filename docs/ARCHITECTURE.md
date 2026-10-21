@@ -97,6 +97,13 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   tool-error events; sensitive tool arguments, side-effect payloads, known
   tool-returned secrets, and copies of those secrets in assistant text are
   redacted before serialization.
+- **Harness events are a closed, versioned vocabulary.** `agentprobe/events.py`
+  registers every trace event the runtimes emit, with its required fields and
+  the layer that produced it: model, tool, policy, execution, or content. Both
+  runtimes build events through `make_event`, and serialization and harness
+  reports refuse an unregistered or malformed event. Harness JSON carries
+  `event_schema_version` alongside `schema_version`, so a consumer can tell
+  which vocabulary a trace uses.
 - **Live harness artifacts are attributable.** A live run records the target
   provider/model, token/step/temperature execution settings, a system-prompt digest, and a
   non-secret target-configuration digest without persisting the prompt or API
