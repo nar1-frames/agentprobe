@@ -29,6 +29,7 @@ that an agent is safe.
 ## Start here
 
 - [Five-minute quickstart](#quickstart)
+- [Offline demo and sample report](demo/README.md)
 - [Project goals](GOALS.md)
 - [Roadmap](ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -70,10 +71,13 @@ git clone https://github.com/nar1-frames/agentprobe.git
 cd agentprobe
 python3 -m pip install -e ".[dev]"
 
-# 2. Run the deterministic, credential-free security harness
+# 2. Run the offline demo: replays a recorded scan, no keys or network needed
+agentprobe scan --non-interactive --config demo/replay.yaml
+
+# 3. Run the deterministic, credential-free security harness
 agentprobe harness --mode guarded
 
-# 3. Optional: install two local models for a full scan
+# 4. Optional: install two local models for a full scan
 ollama pull llama3.2:3b
 ollama pull llama3.1:8b
 agentprobe scan
