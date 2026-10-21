@@ -17,7 +17,8 @@ come before breadth.
 
 - [x] Versioned attack-pack schema with explicit success oracles (schema 1.0;
   oracle evaluation is not yet wired into scan verdicts)
-- [ ] Stable event schema for model, tool, policy, and execution events
+- [x] Stable event schema for model, tool, policy, and execution events
+  (harness schema 1.4, event schema 1.0, closed ten-event vocabulary)
 - [ ] SARIF and JUnit output for security and CI workflows
 - [ ] Baseline and regression comparisons for repeated scans
 - [ ] Deterministic replay provider for offline debugging
