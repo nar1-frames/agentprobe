@@ -100,6 +100,9 @@ For CI or a reproducible scripted run, use the target and judge from
 agentprobe scan --non-interactive --config config.yaml
 # For CI: write the reports, then exit nonzero if any provider call failed.
 agentprobe scan --non-interactive --config config.yaml --fail-on-error
+# CI exports omit model responses and judge reasoning; publish them as artifacts.
+agentprobe scan --non-interactive --config config.yaml --sarif reports/scan.sarif --junit reports/scan.junit.xml
+agentprobe harness --mode guarded --sarif reports/harness.sarif --junit reports/harness.junit.xml
 # For a long run: checkpoint each completed attack and resume after an
 # interruption. Checkpoints contain raw model responses; keep them local.
 agentprobe scan --non-interactive --config config.yaml \

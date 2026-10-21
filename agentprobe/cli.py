@@ -2,13 +2,35 @@
 
 import argparse
 import json
+import sys
 from typing import Sequence
 
+from agentprobe.exports import (
+    harness_report_to_junit, harness_report_to_sarif, scan_report_to_junit,
+    scan_report_to_sarif, write_text_atomic,
+)
 from agentprobe.harness import run_fixture_suite
 from agentprobe.reporting import (
     build_harness_provenance, build_harness_report, save_harness_report,
 )
 from agentprobe import scanner
+
+
+def _write_exports(args, report, to_sarif, to_junit, out=None) -> None:
+    out = out or sys.stdout
+    if args.sarif:
+        write_text_atomic(args.sarif, json.dumps(to_sarif(report), indent=2, allow_nan=False) + "\n")
+        print(f"SARIF report saved to: {args.sarif}", file=out)
+    if args.junit:
+        write_text_atomic(args.junit, to_junit(report))
+        print(f"JUnit report saved to: {args.junit}", file=out)
+
+
+def _add_export_arguments(parser) -> None:
+    parser.add_argument("--sarif", metavar="PATH",
+                        help="also write a data-minimized SARIF 2.1.0 log")
+    parser.add_argument("--junit", metavar="PATH",
+                        help="also write a data-minimized JUnit XML report")
 
 
 def _finish_harness(args, report) -> int:
@@ -35,6 +57,13 @@ def _finish_harness(args, report) -> int:
             print(f"  {result['attack_id']}: {status}; requested={requested}; executed={executed}")
             for error in result.get("operational_errors", []):
                 print(f"    operational error: {error}")
+    try:
+        # Keep stdout a clean JSON stream when the report itself goes there.
+        _write_exports(args, report, harness_report_to_sarif, harness_report_to_junit,
+                       out=sys.stderr if args.json == "-" else sys.stdout)
+    except (OSError, TypeError, ValueError) as exc:
+        print(f"agentprobe: harness export error: {exc}")
+        return 2
     if args.fail_on_success and any(result["attack_succeeded"] for result in results):
         return 1
     if args.fail_on_error and any(result.get("operational_errors") for result in results):
@@ -116,6 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="with --resume, retry checkpointed target/judge failures only",
     )
+    _add_export_arguments(scan)
     scan.set_defaults(handler="scan")
 
     harness = subparsers.add_parser("harness", help="run the offline agent security harness")
@@ -152,6 +182,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="live model output-token budget (default: target.max_tokens)",
     )
     harness.add_argument("--temperature", type=float, default=0.0)
+    _add_export_arguments(harness)
     harness.set_defaults(handler="harness")
     return parser
 
@@ -186,6 +217,11 @@ def main(argv: Sequence[str] = None) -> int:
                 print(f"HTML report saved to: {run['html_path']}")
             if run["json_path"]:
                 print(f"JSON report saved to: {run['json_path']}")
+            try:
+                _write_exports(args, run.get("report"), scan_report_to_sarif, scan_report_to_junit)
+            except (OSError, TypeError, ValueError) as exc:
+                print(f"agentprobe: export error: {exc}")
+                return 2
             if args.fail_on_error:
                 errors = sum(
                     1
@@ -203,6 +239,8 @@ def main(argv: Sequence[str] = None) -> int:
                 parser.error(
                     "--checkpoint/--resume/--repair-errors currently require --non-interactive"
                 )
+            if args.sarif or args.junit:
+                parser.error("--sarif/--junit currently require --non-interactive")
             # Keep the existing interactive UX while making it installable.
             from agentprobe_v12 import main as scan_main
             scan_main()

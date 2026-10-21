@@ -275,15 +275,21 @@ def build_harness_report(results, mode, generated_at=None, metadata=None):
 def _write_json_atomic(path, payload, prefix):
     """Atomically write a private JSON artifact to an explicit path."""
 
+    text = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    return _write_text_atomic(path, text, prefix, suffix=".json")
+
+
+def _write_text_atomic(path, text, prefix, suffix=".tmp"):
+    """Atomically write a private text artifact to an explicit path."""
+
     path = os.fspath(path)
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=prefix, suffix=".json", dir=directory)
+    fd, temporary = tempfile.mkstemp(prefix=prefix, suffix=suffix, dir=directory)
     try:
         os.chmod(temporary, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, ensure_ascii=False, allow_nan=False)
-            f.write("\n")
+            f.write(text)
             f.flush()
             os.fsync(f.fileno())
         os.replace(temporary, path)

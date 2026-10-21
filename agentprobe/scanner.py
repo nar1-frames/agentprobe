@@ -394,4 +394,4 @@ def run_configured_scan(
         )
     if report_format in {"json", "both"}:
         json_path = save_json_report(report, target["model"], report_dir)
-    return {"results": results, "html_path": html_path, "json_path": json_path}
+    return {"results": results, "html_path": html_path, "json_path": json_path, "report": report}

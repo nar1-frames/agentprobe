@@ -60,6 +60,14 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   config, selected attack library, and judge prompt. HTML and JSON paths share
   that run ID, and the HTML embeds the same provenance in metadata tags for
   independent review.
+- **CI exports are data-minimized.** `--sarif` and `--junit` convert the
+  versioned scan and harness reports for code scanning and CI test views.
+  Those artifacts travel further than `reports/`, so they never contain target
+  responses, judge reasoning, error strings, assistant messages, or tool
+  traces. They carry attack IDs, categories, severities, verdicts, methods,
+  statuses, and public attack-library text; an error row exports only its
+  method (`target-error` or `judge-error`). SUSPICIOUS maps to SARIF
+  `review`/`none`, because SARIF allows a non-`none` level only on `fail`.
 - **Long scans are resumable without mixing evidence.** The optional scan
   checkpoint is a versioned, private, atomically replaced JSON document. It is
   written after each completed attack and is bound to the target, judge,
