@@ -66,6 +66,13 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   pins the target scope, attack-library digest, judge matrix, repeat count, and
   labeler rules; the publication gate checks those requirements by default and
   reruns row-level dataset integrity validation before declaring readiness.
+- **Attack packs layer oracles over a frozen library.** Each attack's success
+  oracle lives in `attacks/oracles.py`, keyed by a stable `category-NN` ID;
+  `agentprobe/attackpack.py` joins the oracles to `attacks/library.py` into a
+  versioned, validated pack. The library dicts are never modified, so the
+  `attack_library_sha256` pinned by the study manifest stays valid. Scan
+  reports add `attack_pack_schema_version` and `attack_pack_sha256`, so a
+  changed oracle shows up in provenance without changing the attack digest.
 - **Judge statistics are conservative.** Failed judge calls are excluded;
   Fleiss' κ is only computed for complete, fixed-k item groups. Ties are
   `SUSPICIOUS`, not row-order-dependent majorities.

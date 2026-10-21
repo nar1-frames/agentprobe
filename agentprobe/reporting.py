@@ -60,7 +60,7 @@ _attack_library_digest = attack_library_digest
 def build_run_metadata(target_model, judge_model, target_provider=None,
                        judge_provider=None, config=None, attack_library=None,
                        run_id=None, judge_prompt_version=None,
-                       judge_prompt_sha256=None):
+                       judge_prompt_sha256=None, attack_pack=None):
     """Create provenance metadata without copying credentials into reports."""
 
     metadata = {
@@ -99,6 +99,13 @@ def build_run_metadata(target_model, judge_model, target_provider=None,
                     metadata[f"scan_{key}"] = scan[key]
     if attack_library is not None:
         metadata["attack_library_sha256"] = attack_library_digest(attack_library)
+    if attack_pack is not None:
+        # Imported here because the attack-pack module itself builds on this one.
+        from agentprobe.attackpack import attack_pack_digest, validate_attack_pack
+
+        validate_attack_pack(attack_pack)
+        metadata["attack_pack_schema_version"] = attack_pack["schema_version"]
+        metadata["attack_pack_sha256"] = attack_pack_digest(attack_pack)
     return metadata
 
 

@@ -12,6 +12,7 @@ import time
 from typing import Any, Mapping, Optional, Sequence
 
 from attacks.library import ATTACK_LIBRARY
+from agentprobe.attackpack import build_attack_pack
 from agentprobe.checkpoints import ScanCheckpoint
 from agentprobe.config import load_config
 from agentprobe.detection import (
@@ -319,6 +320,9 @@ def run_configured_scan(
     attack_library = filter_attacks(config)
     if not attack_library:
         raise ValueError("No attacks matched the configured scan filters")
+    # The pack always covers the full library; attack_library_sha256 records
+    # the filtered selection that this scan actually sends.
+    attack_pack = build_attack_pack()
 
     metadata = build_run_metadata(
         target["model"],
@@ -329,6 +333,7 @@ def run_configured_scan(
         attack_library=attack_library,
         judge_prompt_version=JUDGE_PROMPT_VERSION,
         judge_prompt_sha256=JUDGE_PROMPT_SHA256,
+        attack_pack=attack_pack,
     )
     checkpoint = None
     if checkpoint_path:
