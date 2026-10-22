@@ -267,6 +267,10 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--config", default="config.yaml")
     scan.add_argument("--no-color", action="store_true", help="never emit ANSI colour")
     scan.add_argument(
+        "--verbose", action="store_true",
+        help="with --non-interactive, print per-attack progress and category tallies",
+    )
+    scan.add_argument(
         "--fail-on-error",
         action="store_true",
         help="exit nonzero after writing reports if a target or judge call failed",
@@ -346,26 +350,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_scan_summary(report) -> None:
-    """Print a plain verdict summary for a non-interactive scan, if available."""
-    summary = report.get("summary") if isinstance(report, dict) else None
-    if not summary:
-        return
-    print(
-        f"Scan summary: {summary.get('total_attacks', 0)} attacks "
-        f"({summary.get('scorable_attacks', 0)} scorable), "
-        f"{summary.get('operational_errors', 0)} operational errors"
-    )
-    verdicts = summary.get("verdicts", {})
-    print("Verdicts: " + ", ".join(f"{name} {count}" for name, count in verdicts.items()))
-    severities = [
-        f"{name} {count}"
-        for name, count in summary.get("findings_by_severity", {}).items()
-        if count
-    ]
-    print("Findings by severity: " + (", ".join(severities) if severities else "none"))
-    print("Verdict key: SAFE refused, SUSPICIOUS unclear, PARTIAL hedged then complied, "
-          "VULNERABLE complied")
+# The summary printer lives in termstyle so the interactive runner can call it
+# too without importing this module; kept under its old name for callers.
+_print_scan_summary = termstyle.print_scan_summary
 
 
 def main(argv: Sequence[str] = None) -> int:
@@ -394,10 +381,14 @@ def main(argv: Sequence[str] = None) -> int:
                     scan_kwargs["resume"] = True
                 if args.repair_errors:
                     scan_kwargs["repair_errors"] = True
+                if args.verbose:
+                    scan_kwargs["verbose"] = True
                 run = scanner.run_configured_scan(args.config, **scan_kwargs)
             except (OSError, KeyError, ValueError) as exc:
                 print(f"agentprobe: configuration/scan error: {exc}")
                 return 2
+            if args.verbose:
+                print()  # separate the progress stream from the summary block
             _print_scan_summary(run.get("report"))
             if run["html_path"]:
                 print(f"HTML report saved to: {run['html_path']}")
@@ -428,12 +419,10 @@ def main(argv: Sequence[str] = None) -> int:
             if args.sarif or args.junit:
                 parser.error("--sarif/--junit currently require --non-interactive")
             # Keep the existing interactive UX while making it installable.
+            # The runner prints the shared scan summary itself, before its
+            # "saved" lines, so nothing is printed here afterwards.
             from agentprobe_v12 import main as scan_main
-            report = scan_main()
-            # The interactive runner returns its JSON report; print the same
-            # summary block the non-interactive path prints, exactly once.
-            if isinstance(report, dict):
-                _print_scan_summary(report)
+            scan_main()
         return 0
     parser.error("unknown command")
 

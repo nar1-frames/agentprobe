@@ -46,6 +46,7 @@ from report_html_v11 import generate_html_report, save_html_report
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from agentprobe.models import parse_model_size_b
 from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION
+from agentprobe.termstyle import print_scan_summary
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
@@ -293,6 +294,10 @@ def main():
         results, target["model"], judge["model"], metadata=report_metadata
     )
     run_id = json_report["run"]["run_id"]
+    # Same summary block as the non-interactive CLI path, printed once here
+    # before the saved-file lines.
+    print()
+    print_scan_summary(json_report)
     if report_format in {"html", "both"}:
         print("\nGenerating HTML report (with Mitigation Map)...")
         html = generate_html_report(

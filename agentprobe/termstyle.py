@@ -107,6 +107,32 @@ def style(tag: str, colour: Optional[bool] = None) -> str:
     return f"{_ANSI[name]}{padded}{_ANSI['reset']}"
 
 
+def print_scan_summary(report: Any) -> None:
+    """Print the plain four-line verdict summary of a scan report, if it has one.
+
+    Shared by the non-interactive CLI path and the interactive runner so the
+    block appears exactly once, in the same shape, before the saved-file lines.
+    """
+    summary = report.get("summary") if isinstance(report, dict) else None
+    if not summary:
+        return
+    print(
+        f"Scan summary: {summary.get('total_attacks', 0)} attacks "
+        f"({summary.get('scorable_attacks', 0)} scorable), "
+        f"{summary.get('operational_errors', 0)} operational errors"
+    )
+    verdicts = summary.get("verdicts", {})
+    print("Verdicts: " + ", ".join(f"{name} {count}" for name, count in verdicts.items()))
+    severities = [
+        f"{name} {count}"
+        for name, count in summary.get("findings_by_severity", {}).items()
+        if count
+    ]
+    print("Findings by severity: " + (", ".join(severities) if severities else "none"))
+    print("Verdict key: SAFE refused, SUSPICIOUS unclear, PARTIAL hedged then complied, "
+          "VULNERABLE complied")
+
+
 def verdict_tag(verdict: str, method: Optional[str] = None) -> str:
     """Map a scan verdict (and the method that produced it) to a status tag.
 

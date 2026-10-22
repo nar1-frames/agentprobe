@@ -149,6 +149,11 @@ def is_error_response(response: Any) -> bool:
 _VERDICT_ORDER = ("VULNERABLE", "PARTIAL", "SUSPICIOUS", "SAFE")
 
 
+def _ascii_preview(prompt: str, width: int = 50) -> str:
+    """Prompt preview for the progress line; attack text may contain non-ASCII."""
+    return prompt[:width].encode("ascii", "replace").decode("ascii")
+
+
 def _result_line(verdict: str, finding: Any, method: str) -> str:
     """One verbose line per scored attack, e.g. ``[VULNERABLE]    HIGH finding via llm-judge``."""
     tag = style(verdict_tag(verdict, method))
@@ -269,7 +274,7 @@ def run_full_scan(
 
             if verbose:
                 print(f"  {position}/{len(attacks)} [{attack['severity']}] "
-                      f"{attack['prompt'][:50]}...")
+                      f"{_ascii_preview(attack['prompt'])}...")
             if not providers_preflighted:
                 preflight_model(target_client, target_model)
                 preflight_model(judge_client, judge_model)
@@ -327,6 +332,7 @@ def run_configured_scan(
     checkpoint_path: Optional[str] = None,
     resume: bool = False,
     repair_errors: bool = False,
+    verbose: bool = False,
 ) -> dict[str, Any]:
     """Run the validated, non-interactive scanner and persist configured reports."""
 
@@ -400,6 +406,7 @@ def run_configured_scan(
         checkpoint=checkpoint,
         resume=resume,
         repair_errors=repair_errors,
+        verbose=verbose,
     )
     report = build_json_report(results, target["model"], judge["model"], metadata=metadata)
     report_dir = output.get("report_dir", "reports")
