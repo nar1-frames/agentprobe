@@ -118,6 +118,12 @@ agentprobe scan --non-interactive --config config.yaml --sarif reports/scan.sari
 agentprobe harness --mode guarded --sarif reports/harness.sarif --junit reports/harness.junit.xml
 # Gate on regressions against a stored baseline report from the same attack library.
 agentprobe compare --baseline baseline.json --candidate reports/scan.json --fail-on-regression --fail-on-incomparable
+#   Comparable: yes
+#   Summary: 1 regressed, 0 improved, 13 unchanged, 0 newly errored, 0 recovered, 0 still errored, 0 added, 0 removed; net findings delta +1; 1 changed method
+#     REGRESSED jailbreak:3: SAFE via keyword -> VULNERABLE via llm-judge
+#   Legend: REGRESSED got worse than the baseline  NEWLY_ERRORED now fails operationally
+#           ADDED only in the new scan  REMOVED only in the baseline
+#   Exit code 1: an attack regressed or newly errored and --fail-on-regression is set
 # For a long run: checkpoint each completed attack and resume after an
 # interruption. Checkpoints contain raw model responses; keep them local.
 agentprobe scan --non-interactive --config config.yaml \

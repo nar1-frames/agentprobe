@@ -28,6 +28,7 @@ from agentprobe.providers import build_client, preflight_model
 from agentprobe.reliability import is_retryable_error
 from agentprobe.replay import RecordingClient, ReplayRecording
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
+from agentprobe.termstyle import TAG_WIDTH, style, verdict_tag
 from report_html_v11 import generate_html_report, save_html_report
 
 
@@ -145,6 +146,30 @@ def is_error_response(response: Any) -> bool:
     return isinstance(response, str) and response.startswith("[ERROR:")
 
 
+_VERDICT_ORDER = ("VULNERABLE", "PARTIAL", "SUSPICIOUS", "SAFE")
+
+
+def _result_line(verdict: str, finding: Any, method: str) -> str:
+    """One verbose line per scored attack, e.g. ``[VULNERABLE]    HIGH finding via llm-judge``."""
+    tag = style(verdict_tag(verdict, method))
+    if method in ERROR_METHODS:
+        return f"  {tag}  no verdict ({method})"
+    finding_text = f"{finding} finding " if finding else ""
+    return f"  {tag}  {finding_text}via {method}"
+
+
+def _category_tally(rows: Sequence[Sequence[Any]]) -> str:
+    """Per-category count line; errors are counted separately, never as verdicts."""
+    errors = sum(1 for row in rows if row[5] in ERROR_METHODS)
+    counts = {name: 0 for name in _VERDICT_ORDER}
+    for row in rows:
+        if row[5] not in ERROR_METHODS and row[2] in counts:
+            counts[row[2]] += 1
+    parts = [f"{name} {count}" for name, count in counts.items() if count]
+    parts.append(f"errors {errors}")
+    return "  category total: " + ", ".join(parts)
+
+
 def run_full_scan(
     target_client: Any,
     target_model: str,
@@ -198,7 +223,7 @@ def run_full_scan(
     providers_preflighted = False
     for category, attacks in attack_library.items():
         if verbose:
-            print(f"\n[{category.upper()}] — {len(attacks)} prompts")
+            print(f"\n[{category.upper()}] {len(attacks)} prompts")
         category_results = []
         for position, attack in enumerate(attacks, start=1):
             attack_key = f"{category}:{attack.get('_library_index', position)}"
@@ -207,11 +232,12 @@ def run_full_scan(
                 if not (repair_errors and row[5] in ERROR_METHODS):
                     category_results.append(row)
                     if verbose:
-                        print(f"  [resume] {attack_key} {row[2]} via {row[5]}")
+                        print(f"  {style(verdict_tag(row[2], row[5]))}  [resume] "
+                              f"{attack_key} via {row[5]}")
                     continue
                 checkpoint.remove(attack_key)
                 if verbose:
-                    print(f"  [repair] {attack_key} retrying {row[5]}")
+                    print(f"  {'':{TAG_WIDTH}}  [repair] {attack_key} retrying {row[5]}")
                 if row[5] == "judge-error" and not is_error_response(row[1]):
                     if not providers_preflighted:
                         preflight_model(target_client, target_model)
@@ -238,9 +264,7 @@ def run_full_scan(
                     category_results.append(repaired)
                     checkpoint.record(category, repaired, position)
                     if verbose:
-                        marker = {"VULNERABLE": "[VULN]", "PARTIAL": "[PART]",
-                                  "SUSPICIOUS": "[?]", "SAFE": "[safe]"}.get(verdict, "[?]")
-                        print(f"  {marker} {verdict} via {method}")
+                        print(_result_line(verdict, finding, method))
                     continue
 
             if verbose:
@@ -285,12 +309,11 @@ def run_full_scan(
             if checkpoint is not None:
                 checkpoint.record(category, row, position)
             if verbose:
-                marker = {"VULNERABLE": "[VULN]", "PARTIAL": "[PART]",
-                          "SUSPICIOUS": "[?]", "SAFE": "[safe]"}.get(verdict, "[?]")
-                finding_text = f"[{finding}]" if finding else ""
-                print(f"  {marker} {verdict} {finding_text} via {method}")
+                print(_result_line(verdict, finding, method))
             time.sleep(rate_limit)
         scan_results[category] = category_results
+        if verbose:
+            print(_category_tally(category_results))
         time.sleep(rate_limit)
 
     if checkpoint is not None:

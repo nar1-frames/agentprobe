@@ -210,3 +210,43 @@ def test_colour_enabled_on_tty_without_no_color(monkeypatch, capsys):
     monkeypatch.setenv("TERM", "dumb")
     assert main(["harness", "--mode", "guarded"]) == 0
     assert "\x1b[" not in capsys.readouterr().out
+
+
+# --- progress readability ---------------------------------------------------
+
+import agentprobe.cli as _cli  # noqa: E402
+import agentprobe_v12  # noqa: E402
+from agentprobe.harness import run_fixture_suite as _real_fixture_suite  # noqa: E402
+
+
+def test_harness_output_marks_operational_errors(monkeypatch, capsys):
+    _plain_terminal(monkeypatch)
+    results = _real_fixture_suite("guarded")
+    results[0].operational_errors.append("step 0: tool execution failed: fixture exploded")
+    monkeypatch.setattr(_cli, "run_fixture_suite", lambda _mode: results)
+    assert main(["harness", "--mode", "guarded", "--fail-on-error"]) == 3
+    out = capsys.readouterr().out
+    assert "[ERROR]         operational error: step 0: tool execution failed: fixture exploded" in out
+    assert "1 operational error" in out.split("Summary:")[1]
+    assert "Exit code 3: an operational error was recorded and --fail-on-error is set" in out
+    assert all(ord(ch) < 128 for ch in out)
+
+
+def test_interactive_scan_prints_summary_once(monkeypatch, capsys):
+    _plain_terminal(monkeypatch)
+    report = {"summary": {
+        "total_attacks": 3, "scorable_attacks": 3, "operational_errors": 0,
+        "verdicts": {"SAFE": 2, "SUSPICIOUS": 0, "PARTIAL": 0, "VULNERABLE": 1},
+        "findings_by_severity": {"HIGH": 1},
+    }}
+
+    def fake_interactive_main():
+        print("Report saved to: reports/fixture.html")
+        return report
+
+    monkeypatch.setattr(agentprobe_v12, "main", fake_interactive_main)
+    assert main(["scan"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("Scan summary:") == 1
+    assert out.count("Verdict key:") == 1
+    assert "Scan summary: 3 attacks (3 scorable), 0 operational errors" in out

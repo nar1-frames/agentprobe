@@ -16,6 +16,13 @@ from agentprobe.reporting import (
     _write_json_atomic, build_harness_provenance, build_harness_report, save_harness_report,
 )
 from agentprobe import scanner
+# Tag constants and styling live in agentprobe.termstyle (shared with the
+# scanner and compare); the names are re-exported here for existing callers.
+from agentprobe import termstyle
+from agentprobe.termstyle import (  # noqa: F401 - re-exported names
+    TAG_ADDED, TAG_ATTACK_OK, TAG_BLOCKED, TAG_CONTROL_FAIL, TAG_CONTROL_OK, TAG_ERROR,
+    TAG_NEW_ERROR, TAG_REGRESSED, TAG_REMOVED,
+)
 
 
 def _load_report(path, label):
@@ -36,6 +43,9 @@ def _compare(args) -> int:
         return 2
     out = sys.stderr if args.json == "-" else sys.stdout
     print(format_comparison_text(result), end="", file=out)
+    exit_code = _compare_exit_code(args, result)
+    if args.fail_on_incomparable or args.fail_on_regression:
+        print(_compare_exit_explanation(args, exit_code), file=out)
     if args.json == "-":
         print(json.dumps(result, indent=2, ensure_ascii=False))
     elif args.json:
@@ -45,6 +55,10 @@ def _compare(args) -> int:
             print(f"agentprobe: comparison output error: {exc}", file=sys.stderr)
             return 2
         print(f"Wrote comparison to {args.json}", file=out)
+    return exit_code
+
+
+def _compare_exit_code(args, result) -> int:
     # A regression across different attack libraries is meaningless, so an
     # incomparable gate outranks the regression gate.
     if args.fail_on_incomparable and not result["comparability"]["comparable"]:
@@ -53,6 +67,19 @@ def _compare(args) -> int:
     if args.fail_on_regression and (summary["regressed"] or summary["newly_errored"]):
         return 1
     return 0
+
+
+def _compare_exit_explanation(args, exit_code: int) -> str:
+    if exit_code == 4:
+        return "Exit code 4: the reports are not comparable and --fail-on-incomparable is set"
+    if exit_code == 1:
+        return ("Exit code 1: an attack regressed or newly errored and "
+                "--fail-on-regression is set")
+    flags = [flag for flag, on in (
+        ("--fail-on-incomparable", args.fail_on_incomparable),
+        ("--fail-on-regression", args.fail_on_regression),
+    ) if on]
+    return f"Exit code 0: nothing that {' or '.join(flags)} checks for happened"
 
 
 def _write_exports(args, report, to_sarif, to_junit, out=None) -> None:
@@ -84,47 +111,17 @@ _MODE_EXPLANATIONS = {
     "guarded": "policy gate on and model distrusts external content",
 }
 
-TAG_BLOCKED = "[BLOCKED]"
-TAG_ATTACK_OK = "[ATTACK OK]"
-TAG_CONTROL_OK = "[CONTROL OK]"
-TAG_CONTROL_FAIL = "[CONTROL FAIL]"
-TAG_ERROR = "[ERROR]"
-_TAG_WIDTH = max(map(len, (
-    TAG_BLOCKED, TAG_ATTACK_OK, TAG_CONTROL_OK, TAG_CONTROL_FAIL, TAG_ERROR,
-)))
-_INDENT = " " * (_TAG_WIDTH + 2)
-
-_ANSI = {"green": "\x1b[32m", "red": "\x1b[31m", "yellow": "\x1b[33m", "reset": "\x1b[0m"}
-_TAG_COLOURS = {
-    TAG_BLOCKED: "green",
-    TAG_CONTROL_OK: "green",
-    TAG_ATTACK_OK: "red",
-    TAG_CONTROL_FAIL: "red",
-    TAG_ERROR: "yellow",
-}
+_INDENT = termstyle.INDENT
 
 
 def _colour_enabled(args) -> bool:
     """ANSI colour only on an interactive terminal that has not opted out."""
-    if getattr(args, "no_color", False):
-        return False
-    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
-        return False
-    try:
-        return bool(sys.stdout.isatty())
-    except (AttributeError, ValueError):
-        return False
+    return termstyle.colour_enabled(getattr(args, "no_color", False))
 
 
 def _style(tag: str, colour: bool) -> str:
     """Return a fixed-width status tag, wrapped in ANSI colour when enabled."""
-    padded = tag.ljust(_TAG_WIDTH)
-    if not colour:
-        return padded
-    name = _TAG_COLOURS.get(tag)
-    if name is None:
-        return padded
-    return f"{_ANSI[name]}{padded}{_ANSI['reset']}"
+    return termstyle.style(tag, colour)
 
 
 def _harness_exit_code(args, results) -> int:
@@ -377,6 +374,8 @@ def main(argv: Sequence[str] = None) -> int:
     if not getattr(args, "command", None):
         parser.print_help()
         return 0
+    # Library code (the scanner) never sees argparse; record --no-color once.
+    termstyle.configure(getattr(args, "no_color", False))
     if args.handler == "harness":
         return _live_harness(args) if args.live else _harness(args)
     if args.handler == "compare":
@@ -430,7 +429,11 @@ def main(argv: Sequence[str] = None) -> int:
                 parser.error("--sarif/--junit currently require --non-interactive")
             # Keep the existing interactive UX while making it installable.
             from agentprobe_v12 import main as scan_main
-            scan_main()
+            report = scan_main()
+            # The interactive runner returns its JSON report; print the same
+            # summary block the non-interactive path prints, exactly once.
+            if isinstance(report, dict):
+                _print_scan_summary(report)
         return 0
     parser.error("unknown command")
 
