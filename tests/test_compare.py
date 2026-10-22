@@ -190,3 +190,44 @@ def test_replayed_scans_show_a_flipped_response_as_a_regression(tmp_path, monkey
     assert regressed[0]["baseline"]["verdict"] == "SAFE"
     assert regressed[0]["candidate"]["verdict"] == "VULNERABLE"
     assert result["summary"]["unchanged"] == 12
+
+
+
+def test_compare_text_has_tags_legend_and_summary(tmp_path, capsys):
+    result = compare_scan_reports(_report(BASELINE, "base"), _report(CANDIDATE, "cand"))
+    text = format_comparison_text(result)
+    lines = text.splitlines()
+    assert lines[0] == "Comparable: yes"
+    assert lines[1] == (
+        "Summary: 1 regressed, 1 improved, 3 unchanged, 1 newly errored, 1 recovered, "
+        "1 still errored, 1 added, 1 removed; net findings delta +0; 3 changed method"
+    )
+    assert "  REGRESSED fixture:1: SAFE via keyword -> VULNERABLE via llm-judge" in lines
+    assert any(line.startswith("  NEWLY_ERRORED ") for line in lines)
+    assert any(line.startswith("  ADDED ") for line in lines)
+    assert any(line.startswith("  REMOVED ") for line in lines)
+    assert not any(line.lstrip().startswith(("IMPROVED", "UNCHANGED", "RECOVERED", "STILL_ERRORED"))
+                   for line in lines)
+    assert lines[-2] == ("Legend: REGRESSED got worse than the baseline  "
+                         "NEWLY_ERRORED now fails operationally")
+    assert lines[-1] == "        ADDED only in the new scan  REMOVED only in the baseline"
+    assert all(ord(ch) < 128 for ch in text)
+
+    base = _write(tmp_path / "base.json", _report(BASELINE, "base"))
+    cand = _write(tmp_path / "cand.json", _report(CANDIDATE, "cand"))
+    same = _write(tmp_path / "same.json", _report(BASELINE, "same"))
+    other = _write(tmp_path / "other.json",
+                   _report(BASELINE, "other", attack_library_sha256="c" * 64))
+
+    assert main(["compare", "--baseline", base, "--candidate", cand]) == 0
+    assert "Exit code" not in capsys.readouterr().out
+    assert main(["compare", "--baseline", base, "--candidate", cand, "--fail-on-regression"]) == 1
+    assert ("Exit code 1: an attack regressed or newly errored and --fail-on-regression is set"
+            in capsys.readouterr().out)
+    assert main(["compare", "--baseline", base, "--candidate", same, "--fail-on-regression"]) == 0
+    assert "Exit code 0: nothing that --fail-on-regression checks for happened" in capsys.readouterr().out
+    assert main(["compare", "--baseline", base, "--candidate", other,
+                 "--fail-on-incomparable", "--fail-on-regression"]) == 4
+    out = capsys.readouterr().out
+    assert out.startswith("NOT COMPARABLE:")
+    assert "Exit code 4: the reports are not comparable and --fail-on-incomparable is set" in out
