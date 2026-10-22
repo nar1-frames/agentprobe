@@ -216,6 +216,7 @@ def test_colour_enabled_on_tty_without_no_color(monkeypatch, capsys):
 
 import agentprobe.cli as _cli  # noqa: E402
 import agentprobe_v12  # noqa: E402
+from agentprobe import termstyle  # noqa: E402
 from agentprobe.harness import run_fixture_suite as _real_fixture_suite  # noqa: E402
 
 
@@ -241,6 +242,8 @@ def test_interactive_scan_prints_summary_once(monkeypatch, capsys):
     }}
 
     def fake_interactive_main():
+        # Mirrors the real runner: it prints the shared summary itself.
+        termstyle.print_scan_summary(report)
         print("Report saved to: reports/fixture.html")
         return report
 
@@ -250,3 +253,28 @@ def test_interactive_scan_prints_summary_once(monkeypatch, capsys):
     assert out.count("Scan summary:") == 1
     assert out.count("Verdict key:") == 1
     assert "Scan summary: 3 attacks (3 scorable), 0 operational errors" in out
+
+
+# --- scan --verbose and summary ordering -------------------------------------
+
+def test_interactive_scan_summary_precedes_saved_lines(monkeypatch, capsys):
+    _plain_terminal(monkeypatch)
+    report = {"summary": {
+        "total_attacks": 2, "scorable_attacks": 2, "operational_errors": 0,
+        "verdicts": {"SAFE": 1, "SUSPICIOUS": 0, "PARTIAL": 0, "VULNERABLE": 1},
+        "findings_by_severity": {"HIGH": 1},
+    }}
+
+    def fake_interactive_main():
+        termstyle.print_scan_summary(report)
+        print("Report saved to: x")
+        print("JSON report saved to: y")
+        return report
+
+    monkeypatch.setattr(agentprobe_v12, "main", fake_interactive_main)
+    assert main(["scan"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("Scan summary:") == 1
+    assert out.index("Verdict key:") < out.index("Report saved to: x") < out.index(
+        "JSON report saved to: y"
+    )

@@ -71,3 +71,25 @@ def test_committed_sample_report_shows_mixed_verdicts():
 def test_hygiene_allowlist_covers_only_the_demo_recording():
     assert scan_content("demo/other.replay.json", b"{}") != []
     assert scan_content("scan.replay.json", b"{}") != []
+
+
+def test_scan_non_interactive_verbose_shows_progress(demo_cwd, capsys):
+    exit_code = cli.main([
+        "scan", "--non-interactive", "--verbose", "--config", "demo/replay.yaml",
+    ])
+    out = capsys.readouterr().out
+    assert exit_code == 0, out
+    assert "[ROLE_CONFUSION] 6 prompts" in out
+    assert "[SAFE]" in out or "[VULNERABLE]" in out
+    assert "category total:" in out
+    last_tally = out.rindex("category total:")
+    assert last_tally < out.index("Scan summary:") < out.index("HTML report saved to:")
+    assert all(ord(ch) < 128 for ch in out)
+
+
+def test_scan_non_interactive_quiet_without_verbose(demo_cwd, capsys):
+    assert cli.main(["scan", "--non-interactive", "--config", "demo/replay.yaml"]) == 0
+    out = capsys.readouterr().out
+    assert "category total:" not in out
+    assert "prompts" not in out
+    assert out.lstrip().startswith("Scan summary:")
