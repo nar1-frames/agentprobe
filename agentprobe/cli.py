@@ -332,6 +332,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_export_arguments(harness)
     harness.set_defaults(handler="harness")
 
+    demo = subparsers.add_parser(
+        "demo",
+        help="run the offline replay demo verbosely (no keys or network; run from the repo root)",
+    )
+    demo.add_argument("--no-color", action="store_true", help="never emit ANSI colour")
+    _add_export_arguments(demo)
+    demo.set_defaults(handler="demo")
+
     compare = subparsers.add_parser(
         "compare", help="compare a candidate scan report against a baseline report",
     )
@@ -355,6 +363,77 @@ def build_parser() -> argparse.ArgumentParser:
 _print_scan_summary = termstyle.print_scan_summary
 
 
+def _run_non_interactive_scan(args) -> int:
+    """Run a configured scan and print progress, summary, saved paths, exports."""
+    try:
+        scan_kwargs = {}
+        if getattr(args, "checkpoint", None) is not None:
+            scan_kwargs["checkpoint_path"] = args.checkpoint
+        if getattr(args, "resume", False):
+            scan_kwargs["resume"] = True
+        if getattr(args, "repair_errors", False):
+            scan_kwargs["repair_errors"] = True
+        if args.verbose:
+            scan_kwargs["verbose"] = True
+        run = scanner.run_configured_scan(args.config, **scan_kwargs)
+    except (OSError, KeyError, ValueError) as exc:
+        print(f"agentprobe: configuration/scan error: {exc}")
+        return 2
+    if args.verbose:
+        print()  # separate the progress stream from the summary block
+    _print_scan_summary(run.get("report"))
+    if run["html_path"]:
+        print(f"HTML report saved to: {run['html_path']}")
+    if run["json_path"]:
+        print(f"JSON report saved to: {run['json_path']}")
+    try:
+        _write_exports(args, run.get("report"), scan_report_to_sarif, scan_report_to_junit)
+    except (OSError, TypeError, ValueError) as exc:
+        print(f"agentprobe: export error: {exc}")
+        return 2
+    if getattr(args, "fail_on_error", False):
+        errors = sum(
+            1
+            for rows in run["results"].values()
+            for row in rows
+            if len(row) > 5 and row[5] in {"target-error", "judge-error"}
+        )
+        if errors:
+            print(f"agentprobe: {errors} operational error(s) recorded")
+            return 3
+    return 0
+
+
+# The demo config refers to its recording and report folder with paths
+# relative to the current directory, so `agentprobe demo` runs from the
+# repository root (where demo/ lives) rather than from an installed package.
+DEMO_CONFIG = os.path.join("demo", "replay.yaml")
+DEMO_REPLAY = os.path.join("demo", "scan.replay.json")
+_DEMO_INTRO = (
+    "AgentProbe offline demo: replays a recorded scan of openai/gpt-oss-20b, "
+    "no keys or network needed.",
+    "Each attack prompt below is judged from the recording; verdict tags are "
+    "explained at the end.",
+    "",
+)
+
+
+def _demo(args) -> int:
+    """`agentprobe demo` == `scan --non-interactive --verbose --config demo/replay.yaml`."""
+    missing = [path for path in (DEMO_CONFIG, DEMO_REPLAY) if not os.path.isfile(path)]
+    if missing:
+        shown = ", ".join(os.path.abspath(path) for path in missing)
+        print(f"agentprobe: demo files not found: {shown}")
+        print("Run `agentprobe demo` from the repository root, the folder that "
+              "contains demo/replay.yaml (git clone the repo first if needed).")
+        return 2
+    for line in _DEMO_INTRO:
+        print(line)
+    args.config = DEMO_CONFIG
+    args.verbose = True
+    return _run_non_interactive_scan(args)
+
+
 def main(argv: Sequence[str] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -367,48 +446,15 @@ def main(argv: Sequence[str] = None) -> int:
         return _live_harness(args) if args.live else _harness(args)
     if args.handler == "compare":
         return _compare(args)
+    if args.handler == "demo":
+        return _demo(args)
     if args.handler == "scan":
         if args.resume and not args.checkpoint:
             parser.error("--resume requires --checkpoint")
         if args.repair_errors and not args.resume:
             parser.error("--repair-errors requires --resume")
         if args.non_interactive:
-            try:
-                scan_kwargs = {}
-                if args.checkpoint is not None:
-                    scan_kwargs["checkpoint_path"] = args.checkpoint
-                if args.resume:
-                    scan_kwargs["resume"] = True
-                if args.repair_errors:
-                    scan_kwargs["repair_errors"] = True
-                if args.verbose:
-                    scan_kwargs["verbose"] = True
-                run = scanner.run_configured_scan(args.config, **scan_kwargs)
-            except (OSError, KeyError, ValueError) as exc:
-                print(f"agentprobe: configuration/scan error: {exc}")
-                return 2
-            if args.verbose:
-                print()  # separate the progress stream from the summary block
-            _print_scan_summary(run.get("report"))
-            if run["html_path"]:
-                print(f"HTML report saved to: {run['html_path']}")
-            if run["json_path"]:
-                print(f"JSON report saved to: {run['json_path']}")
-            try:
-                _write_exports(args, run.get("report"), scan_report_to_sarif, scan_report_to_junit)
-            except (OSError, TypeError, ValueError) as exc:
-                print(f"agentprobe: export error: {exc}")
-                return 2
-            if args.fail_on_error:
-                errors = sum(
-                    1
-                    for rows in run["results"].values()
-                    for row in rows
-                    if len(row) > 5 and row[5] in {"target-error", "judge-error"}
-                )
-                if errors:
-                    print(f"agentprobe: {errors} operational error(s) recorded")
-                    return 3
+            return _run_non_interactive_scan(args)
         else:
             if args.fail_on_error:
                 parser.error("--fail-on-error requires --non-interactive")

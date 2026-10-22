@@ -107,6 +107,21 @@ def style(tag: str, colour: Optional[bool] = None) -> str:
     return f"{_ANSI[name]}{padded}{_ANSI['reset']}"
 
 
+def console_is_unicode(stream: Any = None) -> bool:
+    """True when the console can render non-ASCII glyphs (a UTF encoding).
+
+    Windows consoles often report ``cp1252``; there emoji and em dashes print
+    as ``?`` and the caller should use the ASCII tags instead.
+    """
+    encoding = getattr(stream if stream is not None else sys.stdout, "encoding", None) or ""
+    return "utf" in encoding.lower()
+
+
+def glyph(unicode_text: str, ascii_text: str) -> str:
+    """Return ``unicode_text`` on a UTF console, otherwise ``ascii_text``."""
+    return unicode_text if console_is_unicode() else ascii_text
+
+
 def print_scan_summary(report: Any) -> None:
     """Print the plain four-line verdict summary of a scan report, if it has one.
 
