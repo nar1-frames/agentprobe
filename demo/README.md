@@ -4,13 +4,19 @@ Run a real AgentProbe scan with no API keys, no Ollama, and no network:
 
 ```bash
 python -m pip install -e ".[dev]"
-agentprobe scan --non-interactive --config demo/replay.yaml
+agentprobe demo
+# equivalent to:
+agentprobe scan --non-interactive --verbose --config demo/replay.yaml
 ```
 
-It finishes in about a second and writes an HTML dashboard and a JSON report
-to `reports/`, through the same scanner code path as a live scan. The only
-difference is the `replay` provider in `demo/replay.yaml`, which serves the
-recorded responses in `demo/scan.replay.json` instead of calling a model.
+Run it from the repository root: `demo/replay.yaml` refers to the recording
+and the `reports/` folder with paths relative to the current directory, and
+`agentprobe demo` says so and exits 2 if those files are not where it looks.
+It finishes in about a second, prints each attack's verdict tag and a per
+category tally, then the scan summary, and writes an HTML dashboard and a JSON
+report to `reports/`, through the same scanner code path as a live scan. The
+only difference is the `replay` provider in `demo/replay.yaml`, which serves
+the recorded responses in `demo/scan.replay.json` instead of calling a model.
 
 If you just want to read the output, the committed sample is in
 [`docs/demo/`](../docs/demo/): `demo_report.html` and `demo_report.json`.
