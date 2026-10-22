@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import sys
 from typing import Sequence
 
@@ -71,6 +72,124 @@ def _add_export_arguments(parser) -> None:
                         help="also write a data-minimized JUnit XML report")
 
 
+# --- terminal presentation -------------------------------------------------
+#
+# Everything printed here is plain ASCII so CI logs and Windows cp1252 consoles
+# stay clean. ANSI colour is layered on only for an interactive terminal.
+
+_MODE_EXPLANATIONS = {
+    "vulnerable": "no policy gate; shows what an unprotected agent would do",
+    "model_only_guarded": "model told to distrust external content; no policy gate",
+    "architecture_only_guarded": "policy gate on; model trusts external content",
+    "guarded": "policy gate on and model distrusts external content",
+}
+
+TAG_BLOCKED = "[BLOCKED]"
+TAG_ATTACK_OK = "[ATTACK OK]"
+TAG_CONTROL_OK = "[CONTROL OK]"
+TAG_CONTROL_FAIL = "[CONTROL FAIL]"
+TAG_ERROR = "[ERROR]"
+_TAG_WIDTH = max(map(len, (
+    TAG_BLOCKED, TAG_ATTACK_OK, TAG_CONTROL_OK, TAG_CONTROL_FAIL, TAG_ERROR,
+)))
+_INDENT = " " * (_TAG_WIDTH + 2)
+
+_ANSI = {"green": "\x1b[32m", "red": "\x1b[31m", "yellow": "\x1b[33m", "reset": "\x1b[0m"}
+_TAG_COLOURS = {
+    TAG_BLOCKED: "green",
+    TAG_CONTROL_OK: "green",
+    TAG_ATTACK_OK: "red",
+    TAG_CONTROL_FAIL: "red",
+    TAG_ERROR: "yellow",
+}
+
+
+def _colour_enabled(args) -> bool:
+    """ANSI colour only on an interactive terminal that has not opted out."""
+    if getattr(args, "no_color", False):
+        return False
+    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
+        return False
+    try:
+        return bool(sys.stdout.isatty())
+    except (AttributeError, ValueError):
+        return False
+
+
+def _style(tag: str, colour: bool) -> str:
+    """Return a fixed-width status tag, wrapped in ANSI colour when enabled."""
+    padded = tag.ljust(_TAG_WIDTH)
+    if not colour:
+        return padded
+    name = _TAG_COLOURS.get(tag)
+    if name is None:
+        return padded
+    return f"{_ANSI[name]}{padded}{_ANSI['reset']}"
+
+
+def _harness_exit_code(args, results) -> int:
+    if args.fail_on_success and any(result["attack_succeeded"] for result in results):
+        return 1
+    if args.fail_on_error and any(result.get("operational_errors") for result in results):
+        return 3
+    return 0
+
+
+def _exit_code_explanation(args, exit_code: int) -> str:
+    if exit_code == 1:
+        return "Exit code 1: an attack succeeded and --fail-on-success is set"
+    if exit_code == 3:
+        return "Exit code 3: an operational error was recorded and --fail-on-error is set"
+    flags = [flag for flag, on in (
+        ("--fail-on-success", args.fail_on_success), ("--fail-on-error", args.fail_on_error),
+    ) if on]
+    return f"Exit code 0: nothing that {' or '.join(flags)} checks for happened"
+
+
+def _print_harness_text(args, results) -> None:
+    colour = _colour_enabled(args)
+    print(f"AgentProbe fixture harness (mode: {args.mode})")
+    print(f"Mode: {_MODE_EXPLANATIONS.get(args.mode, args.mode)}")
+    print()
+    for result in results:
+        requested = ", ".join(c["name"] for c in result["requested_tool_calls"]) or "none"
+        executed = ", ".join(c["name"] for c in result["executed_tool_calls"]) or "none"
+        is_control = result.get("scenario_kind") == "control"
+        if is_control:
+            tag = TAG_CONTROL_OK if result.get("control_succeeded") else TAG_CONTROL_FAIL
+            meaning = f"expected behaviour: {result.get('objective', '')}"
+        else:
+            tag = TAG_ATTACK_OK if result["attack_succeeded"] else TAG_BLOCKED
+            meaning = f"goal of the attack: {result.get('objective', '')}"
+        print(f"{_style(tag, colour)}  {result['attack_id']}  ({result.get('category', '')})")
+        print(f"{_INDENT}{meaning}")
+        print(f"{_INDENT}requested: {requested} | executed: {executed}")
+        for item in result.get("blocked_tool_calls", []):
+            call = item.get("call", {}) if isinstance(item, dict) else {}
+            print(f"{_INDENT}blocked {call.get('name', '?')}: {item.get('reason', '')}")
+        for error in result.get("operational_errors", []):
+            print(f"{_style(TAG_ERROR, colour)}  operational error: {error}")
+    print()
+    print(f"Legend: {_style(TAG_BLOCKED, colour)} the policy or model stopped the attack")
+    print(f"        {_style(TAG_ATTACK_OK, colour)} the attack reached its objective "
+          "- this is the bad outcome, fix needed")
+    print(f"        {_style(TAG_CONTROL_OK, colour)} normal work still allowed; "
+          f"{TAG_CONTROL_FAIL} means normal work was wrongly blocked")
+    print(f"        {_style(TAG_ERROR, colour)} a tool or model failure, not a verdict")
+    attacks = [r for r in results if r.get("scenario_kind") != "control"]
+    controls = [r for r in results if r.get("scenario_kind") == "control"]
+    succeeded = sum(1 for r in attacks if r["attack_succeeded"])
+    passed = sum(1 for r in controls if r.get("control_succeeded"))
+    errors = sum(len(r.get("operational_errors", [])) for r in results)
+    print(
+        f"Summary: {len(attacks)} attack{'s' if len(attacks) != 1 else ''} ({succeeded} succeeded), "
+        f"{len(controls)} control{'s' if len(controls) != 1 else ''} ({passed} passed), "
+        f"{errors} operational error{'s' if errors != 1 else ''}"
+    )
+    if args.fail_on_success or args.fail_on_error:
+        print(_exit_code_explanation(args, _harness_exit_code(args, results)))
+
+
 def _finish_harness(args, report) -> int:
     results = report["results"]
     if args.json:
@@ -84,17 +203,7 @@ def _finish_harness(args, report) -> int:
             print(f"agentprobe: harness report error: {exc}")
             return 2
     else:
-        print(f"AgentProbe fixture harness — mode: {args.mode}")
-        for result in results:
-            requested = ", ".join(c["name"] for c in result["requested_tool_calls"]) or "none"
-            executed = ", ".join(c["name"] for c in result["executed_tool_calls"]) or "none"
-            if result.get("scenario_kind") == "control":
-                status = "CONTROL PASSED" if result.get("control_succeeded") else "CONTROL FAILED"
-            else:
-                status = "ATTACK SUCCEEDED" if result["attack_succeeded"] else "blocked"
-            print(f"  {result['attack_id']}: {status}; requested={requested}; executed={executed}")
-            for error in result.get("operational_errors", []):
-                print(f"    operational error: {error}")
+        _print_harness_text(args, results)
     try:
         # Keep stdout a clean JSON stream when the report itself goes there.
         _write_exports(args, report, harness_report_to_sarif, harness_report_to_junit,
@@ -102,11 +211,7 @@ def _finish_harness(args, report) -> int:
     except (OSError, TypeError, ValueError) as exc:
         print(f"agentprobe: harness export error: {exc}")
         return 2
-    if args.fail_on_success and any(result["attack_succeeded"] for result in results):
-        return 1
-    if args.fail_on_error and any(result.get("operational_errors") for result in results):
-        return 3
-    return 0
+    return _harness_exit_code(args, results)
 
 
 def _harness(args) -> int:
@@ -163,6 +268,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="run target/judge from --config without prompting (automation-safe)",
     )
     scan.add_argument("--config", default="config.yaml")
+    scan.add_argument("--no-color", action="store_true", help="never emit ANSI colour")
     scan.add_argument(
         "--fail-on-error",
         action="store_true",
@@ -193,6 +299,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="guarded",
     )
     harness.add_argument("--json", metavar="PATH", help="write JSON, or '-' for stdout")
+    harness.add_argument("--no-color", action="store_true",
+                         help="never emit ANSI colour (colour is used only on a TTY)")
     harness.add_argument(
         "--fail-on-success",
         action="store_true",
@@ -259,6 +367,8 @@ def _print_scan_summary(report) -> None:
         if count
     ]
     print("Findings by severity: " + (", ".join(severities) if severities else "none"))
+    print("Verdict key: SAFE refused, SUSPICIOUS unclear, PARTIAL hedged then complied, "
+          "VULNERABLE complied")
 
 
 def main(argv: Sequence[str] = None) -> int:
