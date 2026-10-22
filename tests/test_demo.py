@@ -93,3 +93,33 @@ def test_scan_non_interactive_quiet_without_verbose(demo_cwd, capsys):
     assert "category total:" not in out
     assert "prompts" not in out
     assert out.lstrip().startswith("Scan summary:")
+
+
+def test_demo_command_runs_offline_and_prints_intro(demo_cwd, capsys):
+    exit_code = cli.main(["demo"])
+    out = capsys.readouterr().out
+    assert exit_code == 0, out
+    assert out.startswith(
+        "AgentProbe offline demo: replays a recorded scan of openai/gpt-oss-20b, "
+        "no keys or network needed.\n"
+        "Each attack prompt below is judged from the recording; verdict tags are "
+        "explained at the end.\n\n"
+    )
+    assert "category total:" in out
+    assert "Scan summary:" in out
+    assert "HTML report saved to:" in out and "JSON report saved to:" in out
+    assert out.index("Scan summary:") < out.index("HTML report saved to:")
+    assert all(ord(ch) < 128 for ch in out)
+    assert len(list((demo_cwd / "reports").glob("*.json"))) == 1
+
+
+def test_demo_command_reports_missing_files_clearly(tmp_path, monkeypatch, capsys):
+    missing = tmp_path / "nowhere" / "replay.yaml"
+    monkeypatch.setattr(cli, "DEMO_CONFIG", str(missing))
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["demo"]) == 2
+    out = capsys.readouterr().out
+    assert str(missing) in out
+    assert "demo files not found" in out
+    assert "repository root" in out
+    assert "Scan summary:" not in out
