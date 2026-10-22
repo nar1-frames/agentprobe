@@ -151,7 +151,8 @@ self-contained HTML file (inline CSS, no scripts or links) that prints cleanly
 to PDF from a browser.
 
 ```bash
-agentprobe report --scan reports/scan.json --out reports/customer.html   --client "Acme Co" --prepared-by "Your name" [--baseline reports/previous.json]
+agentprobe report --scan reports/scan.json --out reports/customer.html --client "Acme Co"
+# Optional: --prepared-by "Your name" and --baseline reports/previous.json
 ```
 
 The first screen shows the client, scan date, system tested, a PASS / FAIL /

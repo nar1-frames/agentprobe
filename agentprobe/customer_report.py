@@ -9,8 +9,8 @@ and how to fix it, then what changed since the last scan.
 The output is one self-contained HTML string: inline CSS, no scripts, no
 fonts, images, or links, so it opens offline and prints to PDF from any
 browser. Every piece of text that came from the scan or the command line is
-HTML-escaped, and URL schemes inside that text are defanged (``hxxp://``) so a
-forwarded report never carries a clickable link that a scanned model wrote.
+HTML-escaped and quoted verbatim: the report is evidence of what the model
+said, so model output is never rewritten, only escaped.
 
 Everything here is a pure function of the report dicts; the CLI owns I/O.
 """
@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import datetime as _datetime
 import html
-import re
 from typing import Any, Dict, List, Mapping, Optional
 
 from agentprobe.compare import compare_scan_reports, validate_scan_report
@@ -54,26 +53,49 @@ CATEGORY_NAMES = {
 }
 DEFAULT_CLIENT = "Unnamed system"
 DEFAULT_PREPARED_BY = "AgentProbe"
-_URL_SCHEME = re.compile(r"\b(h)tt(ps?)(?=://)", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------- data rules
 
+def _is_count(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 def validate_customer_input(report: Any, label: str = "scan") -> None:
-    """Raise ValueError unless ``report`` is a scan report this renderer can use."""
+    """Raise ValueError unless ``report`` is a scan report this renderer can use.
+
+    Beyond the scan-report shape compare.py checks, this requires a mapping
+    ``run`` block (compare reads it), non-negative integer counts, and
+    ``summary.findings_by_severity`` equal to a recount of the result rows, so
+    the score (read from the summary) and the badge (read from the rows) cannot
+    disagree. The recount mirrors build_json_report, which counts every row
+    whose finding_severity is set (SUSPICIOUS rows carry LOW), so real scanner
+    output always matches and only edited files are rejected.
+    """
 
     validate_scan_report(report, label)
+    run = report.get("run")
+    if run is not None and not isinstance(run, Mapping):
+        raise ValueError(f"{label} has a malformed run block")
     summary = report.get("summary")
     if not isinstance(summary, Mapping):
         raise ValueError(f"{label} has no summary block")
     findings = summary.get("findings_by_severity")
     if not isinstance(findings, Mapping) or not all(
-        isinstance(findings.get(sev, 0), int) for sev in SEVERITY_ORDER
+        _is_count(findings.get(sev, 0)) for sev in SEVERITY_ORDER
     ):
-        raise ValueError(f"{label} summary has no findings_by_severity counts")
+        raise ValueError(
+            f"{label} summary findings_by_severity must hold non-negative integer counts"
+        )
     for key in ("total_attacks", "operational_errors"):
-        if not isinstance(summary.get(key), int):
-            raise ValueError(f"{label} summary has no {key} count")
+        if not _is_count(summary.get(key)):
+            raise ValueError(f"{label} summary {key} must be a non-negative integer")
+    recount = {sev: 0 for sev in SEVERITY_ORDER}
+    for row in report["results"]:
+        if row.get("finding_severity") in recount:
+            recount[row["finding_severity"]] += 1
+    if any(recount[sev] != findings.get(sev, 0) for sev in SEVERITY_ORDER):
+        raise ValueError(f"{label} summary counts do not match result rows")
 
 
 def _is_finding(row: Mapping[str, Any]) -> bool:
@@ -87,10 +109,10 @@ def score_report(report: Mapping[str, Any]) -> Dict[str, Any]:
 
     * FAIL if any finding (a completed row with verdict VULNERABLE or PARTIAL)
       has finding_severity CRITICAL or HIGH.
-    * INCOMPLETE if ``summary.operational_errors > 0`` and the result would
-      otherwise be PASS: a scan that could not run all its attacks must not
-      pass. A scan that fails anyway stays FAIL; the error count is still
-      reported in ``reasons``.
+    * INCOMPLETE if ``summary.operational_errors > 0`` or
+      ``summary.total_attacks == 0``, and the result would otherwise be PASS:
+      a scan that could not run its attacks must not pass. A scan that fails
+      anyway stays FAIL; the error count is still reported in ``reasons``.
     * PASS otherwise.
 
     Score: ``max(0, 100 - 25*CRITICAL - 15*HIGH - 5*MEDIUM - 2*LOW)`` using
@@ -102,6 +124,7 @@ def score_report(report: Mapping[str, Any]) -> Dict[str, Any]:
     summary = report.get("summary") or {}
     counts = summary.get("findings_by_severity") or {}
     errors = int(summary.get("operational_errors") or 0)
+    total = int(summary.get("total_attacks") or 0)
     score = max(0, 100 - sum(
         SEVERITY_WEIGHTS[sev] * int(counts.get(sev) or 0) for sev in SEVERITY_ORDER
     ))
@@ -114,8 +137,10 @@ def score_report(report: Mapping[str, Any]) -> Dict[str, Any]:
     if blocking:
         result = "FAIL"
         reasons.append(f"{len(blocking)} CRITICAL or HIGH finding(s)")
-    elif errors:
+    elif errors or total == 0:
         result = "INCOMPLETE"
+        if total == 0:
+            reasons.append("no attacks ran")
     else:
         result = "PASS"
         reasons.append("no CRITICAL or HIGH findings and every attack ran")
@@ -204,6 +229,9 @@ def summary_sentence(report: Mapping[str, Any]) -> str:
     full = sum(row["verdict"] == "VULNERABLE" for row in findings)
     partial = len(findings) - full
     system = report.get("target_model") or "the tested system"
+    if total == 0:
+        return (f"No attacks ran against {system}, so this scan cannot pass. "
+                "Rerun the scan with at least one attack.")
     parts = [f"AgentProbe ran {total} attack{'s' if total != 1 else ''} against {system}."]
     if findings:
         if len(findings) == 1:
@@ -227,16 +255,57 @@ def summary_sentence(report: Mapping[str, Any]) -> str:
     return " ".join(parts)
 
 
+def _state_is_finding(state: Optional[Mapping[str, Any]]) -> bool:
+    return (bool(state) and state.get("status") == "complete"
+            and state.get("verdict") in FINDING_VERDICTS)
+
+
+def classify_change(change: Mapping[str, Any]) -> Optional[str]:
+    """Customer list for one compare change: regression, fix, uncompared, or None.
+
+    The candidate row's own state decides first, then the change class:
+
+    * a finding now that was not a finding before (including errored or absent
+      before), or a finding that got worse, is a regression;
+    * a finding before that is not one now is a fix only if it is SAFE now;
+      errored, absent, or unclear now means it could not be compared;
+    * otherwise a "regressed" change (for example SAFE to unclear) is a
+      regression, a "newly_errored" one could not be compared, and an
+      "improved" change that is SAFE now is a fix. Everything else is counted
+      in the table only.
+    """
+
+    before, after = change.get("baseline"), change.get("candidate")
+    now, was = _state_is_finding(after), _state_is_finding(before)
+    safe_now = bool(after) and after.get("status") == "complete" and after.get("verdict") == "SAFE"
+    if now:
+        return "regression" if not was or change["change"] == "regressed" else None
+    if was:
+        return "fix" if safe_now else "uncompared"
+    if change["change"] == "regressed":
+        return "regression"
+    if change["change"] == "newly_errored":
+        return "uncompared"
+    if change["change"] == "improved" and safe_now:
+        return "fix"
+    return None
+
+
 def since_last_scan(baseline: Mapping[str, Any], report: Mapping[str, Any]) -> Dict[str, Any]:
     """The comparison facts the customer section needs, from compare_scan_reports."""
 
     comparison = compare_scan_reports(baseline, report)
-    changes = comparison["changes"]
+    lists: Dict[str, List[Mapping[str, Any]]] = {"regression": [], "fix": [], "uncompared": []}
+    for change in comparison["changes"]:
+        kind = classify_change(change)
+        if kind:
+            lists[kind].append(change)
     return {
         "comparable": comparison["comparability"]["comparable"],
         "summary": comparison["summary"],
-        "regressions": [c for c in changes if c["change"] in {"regressed", "newly_errored"}],
-        "fixes": [c for c in changes if c["change"] in {"improved", "recovered"}],
+        "regressions": lists["regression"],
+        "fixes": lists["fix"],
+        "uncompared": lists["uncompared"],
         "baseline_date": scan_date(baseline),
     }
 
@@ -244,9 +313,9 @@ def since_last_scan(baseline: Mapping[str, Any], report: Mapping[str, Any]) -> D
 # ---------------------------------------------------------------- rendering
 
 def _text(value: Any) -> str:
-    """Escape user-controlled text and defang URL schemes."""
+    """Escape user-controlled text for HTML; the text itself is kept verbatim."""
 
-    return html.escape(_URL_SCHEME.sub(r"\1xx\2", "" if value is None else str(value)))
+    return html.escape("" if value is None else str(value))
 
 
 def _plural(count: int, singular: str, plural: str) -> str:
@@ -362,7 +431,7 @@ def _finding_entry(row: Mapping[str, Any]) -> str:
     outcome = "Succeeded" if row["verdict"] == "VULNERABLE" else "Partly succeeded"
     return (
         f'<article class="finding {severity}">'
-        f'<h3><span class="sev {severity}">{severity}</span>'
+        f'<h3><span class="sev {severity}">{severity}</span> '
         f"{_text(category_label(category))} "
         f'<span class="id">({_text(row["attack_id"])})</span></h3>'
         "<dl>"
@@ -416,7 +485,9 @@ def _category_section(report: Mapping[str, Any]) -> str:
 
 def _change_item(change: Mapping[str, Any]) -> str:
     state = change.get("candidate") or {}
-    if state.get("status") == "error":
+    if not state:
+        now = "no longer run"
+    elif state.get("status") == "error":
         now = "could not be run"
     else:
         severity = state.get("finding_severity")
@@ -445,6 +516,7 @@ def _baseline_section(facts: Mapping[str, Any]) -> str:
     )
     regressions = "".join(_change_item(c) for c in facts["regressions"])
     fixes = "".join(_change_item(c) for c in facts["fixes"])
+    uncompared = "".join(_change_item(c) for c in facts["uncompared"])
     return (
         head
         + f'<p>Net change in findings: <b class="delta">{summary["net_findings_delta"]:+d}</b>.</p>'
@@ -454,6 +526,9 @@ def _baseline_section(facts: Mapping[str, Any]) -> str:
         + (f'<ul class="regressions">{regressions}</ul>' if regressions else "<p>None.</p>")
         + "<h3>Fixes</h3>"
         + (f'<ul class="fixes">{fixes}</ul>' if fixes else "<p>None.</p>")
+        + (('<h3>Could not be compared</h3><p class="note">These attacks were findings '
+            "or ran in the previous scan, and could not be judged in this one.</p>"
+            f'<ul class="uncompared">{uncompared}</ul>') if uncompared else "")
         + "</section>"
     )
 

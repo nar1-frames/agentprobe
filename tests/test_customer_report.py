@@ -81,6 +81,17 @@ def test_score_never_goes_below_zero():
     assert score_report(_summary_only(critical=5))["score"] == 0
 
 
+def test_score_zero_attacks_is_incomplete():
+    report = _report([])
+    assert report["summary"]["total_attacks"] == 0
+    scored = score_report(report)
+    assert scored["result"] == "INCOMPLETE"
+    assert "no attacks ran" in scored["reasons"]
+    page = render_customer_report(report)
+    assert '<span class="badge INCOMPLETE">INCOMPLETE</span>' in page
+    assert "No attacks ran against demo-target, so this scan cannot pass." in page
+
+
 def test_score_ignores_severity_on_error_rows():
     # A finding severity only counts when the row actually ran.
     report = _report([_row("jailbreak", 1, "SAFE", method="keyword")])
@@ -117,15 +128,37 @@ def test_defaults_for_client_and_prepared_by():
     assert "None succeeded" in page
 
 
+_EXTERNAL_MARKERS = ("<script", "href=", "src=", "<link", "<img", "<iframe", "@import", "url(")
+
+
 def test_page_is_self_contained_with_one_h1_and_title():
-    page = render_customer_report(_report([_row("jailbreak", 1, "VULNERABLE", "HIGH",
-                                                response="see https://evil.example/x")]))
-    assert "<script" not in page.lower()
-    assert not re.search(r"https?://", page)
-    assert "hxxps://evil.example/x" in page  # defanged, still readable
+    page = render_customer_report(_report([_row("jailbreak", 1, "SAFE", method="keyword")]))
+    lowered = page.lower()
+    assert [marker for marker in _EXTERNAL_MARKERS if marker in lowered] == []
     assert page.count("<h1") == 1
     assert re.search(r"<title>[^<]+</title>", page)
-    assert "<link" not in page and "<img" not in page and "@import" not in page
+
+
+def test_urls_in_responses_are_quoted_verbatim_and_never_linked():
+    reply = 'see https://example.test/x?a=1&b="2" <a href="https://example.test/y">'
+    page = render_customer_report(_report([_row("jailbreak", 1, "VULNERABLE", "HIGH",
+                                                response=reply)]))
+    assert "see https://example.test/x?a=1&amp;b=&quot;2&quot;" in page
+    assert "&lt;a href=&quot;https://example.test/y&quot;&gt;" in page
+    lowered = page.lower()
+    # Escaped text is fine; no live tag or attribute may survive.
+    assert "<a " not in lowered
+    for marker in _EXTERNAL_MARKERS:
+        assert marker not in lowered.replace("&lt;a href=", ""), marker
+
+
+def test_finding_heading_separates_severity_from_category():
+    page = render_customer_report(_report([_row("context_manipulation", 1, "VULNERABLE",
+                                                "HIGH")]))
+    heading = re.search(r"<h3>.*?</h3>", page).group(0)
+    text = re.sub(r"<[^>]+>", "", heading)
+    assert text.startswith("HIGH Context manipulation")
+    assert "HIGHContext" not in text
 
 
 def test_findings_order_fields_and_mitigation():
@@ -254,6 +287,40 @@ def test_incomparable_baseline_shows_warning_and_still_renders_findings():
     assert 'id="categories"' in page
 
 
+def _section_list(page, name):
+    match = re.search(rf'<ul class="{name}">(.*?)</ul>', page)
+    return match.group(1) if match else ""
+
+
+def test_errored_before_finding_now_is_a_regression_not_a_fix():
+    baseline = _report([_row("jailbreak", 1, "SUSPICIOUS", method="target-error"),
+                        _row("jailbreak", 2, "SAFE", method="keyword")], run_id="base")
+    current = _report([_row("jailbreak", 1, "VULNERABLE", "CRITICAL"),
+                       _row("jailbreak", 2, "SAFE", method="keyword")], run_id="now")
+    page = render_customer_report(current, baseline)
+    assert "jailbreak:1" in _section_list(page, "regressions")
+    assert "jailbreak:1" not in _section_list(page, "fixes")
+    assert "now VULNERABLE, severity CRITICAL" in _section_list(page, "regressions")
+
+
+def test_new_attack_that_is_a_finding_is_a_regression():
+    baseline = _report([_row("jailbreak", 1, "SAFE", method="keyword")], run_id="base")
+    current = _report([_row("jailbreak", 1, "SAFE", method="keyword"),
+                       _row("jailbreak", 2, "VULNERABLE", "HIGH")], run_id="now")
+    page = render_customer_report(current, baseline)
+    assert "jailbreak:2" in _section_list(page, "regressions")
+
+
+def test_finding_that_now_errors_is_not_a_fix():
+    baseline = _report([_row("jailbreak", 1, "VULNERABLE", "HIGH")], run_id="base")
+    current = _report([_row("jailbreak", 1, "SUSPICIOUS", method="target-error")], run_id="now")
+    page = render_customer_report(current, baseline)
+    assert "jailbreak:1" not in _section_list(page, "fixes")
+    assert "jailbreak:1" not in _section_list(page, "regressions")
+    assert "jailbreak:1 (Jailbreak): now could not be run" in _section_list(page, "uncompared")
+    assert "Could not be compared" in page
+
+
 def test_no_baseline_section_without_baseline():
     page = render_customer_report(_report([_row("jailbreak", 1, "SAFE", method="keyword")]))
     assert 'id="since"' not in page
@@ -276,6 +343,42 @@ def test_large_report_renders():
     assert page.count('<article class="finding') == 166
     assert '<span class="badge PASS">PASS</span>' in page
     assert ">0<small> / 100</small>" in page
+
+
+def test_validation_rejects_negative_and_boolean_counts():
+    negative = _report([_row("jailbreak", 1, "SAFE", method="keyword")])
+    negative["summary"]["findings_by_severity"]["CRITICAL"] = -2
+    with pytest.raises(ValueError, match="non-negative"):
+        render_customer_report(negative)
+    boolean = _report([_row("jailbreak", 1, "SAFE", method="keyword")])
+    boolean["summary"]["findings_by_severity"]["HIGH"] = True
+    with pytest.raises(ValueError, match="non-negative"):
+        render_customer_report(boolean)
+    total = _report([_row("jailbreak", 1, "SAFE", method="keyword")])
+    total["summary"]["total_attacks"] = -5
+    with pytest.raises(ValueError, match="total_attacks"):
+        render_customer_report(total)
+    errors = _report([_row("jailbreak", 1, "SAFE", method="keyword")])
+    errors["summary"]["operational_errors"] = False
+    with pytest.raises(ValueError, match="operational_errors"):
+        render_customer_report(errors)
+
+
+def test_validation_rejects_summary_that_disagrees_with_rows():
+    edited = _report([_row("jailbreak", 1, "SAFE", method="keyword")])
+    edited["summary"]["findings_by_severity"]["HIGH"] = 3
+    with pytest.raises(ValueError, match="summary counts do not match result rows"):
+        render_customer_report(edited)
+
+
+def test_validation_accepts_scanner_output_with_suspicious_low_rows():
+    # The scanner gives SUSPICIOUS rows finding_severity LOW and counts them in
+    # the summary; the recount must match that, not reject real output.
+    report = _report([_row("jailbreak", 1, "SUSPICIOUS", "LOW"),
+                      _row("jailbreak", 2, "VULNERABLE", "MEDIUM")])
+    assert report["summary"]["findings_by_severity"]["LOW"] == 1
+    page = render_customer_report(report)
+    assert page.count('<article class="finding') == 1
 
 
 # --------------------------------------------------------------- CLI
@@ -315,7 +418,14 @@ def test_cli_report_missing_scan_exits_2_and_writes_nothing(tmp_path, capsys, mo
     assert not (tmp_path / "x.html").exists()
 
 
-@pytest.mark.parametrize("content", ["{not json", json.dumps({"tool": "other"}), "[]"])
+def _scan_with_run(run):
+    report = _report([_row("jailbreak", 1, "SAFE", method="keyword")])
+    report["run"] = run
+    return json.dumps(report)
+
+
+@pytest.mark.parametrize("content", ["{not json", json.dumps({"tool": "other"}), "[]",
+                                     _scan_with_run("x"), _scan_with_run([1])])
 def test_cli_report_malformed_scan_exits_2(tmp_path, capsys, content):
     scan = tmp_path / "scan.json"
     scan.write_text(content, encoding="utf-8")
@@ -335,4 +445,19 @@ def test_cli_report_malformed_baseline_exits_2(tmp_path, capsys):
     assert main(["report", "--scan", str(scan), "--baseline", str(base),
                  "--out", str(out)]) == 2
     assert len(capsys.readouterr().err.strip().splitlines()) == 1
+    assert not out.exists()
+
+
+@pytest.mark.parametrize("run", ["x", [1]])
+def test_cli_report_malformed_baseline_run_exits_2(tmp_path, capsys, run):
+    scan = tmp_path / "scan.json"
+    scan.write_text(_scan_with_run({"run_id": "c", "attack_library_sha256": "a" * 64}),
+                    encoding="utf-8")
+    base = tmp_path / "base.json"
+    base.write_text(_scan_with_run(run), encoding="utf-8")
+    out = tmp_path / "x.html"
+    assert main(["report", "--scan", str(scan), "--baseline", str(base),
+                 "--out", str(out)]) == 2
+    err = capsys.readouterr().err.strip().splitlines()
+    assert len(err) == 1 and "baseline has a malformed run block" in err[0]
     assert not out.exists()
