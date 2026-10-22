@@ -316,6 +316,7 @@ def main():
             webbrowser.open("file://" + os.path.abspath(saved))
         except Exception:
             print(f"Open it yourself: open {saved}")
+    return json_report
 
 
 if __name__ == "__main__":
