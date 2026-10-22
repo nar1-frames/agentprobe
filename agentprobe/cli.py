@@ -7,13 +7,15 @@ import sys
 from typing import Sequence
 
 from agentprobe.compare import compare_scan_reports, format_comparison_text
+from agentprobe.customer_report import render_customer_report
 from agentprobe.exports import (
     harness_report_to_junit, harness_report_to_sarif, scan_report_to_junit,
     scan_report_to_sarif, write_text_atomic,
 )
 from agentprobe.harness import run_fixture_suite
 from agentprobe.reporting import (
-    _write_json_atomic, build_harness_provenance, build_harness_report, save_harness_report,
+    _write_json_atomic, _write_text_atomic, build_harness_provenance, build_harness_report,
+    save_harness_report,
 )
 from agentprobe import scanner
 # Tag constants and styling live in agentprobe.termstyle (shared with the
@@ -56,6 +58,30 @@ def _compare(args) -> int:
             return 2
         print(f"Wrote comparison to {args.json}", file=out)
     return exit_code
+
+
+def _report(args) -> int:
+    """Render the customer HTML report; on any input problem write nothing, exit 2."""
+    try:
+        scan = _load_report(args.scan, "scan")
+        baseline = _load_report(args.baseline, "baseline") if args.baseline else None
+        page = render_customer_report(
+            scan, baseline, client=args.client, prepared_by=args.prepared_by,
+        )
+    except (OSError, ValueError) as exc:
+        print(f"agentprobe: report input error: {_one_line(exc)}", file=sys.stderr)
+        return 2
+    try:
+        _write_text_atomic(args.out, page, ".agentprobe-customer-", suffix=".html")
+    except OSError as exc:
+        print(f"agentprobe: report output error: {_one_line(exc)}", file=sys.stderr)
+        return 2
+    print(f"Wrote customer report to {args.out}")
+    return 0
+
+
+def _one_line(exc: BaseException) -> str:
+    return " ".join(str(exc).split())
 
 
 def _compare_exit_code(args, result) -> int:
@@ -355,6 +381,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="exit 4 if the reports used different attack libraries or report schemas",
     )
     compare.set_defaults(handler="compare")
+
+    report = subparsers.add_parser(
+        "report",
+        help="write a self-contained customer HTML report from a scan JSON report",
+    )
+    report.add_argument("--scan", required=True, metavar="PATH", help="scan JSON report")
+    report.add_argument(
+        "--baseline", metavar="PATH",
+        help="previous scan JSON report; adds a 'since last scan' section",
+    )
+    report.add_argument("--out", required=True, metavar="PATH", help="HTML file to write")
+    report.add_argument("--client", metavar="NAME", help="client or system name for the title")
+    report.add_argument(
+        "--prepared-by", metavar="NAME", help="who prepared the report (default: AgentProbe)",
+    )
+    report.set_defaults(handler="report")
     return parser
 
 
@@ -448,6 +490,8 @@ def main(argv: Sequence[str] = None) -> int:
         return _compare(args)
     if args.handler == "demo":
         return _demo(args)
+    if args.handler == "report":
+        return _report(args)
     if args.handler == "scan":
         if args.resume and not args.checkpoint:
             parser.error("--resume requires --checkpoint")

@@ -146,6 +146,23 @@ agentprobe scan --non-interactive --config config.yaml \
   --checkpoint reports/scan.checkpoint.json --resume --repair-errors
 ```
 
+Turn a scan into a report a customer can read and forward. The output is one
+self-contained HTML file (inline CSS, no scripts or links) that prints cleanly
+to PDF from a browser.
+
+```bash
+agentprobe report --scan reports/scan.json --out reports/customer.html   --client "Acme Co" --prepared-by "Your name" [--baseline reports/previous.json]
+```
+
+The first screen shows the client, scan date, system tested, a PASS / FAIL /
+INCOMPLETE result, a 0-100 score, and a one-paragraph summary. Then come the
+findings (most severe first, each with a response excerpt and the fix from the
+Mitigation Map), a per-category table, and, with `--baseline`, what changed
+since the last scan. FAIL means a CRITICAL or HIGH finding; INCOMPLETE means
+no such finding but some attacks could not run. The score is
+`max(0, 100 - 25*CRITICAL - 15*HIGH - 5*MEDIUM - 2*LOW)` and is printed in the
+report footer. Missing or malformed input exits 2 and writes nothing.
+
 Replay a recorded scan offline, with no network or API keys. Recordings
 contain raw model responses; keep them local.
 
