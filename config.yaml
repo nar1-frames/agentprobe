@@ -86,4 +86,26 @@ output:
 #   model: your-model-name
 #   api_key_env: YOUR_API_KEY_ENV_VAR
 #   base_url: https://your-endpoint.com/v1
+#
+# --- A deployed agent with its own HTTP API (target only) ---
+# Tests the whole agent (system prompt, tools, retrieval, guardrails), not a
+# bare model. Only scan endpoints you own or are authorized in writing to test.
+# target:
+#   provider: http
+#   model: acme-support-bot          # a label for reports; the model is unknown
+#   base_url: https://app.example.com/api/chat
+#   api_key_env: ACME_SCAN_TOKEN     # sent as "Authorization: Bearer <token>"
+#   strength_rank: 1                 # required: the judge-strength gate needs
+#   http:                            # a rank for both target and judge
+#     request_template:              # placeholders: {{prompt}} {{system_prompt}}
+#       message: "{{prompt}}"        #   {{model}} {{session_id}}; a string that
+#       session_id: "{{session_id}}" #   is exactly "{{messages}}" sends the list
+#     response_path: reply.text      # omit to read the body as plain text
+#     session: fresh                 # fresh = new session per attack | shared
+#     headers: {X-Scan-Source: agentprobe}   # static, never credentials
+# judge:
+#   provider: groq
+#   model: openai/gpt-oss-120b
+#   api_key_env: GROQ_API_KEY
+#   strength_rank: 2
 # ============================================================

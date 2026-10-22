@@ -11,8 +11,8 @@ from agentprobe.replay import ReplayClient
 
 
 # "replay" serves a local recording and never transmits content, so it is
-# deliberately absent here.
-EXTERNAL_PROVIDERS = frozenset({"groq", "openai", "custom"})
+# deliberately absent here. "http" sends every attack to a deployed agent.
+EXTERNAL_PROVIDERS = frozenset({"groq", "openai", "custom", "http"})
 
 
 def requires_external_consent(provider: str) -> bool:
@@ -32,8 +32,8 @@ if load_dotenv is not None:
 
 def _validate_base_url(provider: str, base_url: Any) -> None:
     if base_url is None:
-        if provider == "custom":
-            raise ValueError("custom provider requires base_url")
+        if provider in {"custom", "http"}:
+            raise ValueError(f"{provider} provider requires base_url")
         return
     if not isinstance(base_url, str) or not base_url.strip():
         raise ValueError("base_url must be a non-empty HTTP(S) URL")
@@ -54,6 +54,11 @@ def build_client(provider_config: Mapping[str, Any]):
         return ReplayClient(provider_config.get("replay_path"))
     base_url = provider_config.get("base_url")
     _validate_base_url(provider, base_url)
+    if provider == "http":
+        # A deployed agent with its own request shape; see agentprobe/http_target.py.
+        from agentprobe.http_target import build_http_target
+
+        return build_http_target(provider_config)
     key_env = provider_config.get("api_key_env")
     if provider in {"groq", "openai"} and not isinstance(key_env, str):
         raise ValueError(f"{provider} provider requires api_key_env")

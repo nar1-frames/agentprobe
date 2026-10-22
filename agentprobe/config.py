@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 import yaml
 
 
-SUPPORTED_PROVIDERS = frozenset({"groq", "openai", "ollama", "custom", "replay"})
+SUPPORTED_PROVIDERS = frozenset({"groq", "openai", "ollama", "custom", "http", "replay"})
 VALID_CATEGORIES = frozenset({
     "jailbreak", "data_extraction", "privilege_escalation",
     "social_engineering", "role_confusion", "indirect_injection",
@@ -87,10 +87,27 @@ def _validate_model_block(config: Mapping[str, Any], name: str) -> float:
     elif replay_path is not None:
         # Ignoring it would silently send a "replayed" scan to a live provider.
         raise ValueError(f"{name}.replay_path is only valid with the replay provider")
+    if provider == "http":
+        if name != "target":
+            raise ValueError(
+                f"{name}.provider http is only valid for the target; the judge "
+                "must be a model you control"
+            )
+        if "strength_rank" not in block:
+            raise ValueError(
+                "target.strength_rank is required for the http provider: a deployed "
+                "agent does not reveal its model, so the judge-strength gate needs "
+                "an explicit rank for both target and judge"
+            )
+        from agentprobe.http_target import validate_http_block
+
+        validate_http_block(block.get("http"), f"{name}.http")
+    elif "http" in block:
+        raise ValueError(f"{name}.http is only valid with the http provider")
     base_url = block.get("base_url")
     if base_url is None:
-        if provider == "custom":
-            raise ValueError(f"{name}.base_url is required for custom provider")
+        if provider in {"custom", "http"}:
+            raise ValueError(f"{name}.base_url is required for {provider} provider")
     elif not isinstance(base_url, str) or not base_url.strip():
         raise ValueError(f"{name}.base_url must be a non-empty HTTP(S) URL")
     else:
@@ -187,6 +204,10 @@ def validate_config(config: Mapping[str, Any]) -> dict:
         raise ValueError("output.report_format must be html, json, or both")
 
     normalized = deepcopy(dict(config))
+    if target.get("provider") == "http":
+        from agentprobe.http_target import validate_http_block
+
+        normalized["target"]["http"] = validate_http_block(target.get("http"), "target.http")
     normalized.setdefault("scan", {})["rate_limit_seconds"] = rate_limit
     normalized["scan"]["retries"] = int(retry_values["retries"])
     normalized["scan"]["retry_delay_seconds"] = retry_values["retry_delay_seconds"]

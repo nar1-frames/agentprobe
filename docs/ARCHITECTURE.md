@@ -44,6 +44,13 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   OpenAI-compatible clients used by the scanner and research collection,
   disables hidden SDK retries, and rejects malformed or missing custom
   endpoints before credentials or network calls are used.
+- **Deployed agents are first-class targets.** `agentprobe/http_target.py`
+  wraps a customer's own HTTP endpoint in the chat-completions client shape,
+  rendering each attack into a configured JSON `request_template` and reading
+  the reply through a `response_path`. The scanner, record/replay, and
+  reports do not know the difference. It is target-only, defaults to a fresh
+  session per attack, refuses credentials in static headers, and never echoes
+  an error body (which may quote the auth header) into evidence.
 - **Replay never fabricates.** `scan.record_replay_path` records every
   target and judge response under the SHA-256 of its canonical request, and
   the `replay` provider serves that file with no network or credentials. A

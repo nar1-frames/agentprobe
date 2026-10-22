@@ -213,7 +213,7 @@ def build_harness_provenance(model, provider=None, temperature=None, max_steps=N
             for key in (
                 "provider", "model", "api_key_env", "base_url",
                 "timeout_seconds", "max_tokens", "temperature", "strength_rank",
-                "reasoning_effort",
+                "reasoning_effort", "http",
             )
             if key in config
         }

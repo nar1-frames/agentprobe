@@ -156,6 +156,24 @@ agentprobe scan --non-interactive --config config.yaml
 agentprobe scan --non-interactive --config replay.yaml
 ```
 
+Scan a deployed agent, not just a model. The `http` provider sends each attack
+to an endpoint you own, in the endpoint's own JSON shape, so the system prompt,
+tools, retrieval, and guardrails are all in the loop. Every attack gets a fresh
+session ID by default. Only the `target` block may use it; the judge stays a
+model you control. See the commented example at the bottom of `config.yaml`.
+
+```yaml
+target:
+  provider: http
+  model: acme-support-bot            # report label; the real model is unknown
+  base_url: https://app.example.com/api/chat
+  api_key_env: ACME_SCAN_TOKEN       # Authorization: Bearer <token>
+  strength_rank: 1                   # required; see the judge-strength gate
+  http:
+    request_template: {message: "{{prompt}}", session_id: "{{session_id}}"}
+    response_path: reply.text        # dotted path, e.g. choices[0].message.content
+```
+
 The automated path fails closed if it cannot verify that the configured judge is
 at least as strong as the target according to the configured model metadata.
 This is an operational heuristic, not proof that the judge is correct. For
@@ -357,6 +375,7 @@ All 49 prompts AgentProbe sends, grouped by category. Each is a public prompt-in
 agentprobe/cli.py            installable CLI (`agentprobe scan` / `harness`)
 agentprobe/scanner.py        package scanner path used by automation and CI
 agentprobe/providers.py      shared provider clients and endpoint validation
+agentprobe/http_target.py    the `http` provider: scan a deployed agent's own endpoint
 agentprobe/harness.py        offline end-to-end tool-use security harness
 agentprobe/config.py         validated config and bounded runtime settings
 agentprobe/reporting.py      versioned JSON + HTML provenance with atomic writes
