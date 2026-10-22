@@ -46,15 +46,20 @@ from report_html_v11 import generate_html_report, save_html_report
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from agentprobe.models import parse_model_size_b
 from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION
-from agentprobe.termstyle import print_scan_summary
+from agentprobe.termstyle import glyph, print_scan_summary, verdict_tag
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
-# Console verdict styling — the part you liked.
+# Console verdict styling — the part you liked. Emoji on a UTF console, the
+# shared ASCII tags ([VULNERABLE] etc.) on consoles such as Windows cp1252.
 VERDICT_EMOJI = {
     "VULNERABLE": "🔴", "PARTIAL": "🟠",
     "SUSPICIOUS": "🟡", "SAFE": "🟢",
 }
+
+
+def verdict_marker(verdict):
+    return glyph(VERDICT_EMOJI.get(verdict, "🟡"), verdict_tag(verdict))
 
 
 # ============================================================
@@ -146,7 +151,7 @@ def discover_models():
 
 def _fmt(m):
     size = f"{m['size']:g}B" if m["size"] else "size?"
-    tag = "🖥  local " if m["where"] == "local" else "☁  cloud "
+    tag = glyph("🖥  local ", "local") if m["where"] == "local" else glyph("☁  cloud ", "cloud")
     return f"{tag} {m['provider']:<7} {m['label']:<34} ({size})"
 
 
@@ -175,17 +180,17 @@ def pick_target_and_judge(models):
         judge = choose(models, "judge (the smarter model that grades it)")
         ok, needs_confirm = judge_is_strong_enough(target, judge)
         if not ok:
-            print(f"\n  ⛔  Judge '{judge['label']}' ({judge['size']:g}B) is smaller than "
+            print(f"\n  {glyph('⛔', 'STOP')}  Judge '{judge['label']}' ({judge['size']:g}B) is smaller than "
                   f"target '{target['label']}' ({target['size']:g}B).")
             print("      The judge has to out-reason the target, or it shares its blind "
                   "spots. Pick a bigger judge.\n")
             continue
         if needs_confirm:
-            print(f"\n  ⚠  I can't read the size of one of these from its name, so I can't "
+            print(f"\n  {glyph('⚠', 'WARNING')}  I can't read the size of one of these from its name, so I can't "
                   f"auto-verify the rule.")
             print(f"      Target: {target['label']}   Judge: {judge['label']}")
             if input("      Is the judge at least as strong as the target? [y/N] ").strip().lower() != "y":
-                print("      Okay — let's pick again.\n")
+                print(f"      Okay {glyph('—', '-')} let's pick again.\n")
                 continue
         return target, judge
 
@@ -236,7 +241,7 @@ def _selected_run_config(config, target, judge):
 
 def main():
     print("=" * 60)
-    print("  AGENTPROBE v1.2 — pick your models, then attack")
+    print(f"  AGENTPROBE v1.2 {glyph('—', '-')} pick your models, then attack")
     print("=" * 60)
 
     models = discover_models()
