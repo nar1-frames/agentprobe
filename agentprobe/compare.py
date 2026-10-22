@@ -195,16 +195,28 @@ def format_comparison_text(result: Mapping[str, Any]) -> str:
         if warnings:
             line += f"; also changed: {', '.join(warnings)}"
     summary = result["summary"]
+    counts = ", ".join(
+        f"{summary[name]} {name.replace('_', ' ')}" for name in CHANGE_CLASSES
+    )
     lines = [
         line,
-        ", ".join(f"{name}={summary[name]}" for name in CHANGE_CLASSES)
-        + f"; method_changed={summary['method_changed']}"
-        + f"; net_findings_delta={summary['net_findings_delta']:+d}",
+        f"Summary: {counts}; net findings delta {summary['net_findings_delta']:+d}; "
+        f"{summary['method_changed']} changed method",
     ]
+    # Change lines keep the "CLASS attack_id: before -> after" shape (CI greps
+    # and tests depend on it); only the four actionable classes are listed.
     for entry in result["changes"]:
-        if entry["change"] in {"regressed", "newly_errored", "added", "removed"}:
+        if entry["change"] in _LISTED_CHANGES:
             lines.append(
                 f"  {entry['change'].upper()} {entry['attack_id']}: "
                 f"{_describe(entry['baseline'])} -> {_describe(entry['candidate'])}"
             )
+    lines.append(
+        "Legend: REGRESSED got worse than the baseline  "
+        "NEWLY_ERRORED now fails operationally"
+    )
+    lines.append("        ADDED only in the new scan  REMOVED only in the baseline")
     return "\n".join(lines) + "\n"
+
+
+_LISTED_CHANGES = frozenset({"regressed", "newly_errored", "added", "removed"})
