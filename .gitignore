@@ -73,3 +73,9 @@ data/results.json
 # Blinded human-label packets contain raw model responses; keep them local.
 *.label-packet.csv
 *.label-packet.csv.key.json
+
+_archive/
+
+_archive/
+
+_archive/
