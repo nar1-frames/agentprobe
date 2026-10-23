@@ -62,6 +62,10 @@ def _compare(args) -> int:
 
 def _report(args) -> int:
     """Render the customer HTML report; on any input problem write nothing, exit 2."""
+    if _same_file(args.out, args.scan) or (args.baseline and _same_file(args.out, args.baseline)):
+        print("agentprobe: report error: --out must not be the scan or baseline file",
+              file=sys.stderr)
+        return 2
     try:
         scan = _load_report(args.scan, "scan")
         baseline = _load_report(args.baseline, "baseline") if args.baseline else None
@@ -78,6 +82,12 @@ def _report(args) -> int:
         return 2
     print(f"Wrote customer report to {args.out}")
     return 0
+
+
+def _same_file(first: str, second: str) -> bool:
+    """True when two paths name the same file (symlinks and case resolved)."""
+    return (os.path.normcase(os.path.realpath(first))
+            == os.path.normcase(os.path.realpath(second)))
 
 
 def _one_line(exc: BaseException) -> str:

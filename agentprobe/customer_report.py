@@ -156,10 +156,15 @@ def category_label(category: str) -> str:
 
 
 def highest_severity(report: Mapping[str, Any]) -> Optional[str]:
-    """Most severe finding level in the summary, or None without findings."""
+    """Most severe level among findings (VULNERABLE or PARTIAL rows), or None.
 
-    counts = (report.get("summary") or {}).get("findings_by_severity") or {}
-    return next((sev for sev in SEVERITY_ORDER if counts.get(sev)), None)
+    Read from the rows, not summary.findings_by_severity: the summary also
+    counts inconclusive (SUSPICIOUS) rows as LOW, and an inconclusive response
+    is not a successful attack.
+    """
+
+    present = {row.get("finding_severity") for row in report["results"] if _is_finding(row)}
+    return next((sev for sev in SEVERITY_ORDER if sev in present), None)
 
 
 def ordered_findings(report: Mapping[str, Any]) -> List[Mapping[str, Any]]:
@@ -226,6 +231,8 @@ def summary_sentence(report: Mapping[str, Any]) -> str:
     total = summary["total_attacks"]
     errors = summary["operational_errors"]
     findings = [row for row in report["results"] if _is_finding(row)]
+    inconclusive = [row for row in report["results"]
+                    if row.get("status") == "complete" and row.get("verdict") == "SUSPICIOUS"]
     full = sum(row["verdict"] == "VULNERABLE" for row in findings)
     partial = len(findings) - full
     system = report.get("target_model") or "the tested system"
@@ -244,15 +251,37 @@ def summary_sentence(report: Mapping[str, Any]) -> str:
             f"{len(findings)} succeeded ({detail}). "
             f"The highest severity found was {highest_severity(report) or 'unrated'}."
         )
+    elif inconclusive:
+        parts.append(
+            f"No attack succeeded; {len(inconclusive)} "
+            f"{_pick(len(inconclusive), 'was', 'were')} inconclusive."
+        )
     else:
         parts.append("None succeeded, so no severity applies.")
+    if inconclusive:
+        parts.append(_inconclusive_sentence(inconclusive))
     if errors:
         parts.append(
             f"{errors} could not be run because of an operational error and "
-            f"{'were' if errors != 1 else 'was'} not counted as "
-            f"{'passes' if errors != 1 else 'a pass'}."
+            f"{_pick(errors, 'was', 'were')} not counted as {_pick(errors, 'a pass', 'passes')}."
         )
     return " ".join(parts)
+
+
+def _inconclusive_sentence(rows: List[Mapping[str, Any]]) -> str:
+    """Explain inconclusive responses and the points they cost in the score."""
+
+    count = len(rows)
+    costed = sum(row.get("finding_severity") == "LOW" for row in rows)
+    sentence = (
+        f"{_plural(count, 'response was', 'responses were')} inconclusive: the system "
+        "neither clearly refused nor clearly complied."
+    )
+    if costed == count:
+        sentence += f" {_pick(count, 'It costs', 'Each costs')} 2 points."
+    elif costed:
+        sentence += f" {costed} of them cost 2 points each."
+    return sentence
 
 
 def _state_is_finding(state: Optional[Mapping[str, Any]]) -> bool:
@@ -318,8 +347,14 @@ def _text(value: Any) -> str:
     return html.escape("" if value is None else str(value))
 
 
+def _pick(count: int, singular: str, plural: str) -> str:
+    """The singular or plural form of a phrase for ``count``."""
+
+    return singular if count == 1 else plural
+
+
 def _plural(count: int, singular: str, plural: str) -> str:
-    return f"{count} {singular if count == 1 else plural}"
+    return f"{count} {_pick(count, singular, plural)}"
 
 
 _CSS = """
@@ -395,8 +430,10 @@ def _first_screen(report: Mapping[str, Any], score: Mapping[str, Any], client: s
     if errors:
         notice = (
             f'<p class="notice" role="note">{_plural(errors, "attack", "attacks")} '
-            "could not be run because of an operational error. They were not counted "
-            "as passes; rerun the scan to test them.</p>"
+            "could not be run because of an operational error. "
+            f"{_pick(errors, 'It was', 'They were')} not counted as "
+            f"{_pick(errors, 'a pass', 'passes')}; rerun the scan to test "
+            f"{_pick(errors, 'it', 'them')}.</p>"
         )
     return (
         '<header class="first-screen">'

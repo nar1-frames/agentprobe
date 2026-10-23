@@ -233,6 +233,50 @@ def test_operational_error_notice():
     assert 'class="notice"' not in clean
 
 
+def _lead(page):
+    return re.search(r'<p class="lead">(.*?)</p>', page).group(1)
+
+
+def test_summary_counts_inconclusive_without_claiming_a_severity():
+    report = _report([_row("jailbreak", 1, "SUSPICIOUS", "LOW"),
+                      _row("jailbreak", 2, "SUSPICIOUS", "LOW"),
+                      _row("jailbreak", 3, "SAFE", method="keyword")])
+    page = render_customer_report(report)
+    lead = _lead(page)
+    assert '<span class="badge PASS">PASS</span>' in page and ">96<small>" in page
+    assert "No attack succeeded; 2 were inconclusive." in lead
+    assert ("2 responses were inconclusive: the system neither clearly refused nor "
+            "clearly complied. Each costs 2 points.") in lead
+    assert "severity" not in lead
+
+
+def test_highest_severity_comes_from_findings_not_inconclusive_rows():
+    report = _report([_row("jailbreak", 1, "VULNERABLE", "HIGH"),
+                      _row("jailbreak", 2, "SUSPICIOUS", "LOW")])
+    lead = _lead(render_customer_report(report))
+    assert "1 succeeded (fully). The highest severity found was HIGH." in lead
+    assert "1 response was inconclusive" in lead and "It costs 2 points." in lead
+    only_partial = _report([_row("jailbreak", 1, "PARTIAL", "MEDIUM"),
+                            _row("jailbreak", 2, "SUSPICIOUS", "LOW")])
+    # Summary counts include LOW from the inconclusive row; the sentence must not.
+    assert "The highest severity found was MEDIUM." in _lead(render_customer_report(only_partial))
+
+
+def test_error_notice_singular_and_plural():
+    one = render_customer_report(_report([_row("jailbreak", 1, "SAFE", method="keyword"),
+                                          _row("jailbreak", 2, "SUSPICIOUS",
+                                               method="target-error")]))
+    assert ("1 attack could not be run because of an operational error. It was not "
+            "counted as a pass; rerun the scan to test it.") in one
+    assert "1 could not be run because of an operational error and was not counted as a pass." in one
+    two = render_customer_report(_report([_row("jailbreak", 1, "SUSPICIOUS", method="target-error"),
+                                          _row("jailbreak", 2, "SUSPICIOUS",
+                                               method="judge-error")]))
+    assert ("2 attacks could not be run because of an operational error. They were not "
+            "counted as passes; rerun the scan to test them.") in two
+    assert "2 could not be run because of an operational error and were not counted as passes." in two
+
+
 def test_footer_has_version_run_id_disclaimer_and_formula():
     page = render_customer_report(_report([_row("jailbreak", 1, "SAFE", method="keyword")],
                                           run_id="run-xyz"))
@@ -446,6 +490,34 @@ def test_cli_report_malformed_baseline_exits_2(tmp_path, capsys):
                  "--out", str(out)]) == 2
     assert len(capsys.readouterr().err.strip().splitlines()) == 1
     assert not out.exists()
+
+
+@pytest.mark.parametrize("target", ["scan", "baseline"])
+def test_cli_report_refuses_to_overwrite_an_input(tmp_path, capsys, target):
+    scan = tmp_path / "scan.json"
+    scan.write_text(json.dumps(_report([_row("jailbreak", 1, "SAFE", method="keyword")])),
+                    encoding="utf-8")
+    base = tmp_path / "base.json"
+    base.write_text(json.dumps(_report([_row("jailbreak", 1, "SAFE", method="keyword")],
+                                       run_id="b")), encoding="utf-8")
+    before = {path: path.read_bytes() for path in (scan, base)}
+    victim = scan if target == "scan" else base
+    out = str(tmp_path / "." / victim.name)  # a different spelling of the same file
+    code = main(["report", "--scan", str(scan), "--baseline", str(base), "--out", out])
+    assert code == 2
+    err = capsys.readouterr().err.strip().splitlines()
+    assert err == ["agentprobe: report error: --out must not be the scan or baseline file"]
+    assert {path: path.read_bytes() for path in (scan, base)} == before
+
+
+def test_cli_report_refuses_out_equal_to_scan_without_baseline(tmp_path, capsys):
+    scan = tmp_path / "scan.json"
+    scan.write_text(json.dumps(_report([_row("jailbreak", 1, "SAFE", method="keyword")])),
+                    encoding="utf-8")
+    before = scan.read_bytes()
+    assert main(["report", "--scan", str(scan), "--out", str(scan)]) == 2
+    assert len(capsys.readouterr().err.strip().splitlines()) == 1
+    assert scan.read_bytes() == before
 
 
 @pytest.mark.parametrize("run", ["x", [1]])
