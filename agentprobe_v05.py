@@ -105,6 +105,7 @@ def filter_attacks(config):
             attacks = [a for a in attacks
                        if severity_ladder.index(a["severity"]) >= min_index]
 
+
         if attacks:
             filtered[category] = attacks
 

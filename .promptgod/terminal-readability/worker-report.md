@@ -1,0 +1,1 @@
+Worker report sent 2026-10-21 to prompter manage-agents-command [31bf39]. Branch pg/terminal-readability, commits c106631 d9e34b1 cb8cb3f. 331 passed. cli.py ASCII-only; colour gated on TTY/NO_COLOR/TERM/--no-color. Awaiting debug round / merge decision.
