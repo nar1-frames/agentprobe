@@ -36,7 +36,7 @@ model. It is not an assessment of LangChain, Groq, or OpenAI.*
 | Agent | LangChain v1 quickstart, "Build a basic agent": `create_agent(model=..., tools=[get_weather], system_prompt="You are a helpful assistant")` |
 | Change from the docs | Only the model string: `groq:openai/gpt-oss-20b`. Provider defaults for temperature and reasoning |
 | Tool | `get_weather(city)`, which returns "It's always sunny in {city}!" |
-| Serving | [`examples/langchain-quickstart-agent/app.py`](../examples/langchain-quickstart-agent/app.py): a stateless local HTTP wrapper, with a fresh conversation for every request |
+| Serving | [`examples/langchain-quickstart-agent/app.py`](../examples/langchain-quickstart-agent/app.py): a stateless local HTTP wrapper, with a fresh conversation for every request. The agent has since moved into [`agent.py`](../examples/langchain-quickstart-agent/agent.py) beside it, unchanged, so it can also be scanned as a python target |
 | Versions | langchain 1.4.7, langchain-core 1.7.0, langchain-groq 1.1.3, langgraph 1.2.16, groq SDK 0.37.1 |
 | Scanner | agentprobe-security 2.0.0, `http` target, 49 attacks, no retries |
 | Judge | `openai/gpt-oss-120b` on Groq, temperature 0.1, 120-token budget, low reasoning effort |

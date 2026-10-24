@@ -43,8 +43,8 @@ def tracked(root=ROOT):
     return {raw.decode("utf-8") for raw in out.split(b"\0") if raw}
 
 
-def _prose_lines(text):
-    """Yield (line number, line) outside fenced code, with inline code removed."""
+def _prose_lines(text, strip_inline_code=True):
+    """Yield (line number, line) outside fenced code, by default with inline code removed."""
     fenced = None
     for number, line in enumerate(text.splitlines(), 1):
         fence = _FENCE.match(line)
@@ -52,7 +52,7 @@ def _prose_lines(text):
             fenced = None if fenced == fence.group(1) else (fenced or fence.group(1))
             continue
         if fenced is None:
-            yield number, _INLINE_CODE.sub("", line)
+            yield number, _INLINE_CODE.sub("", line) if strip_inline_code else line
 
 
 def _slug(heading):
@@ -69,7 +69,8 @@ def anchors(path):
     if path.suffix.lower() in (".html", ".htm"):
         return set(_HTML_ID.findall(text))
     seen, found = {}, set(_HTML_ID.findall(text))
-    for _, line in _prose_lines(text):
+    # GitHub keeps the text of inline code in a heading's anchor.
+    for _, line in _prose_lines(text, strip_inline_code=False):
         match = _HEADING.match(line)
         if match:
             slug = _slug(match.group(2))

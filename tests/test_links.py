@@ -32,7 +32,8 @@ def test_broken_paths_and_anchors_are_reported(tmp_path):
             "[external](https://example.com/x.md) `[in code](nowhere.md)`\n"
             "```\n[fenced](nowhere.md)\n```\n"
         ),
-        "docs/A.md": "# Title\n\n## Usage\n\n[up](../README.md) [self](#title)\n",
+        "docs/A.md": ("# Title\n\n## Usage\n\n## The `http` target\n\n"
+                      "[up](../README.md) [self](#title) [code](#the-http-target)\n"),
         "site/index.html": '<a href="sample-report/r.html">r</a> <a href="#x">x</a><p id="x"></p>',
         "examples/sample-report/r.html": "<p>report</p>",
     })
@@ -47,6 +48,7 @@ def test_heading_slugs_match_github():
     assert check_links._slug("Scan your own agent") == "scan-your-own-agent"
     assert check_links._slug("60-second demo") == "60-second-demo"
     assert check_links._slug("Reports and retests") == "reports-and-retests"
+    assert check_links._slug("A deployed agent: `http`") == "a-deployed-agent-http"
     assert check_links._slug("The research question: *can we trust the judge?*") == (
         "the-research-question-can-we-trust-the-judge")
 

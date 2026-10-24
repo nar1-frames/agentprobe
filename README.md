@@ -82,15 +82,29 @@ agentprobe scan --non-interactive --config agentprobe.yaml --fail-on-error \
   --sarif reports/scan.sarif --junit reports/scan.junit.xml
 ```
 
+No endpoint yet? Point a `python` target at the function that runs your agent,
+and the scanner calls it directly:
+
+```yaml
+target:
+  provider: python
+  model: my-agent
+  strength_rank: 1
+  python:
+    callable: "my_agent.chat:answer"   # answer(prompt: str) -> str
+```
+
 The judge misses things. In the public example scans it passed verbatim leaks
 of short, generic system prompts, so read the findings and search the replies
 for your own prompt and tool text. To scan a bare model, run `agentprobe scan`
 for an interactive picker of local Ollama and cloud models.
+[docs/TARGETS.md](https://github.com/nar1-frames/agentprobe/blob/main/docs/TARGETS.md)
+covers every target type, and
 [docs/SCANNING.md](https://github.com/nar1-frames/agentprobe/blob/main/docs/SCANNING.md)
 covers grading, the judge-strength gate, regression gates
 (`agentprobe compare`), checkpoints, and offline record and replay.
 [examples/langchain-quickstart-agent](https://github.com/nar1-frames/agentprobe/blob/main/examples/langchain-quickstart-agent/README.md)
-is a complete run against a LangChain agent, with the
+scans a LangChain agent both ways, with the
 [write-up](https://github.com/nar1-frames/agentprobe/blob/main/writeups/public-scan-01.md).
 
 ## Agent harness
@@ -190,7 +204,8 @@ and the [runbook](https://github.com/nar1-frames/agentprobe/blob/main/docs/ASSES
 [docs/README.md](https://github.com/nar1-frames/agentprobe/blob/main/docs/README.md)
 indexes every document. The most used:
 
-- [Scanning](https://github.com/nar1-frames/agentprobe/blob/main/docs/SCANNING.md),
+- [Targets](https://github.com/nar1-frames/agentprobe/blob/main/docs/TARGETS.md),
+  [scanning](https://github.com/nar1-frames/agentprobe/blob/main/docs/SCANNING.md),
   [harness](https://github.com/nar1-frames/agentprobe/blob/main/docs/HARNESS.md),
   [attack packs](https://github.com/nar1-frames/agentprobe/blob/main/docs/PACKS.md),
   and [reports](https://github.com/nar1-frames/agentprobe/blob/main/docs/REPORTS.md)

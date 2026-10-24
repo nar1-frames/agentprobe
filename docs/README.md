@@ -5,6 +5,7 @@ Every document in the repository, one line each. Start with the
 
 ## Using AgentProbe
 
+- [TARGETS.md](TARGETS.md): what a scan can attack: a model, a deployed agent (`http`), an agent function (`python`), or a recording (`replay`).
 - [SCANNING.md](SCANNING.md): how replies are graded, interactive and CI scans, the `http` target, the judge-strength gate, regression gates, checkpoints, and record and replay.
 - [HARNESS.md](HARNESS.md): the agent workflow harness: modes, output, the five guarded controls, live mode, and the JSON report.
 - [ATTACKS.md](ATTACKS.md): all 49 built-in attack prompts by category, and how attack IDs are named.
@@ -16,7 +17,7 @@ Every document in the repository, one line each. Start with the
 
 ## Worked examples
 
-- [../examples/langchain-quickstart-agent/README.md](../examples/langchain-quickstart-agent/README.md): the LangChain quickstart agent as an `http` target, with the recorded public scan and an offline replay.
+- [../examples/langchain-quickstart-agent/README.md](../examples/langchain-quickstart-agent/README.md): the LangChain quickstart agent as an `http` target and a `python` target, with the recorded public scan and an offline replay.
 - [../examples/benchmark-01/README.md](../examples/benchmark-01/README.md): the target, configs, and recordings behind benchmark 01.
 - [../examples/packs/support-desk-sample/](../examples/packs/support-desk-sample/): a small external attack pack to copy.
 - [../examples/sample-report/README.md](../examples/sample-report/README.md): a reviewed sample customer report and the inputs that rebuild it.
