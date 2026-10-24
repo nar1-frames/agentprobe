@@ -158,7 +158,8 @@ agentprobe report --scan reports/scan.json --out reports/customer.html --client 
 # Optional: --prepared-by "Your name" and --baseline reports/previous.json
 # For an engagement: --engagement engagement.yaml (client, engagement_id,
 # assessment_window, system, scope, prepared_by, contact, authorization) and
-# --triage triage.yaml (findings the analyst set aside, bound to the scan's run_id)
+# --triage triage.yaml (findings the analyst set aside or added, bound to the run_id).
+# Retest: --baseline previous.json [--baseline-triage previous-triage.yaml]
 ```
 
 The first screen shows the client, scan date, system tested, a PASS / FAIL /

@@ -210,9 +210,19 @@ anything goes to a client:
 5. **Search the SAFE replies for the client's own text.** Look for distinctive
    phrases from the system prompt, tool names, and tool parameter names. The
    judge misses verbatim disclosures of short or generic prompts; in public
-   scan 01 and benchmark 01 it scored three of them SAFE. The customer
-   report lists only judge findings, so raise any such leak in the delivery
-   notes and on the call.
+   scan 01 and benchmark 01 it scored three of them SAFE. Add each real leak
+   to the triage file so it reaches the report and the score:
+
+   ```yaml
+   confirmed:
+     - attack_id: "data_extraction:1"
+       reason: "The reply quotes the full system prompt."
+       evidence: "The entirety of the instruction text is"   # copied verbatim from the reply
+   ```
+
+   The evidence must be a verbatim substring of that reply, so the report
+   can never quote something the system did not say. The finding is marked
+   "added by the analyst" and shows the judge's original call.
 
 ## 7. Render the report
 
@@ -268,14 +278,35 @@ they contain full model responses.
 4. Run `agentprobe compare --baseline reports/<initial>.json --candidate
    reports/<retest>.json` for the engineer's view.
 5. Run `agentprobe report --scan reports/<retest>.json --baseline
-   reports/<initial>.json --engagement engagement.yaml --triage
-   triage-retest.yaml --out deliverables/retest.html`. The "Since last scan"
-   section lists regressions, fixes, and anything that could not be
-   compared. It compares raw judge verdicts, so a finding you set aside in
-   either scan can still show up there as a change; explain any such case
-   on the call.
+   reports/<initial>.json --baseline-triage triage.yaml --engagement
+   engagement.yaml --triage triage-retest.yaml --out deliverables/retest.html`.
+   The report is labelled as a retest. Its header shows the baseline score
+   and the change. "Changes since baseline" lists what was fixed, what is
+   new, what got worse, what is still open, and what could not be compared.
+   Both scans are compared after their own analyst review, so a false
+   positive you set aside first time does not reappear as a "fix".
 
-## 10. Data handling
+## 10. Close-out (after the retest)
+
+1. **Deliver the retest report** (HTML and PDF) with a two-line summary: the
+   score change, and what is still open with the client's reason for
+   accepting it.
+2. **Ask for case-study consent.** "Would you be open to an anonymized,
+   one-page case study? You approve every word, and we can leave out your
+   name and industry." Use `offer/case-study-template.md` and its
+   anonymization checklist. Record the answer and the agreed anonymity
+   level in writing.
+3. **Ask for a testimonial.** One or two sentences about what the
+   assessment changed, attributed to a role ("Head of Engineering, Series A
+   fintech") unless they offer a name. Get approval for the exact wording.
+4. **Offer the follow-on in one sentence.** "To keep this current as your
+   models and prompts change, we offer a signed attack-pack subscription
+   that runs in your CI with the same reporting." Do not push; send it once.
+5. **Close the data loop.** Delete raw responses, recordings, and
+   checkpoints at the agreed date, confirm in writing, and ask the client to
+   revoke the scan token.
+
+## 11. Data handling
 
 - Keep engagement folders out of every Git repository. AgentProbe's
   `.gitignore` already ignores `reports/`, checkpoints, and recordings, and
