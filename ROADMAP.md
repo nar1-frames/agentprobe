@@ -16,7 +16,8 @@ come before breadth.
 ## Next — developer-grade security harness
 
 - [x] Versioned attack-pack schema with explicit success oracles (schema 1.0;
-  oracle evaluation is not yet wired into scan verdicts)
+  oracle evaluation is not yet wired into scan verdicts). External packs load
+  through the same path since 2.1 (`--pack`, `packs:`, `docs/PACKS.md`)
 - [x] Stable event schema for model, tool, policy, and execution events
   (harness schema 1.4, event schema 1.0, closed ten-event vocabulary)
 - [x] SARIF and JUnit output for security and CI workflows (`--sarif`/`--junit`

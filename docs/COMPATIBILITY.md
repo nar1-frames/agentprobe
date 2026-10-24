@@ -46,6 +46,7 @@ tooling.
 | `agentprobe.replay` | `ReplayClient`, `ReplayRecording`, `RecordingClient`, `ReplayMiss`, `load_recording`, `REPLAY_SCHEMA_VERSION` |
 | `agentprobe.http_target` | `build_http_target`, `HttpTargetError` |
 | `agentprobe.checkpoints` | `ScanCheckpoint`, `CheckpointError` |
+| `agentprobe.packs` (2.1) | `load_pack`, `load_packs`, `resolve_pack`, `builtin_pack`, `available_packs`, `AttackPack`, `PackError`, `PACK_SCHEMA_VERSION`, `BUILTIN_PACK_ID`, `PACKS_PATH_ENV` |
 
 ### CLI exit codes
 
@@ -69,6 +70,7 @@ reports, `--json`, SARIF, or JUnit.
 | Harness report (JSON) | `schema_version` | 1.4 |
 | Harness event vocabulary | `event_schema_version` (in harness reports) | 1.0 |
 | Attack pack | `schema_version` | 1.0 |
+| External attack pack directory (`manifest.yaml`) | `schema_version` | 1.0 |
 | Comparison (`compare --json`) | `schema_version` | 1.0 |
 | Scan checkpoint | `schema_version` | 1.0 |
 | Replay recording | `schema_version` | 1.0 |
@@ -86,6 +88,11 @@ version.
   fields is removed or renamed; or verdict, severity, or status values change
   meaning. A major schema bump ships only in a major package release and is
   listed under "Breaking" in the changelog.
+- **Attack packs in scan reports (2.1, additive).** `run.attack_packs` lists every pack a
+  scan loaded (id, version, schema_version, license, attack count, sha256), never a
+  path. Rows from external packs use the ID `pack-id:attack-id`; built-in rows keep
+  `category:index`. `run.attack_pack_sha256` describes the built-in pack and is present
+  only when the built-in pack was loaded. See [PACKS.md](PACKS.md).
 - **Scan report counts.** `summary.verdicts` and each category's `verdicts`
   count completed rows only, so they sum to `scorable_attacks`. Failed
   target or judge calls are counted only in `operational_errors`. Their rows

@@ -7,6 +7,29 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- External attack packs. A pack is a folder holding `manifest.yaml`
+  (schema_version 1.0, id, version, license, categories) and `attacks/*.yaml`
+  in the existing attack schema with oracles.
+  - Load packs with `agentprobe scan --pack` or a top-level `packs:` config
+    list (relative paths next to the config). Check them with `agentprobe
+    packs list` and `agentprobe packs validate`.
+  - The built-in library is now the pack `agentprobe-core` 1.0.0 on the same
+    code path. A built-in-only selection and its digests are unchanged.
+  - Scan reports add `run.attack_packs` (identity and digest of every pack,
+    never a path). Rows from external packs use the ID
+    `pack-id:attack-id`. The customer report names the packs.
+  - `docs/PACKS.md` is the authoring guide, and
+    `examples/packs/support-desk-sample/` is an example pack.
+- `outreach/tools/record_demo.py` re-records the demo cast and transcript.
+
+### Changed
+
+- `scan.categories` accepts any lowercase snake_case category name. A
+  category that no loaded pack provides is rejected when attacks are
+  selected, still before any request is sent.
+
 ## [2.0.0] - Unreleased (set the date when tagging v2.0.0)
 
 The first release published to PyPI, and the first covered by the
