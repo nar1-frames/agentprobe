@@ -526,7 +526,7 @@ th{color:var(--muted);font-weight:600}
 .mark{font-weight:700}.mark.PASS{color:var(--pass)}.mark.FAIL{color:var(--fail)}
 .mark.INCOMPLETE{color:var(--incomplete)}
 .note{color:var(--muted);font-size:.9rem}
-.engagement{margin:0 0 16px;padding:12px 16px;border:1px solid var(--line);border-radius:8px}
+.engagement{margin:16px 0 0;padding:12px 16px;border:1px solid var(--line);border-radius:8px}
 .engagement ul{margin:0;padding-left:1.2em}
 .set-aside{border-left-color:var(--muted)}
 .method p{margin:.5em 0}
@@ -601,13 +601,13 @@ def _first_screen(report: Mapping[str, Any], score: Mapping[str, Any], client: s
         f"<li>System tested: <b>{_text(_system_label(report, engagement))}</b></li>"
         f"<li>Prepared by: <b>{_text(prepared_by)}</b></li>"
         "</ul>"
-        f"{_engagement_block(engagement)}"
         '<section class="verdict" aria-label="Overall result">'
         f'<span class="badge {result}">{result}</span>'
         f'<span class="score">{score["score"]}<small> / 100</small></span>'
         f'<p class="lead">{_text(summary_sentence(report))}</p>'
         "</section>"
         f"{notice}"
+        f"{_engagement_block(engagement)}"
         "</header>"
     )
 

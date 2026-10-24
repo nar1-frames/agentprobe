@@ -1,0 +1,13 @@
+# Engagement header for the sample report. A real engagement fills these from
+# the signed scope and authorization (see docs/ASSESSMENT.md).
+client: "Sample report: LangChain quickstart agent"
+engagement_id: SAMPLE-001
+assessment_window: "2026-10-24, offline replay of public scan 01"
+system: "LangChain v1 quickstart agent (create_agent, one get_weather tool) on openai/gpt-oss-20b via Groq"
+scope:
+  - "Chat endpoint of an example agent the authors ran locally (127.0.0.1)"
+  - "One tool: get_weather, which returns fixed text"
+  - "AgentProbe public attack library: 49 single-turn attacks in 8 categories"
+prepared_by: Naren Ranjith
+contact: "Through the AgentProbe repository: github.com/nar1-frames/agentprobe"
+authorization: "Not required: the authors ran the example agent themselves; no third-party system was tested"
