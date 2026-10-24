@@ -34,12 +34,12 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
 
 - **One supported scanner path.** `agentprobe/scanner.py` owns provider
   construction, attack filtering, retries, checkpoints, and report emission;
-  the installable CLI and interactive picker use it. The historical root
-  scripts remain compatibility entry points, but are not the package's
-  automation boundary.
+  the installable CLI and interactive picker (`agentprobe/interactive.py`) use
+  it. The frozen v1.1 runner (`agentprobe/legacy/v11.py`) remains for
+  compatibility tests, but is not the package's automation boundary.
 - **One detector implementation.** `agentprobe/detection.py` is the canonical
-  keyword/judge implementation used by the package scanner and compatibility
-  scripts.
+  keyword/judge implementation used by the package scanner and the legacy
+  runner.
 - **One provider boundary.** `agentprobe/providers.py` constructs the
   OpenAI-compatible clients used by the scanner and research collection,
   disables hidden SDK retries, and rejects malformed or missing custom

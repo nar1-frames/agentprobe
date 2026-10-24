@@ -23,9 +23,6 @@ dev = ["pytest>=8.0"]
 [project.scripts]
 agentprobe = "agentprobe.cli:main"
 
-[tool.setuptools]
-py-modules = ["agentprobe_v11", "agentprobe_v12", "report_html_v11", "disclosure_cli", "mitigations"]
-
 [tool.setuptools.packages.find]
 include = ["agentprobe", "agentprobe.*", "attacks", "attacks.*",
            "disclosure", "disclosure.*", "research", "research.*"]

@@ -399,10 +399,14 @@ agentprobe/config.py         validated config and bounded runtime settings
 agentprobe/reporting.py      versioned JSON + HTML provenance with atomic writes
 agentprobe/checkpoints.py     private, atomic, configuration-bound scan checkpoints
 agentprobe/models.py         shared model-size parsing and judge-strength gate
+agentprobe/html_report.py    engineer HTML report
+agentprobe/mitigations.py    canonical Mitigation Map
+agentprobe/customer_report.py customer-facing PASS/FAIL report (`agentprobe report`)
+agentprobe/interactive.py    interactive model picker behind `agentprobe scan`
+agentprobe/legacy/v11.py     frozen v1.1 runner, kept for compatibility tests
 attacks/library.py           the 49 attack prompts (pure data)
-report_html_v11.py, mitigations.py HTML report + canonical Mitigation Map
+disclosure/                  authorization gate and disclosure drafts (`python -m disclosure.cli`)
 config.yaml                  scan settings (categories, rate limit)
-lessons/                     zero-to-tool Python learning path
 research/                    the "can we trust the judge?" study (corpus → judge → label → analyze)
 research/PREREGISTRATION.md  frozen design, hypotheses, exclusions, and analysis contract
 research/study_manifest.json executable target/judge/repeat-count protocol
@@ -416,9 +420,9 @@ CONTRIBUTING.md             development and review standards
 writeups/                   preserved drafts and historical working notes
 ```
 
-The historical `agentprobe_v01.py`–`agentprobe_v12.py` files and `lessons/`
-directory remain available for project history. They are not the supported
-automation boundary; use the installable `agentprobe` package.
+The historical `agentprobe_v01.py`–`agentprobe_v12.py` scripts were retired
+from the tree in 2.0.0; they remain in Git history. The supported automation
+boundary is the installable `agentprobe` package.
 
 ## Project direction
 

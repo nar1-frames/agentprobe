@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-import agentprobe_v11 as v11
+from agentprobe.legacy import v11
 from agentprobe.checkpoints import CheckpointError, ScanCheckpoint
 
 

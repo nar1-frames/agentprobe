@@ -1,7 +1,7 @@
 """Production scan orchestration for the AgentProbe package.
 
-The historical ``agentprobe_v11.py`` script remains available for backwards
-compatibility, but the installable CLI uses this module.  Keeping provider
+The historical v1.1 runner (``agentprobe.legacy.v11``) remains available for
+backwards compatibility, but the installable CLI uses this module.  Keeping provider
 construction, attack selection, retries, checkpointing, and report emission
 inside the package gives automation one supported execution path.
 """
@@ -29,7 +29,7 @@ from agentprobe.reliability import is_retryable_error
 from agentprobe.replay import RecordingClient, ReplayRecording
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from agentprobe.termstyle import TAG_WIDTH, style, verdict_tag
-from report_html_v11 import generate_html_report, save_html_report
+from agentprobe.html_report import generate_html_report, save_html_report
 
 
 SEVERITY_LADDER = ("LOW", "MEDIUM", "HIGH", "CRITICAL")

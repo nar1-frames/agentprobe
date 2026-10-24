@@ -25,7 +25,7 @@ import html as html_module
 import os
 import re
 import tempfile
-from mitigations import MITIGATIONS
+from agentprobe.mitigations import MITIGATIONS
 
 
 def esc(text):

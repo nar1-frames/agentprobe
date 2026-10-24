@@ -7,7 +7,7 @@
 # have caught it the day it was written, and it stops the bug from
 # coming back as detectors are added.
 #
-# The v11 section pins that agentprobe_v11.py routes through THE
+# The v11 section pins that agentprobe/legacy/v11.py routes through THE
 # canonical detector (not a private copy) and that its scan-facing
 # assess_vulnerability still returns the historical
 # (verdict, reason, method) tuple with identical routing.
@@ -17,7 +17,7 @@
 
 import pytest
 
-import agentprobe_v11 as v11
+from agentprobe.legacy import v11
 from agentprobe import detection
 from agentprobe.detection import (
     keyword_check, detect_partial_compliance, assess_vulnerability,

@@ -1,6 +1,6 @@
 """Customer-facing HTML report for one scan, optionally against a baseline.
 
-The engineer dashboard (report_html_v11) is built for the person who runs the
+The engineer dashboard (agentprobe.html_report) is built for the person who runs the
 scan. This renderer is for the person who pays for it: a non-technical buyer
 who reads the first screen, decides whether the system passed, and forwards
 the file. So the order is fixed: verdict and score first, then what went wrong
@@ -22,7 +22,7 @@ import html
 from typing import Any, Dict, List, Mapping, Optional
 
 from agentprobe.compare import compare_scan_reports, validate_scan_report
-from mitigations import MITIGATIONS
+from agentprobe.mitigations import MITIGATIONS
 
 
 SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW")

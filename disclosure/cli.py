@@ -10,12 +10,12 @@
 #   track     add / list / update findings in the disclosure ledger
 #
 # Examples:
-#   python3 disclosure_cli.py check --target openai-safety-bounty --mode automated
-#   python3 disclosure_cli.py check --target openai-safety-bounty --mode manual
-#   python3 disclosure_cli.py classify --target openai-safety-bounty \
+#   python -m disclosure.cli check --target openai-safety-bounty --mode automated
+#   python -m disclosure.cli check --target openai-safety-bounty --mode manual
+#   python -m disclosure.cli classify --target openai-safety-bounty \
 #       --category indirect_injection --crossed-boundary --reproducibility 0.7
-#   python3 disclosure_cli.py report --target openai-safety-bounty --finding finding.json
-#   python3 disclosure_cli.py track list
+#   python -m disclosure.cli report --target openai-safety-bounty --finding finding.json
+#   python -m disclosure.cli track list
 # ============================================================
 import argparse
 import json

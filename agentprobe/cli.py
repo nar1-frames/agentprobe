@@ -521,7 +521,7 @@ def main(argv: Sequence[str] = None) -> int:
             # Keep the existing interactive UX while making it installable.
             # The runner prints the shared scan summary itself, before its
             # "saved" lines, so nothing is printed here afterwards.
-            from agentprobe_v12 import main as scan_main
+            from agentprobe.interactive import main as scan_main
             scan_main()
         return 0
     parser.error("unknown command")

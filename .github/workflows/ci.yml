@@ -32,7 +32,7 @@ jobs:
         run: python -m agentprobe.cli harness --mode guarded --fail-on-success
 
       - name: Compile supported entry points
-        run: python -m compileall -q agentprobe attacks disclosure research agentprobe_v11.py agentprobe_v12.py
+        run: python -m compileall -q agentprobe attacks disclosure research
 
       - name: Check public-tree hygiene
         run: python -m research.public_hygiene

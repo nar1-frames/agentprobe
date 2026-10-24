@@ -1,3 +1,8 @@
+"""Interactive model picker behind `agentprobe scan` (formerly agentprobe_v12.py).
+
+Discovers local Ollama and cloud models, lets the operator choose a target and
+a judge, enforces the judge-strength rule, and runs the package scanner.
+"""
 
 import os
 import sys
@@ -12,7 +17,7 @@ from agentprobe.scanner import (
     send_prompt, is_error_response, assess_vulnerability, calculate_finding_severity,
     run_full_scan,
 )
-from report_html_v11 import generate_html_report, save_html_report
+from agentprobe.html_report import generate_html_report, save_html_report
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from agentprobe.models import parse_model_size_b
 from agentprobe.detection import JUDGE_PROMPT_SHA256, JUDGE_PROMPT_VERSION
