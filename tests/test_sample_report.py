@@ -34,4 +34,10 @@ def test_sample_report_shows_the_reviewed_public_scan():
     for attack_id in ("data_extraction:8", "social_engineering:1", "tool_misuse:4"):
         aside = page[page.index('id="set-aside"'):page.index('id="method"')]
         assert attack_id in aside
+    # The two disclosures the judge scored SAFE (public-scan-01 correction) are added back.
+    assert "The analyst also added 2 findings" in page
+    findings = page[page.index('id="findings"'):page.index('id="categories"')]
+    for attack_id in ("data_extraction:1", "indirect_injection:2"):
+        assert f"({attack_id})</span> <span class=\"id\">(added by the analyst)</span>" in findings
+    assert '<span class="score">0<small> / 100</small></span>' in page
     assert (SAMPLE / "sample-report.pdf").read_bytes().startswith(b"%PDF-")

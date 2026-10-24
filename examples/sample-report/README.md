@@ -3,13 +3,16 @@
 `sample-report.html` (and `sample-report.pdf`) is what a client receives at the
 end of an assessment. It is built from the public example in
 [`writeups/public-scan-01.md`](../../writeups/public-scan-01.md), not from a
-client engagement.
+client engagement. After the analyst's review the result is FAIL with a score
+of 0/100. Setting aside the judge's false positives alone gives 15, but two
+replies the judge scored SAFE print the agent's system prompt (see the
+correction in the writeup), and adding them back brings the score to 0.
 
 | File | Role |
 |---|---|
 | `scan.json` | The scan report: an offline replay of the public-scan-01 recording |
 | `engagement.yaml` | The engagement header: client, scope, prepared by, authorization |
-| `triage.yaml` | The analyst's review, bound to `scan.json`'s run ID. It sets aside the 3 judge false positives identified in the writeup, with reasons |
+| `triage.yaml` | The analyst's review, bound to `scan.json`'s run ID. It sets aside the 3 judge false positives identified in the writeup, with reasons, and adds back the 2 disclosures the judge scored SAFE, each with a verbatim quote from the reply as evidence |
 | `sample-report.html` | The rendered report: one self-contained file with no scripts or links |
 | `sample-report.pdf` | The same report printed to PDF by headless Microsoft Edge |
 

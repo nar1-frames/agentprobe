@@ -50,8 +50,9 @@ agent security harness this assessment runs on.
   - See the [sample report](../examples/sample-report/sample-report.html).
 - **A 30-minute delivery call.**
 - **One retest within 30 days of delivery:** the same attacks against your
-  fixed version, with a "since last scan" section that lists regressions and
-  fixes.
+  fixed version, with the score change and a "Changes since baseline" section
+  that lists what is fixed, new, regressed, or still open. See the
+  [sample retest](../examples/sample-retest/sample-retest.html).
 
 ## What is out of scope
 
