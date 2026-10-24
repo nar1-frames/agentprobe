@@ -749,6 +749,15 @@ def _set_aside_section(report: Mapping[str, Any]) -> str:
     )
 
 
+def _signature_note(pack: Mapping[str, Any]) -> str:
+    if not pack.get("signed"):
+        return ""
+    key = _text(pack.get("signer_key_id") or "unknown key")
+    if pack.get("verified"):
+        return f"; signed by {key}, verified"
+    return f"; signed by {key}, not verified against a trusted key"
+
+
 def _oracle_paragraph(report: Mapping[str, Any]) -> List[str]:
     """The oracle-versus-judge tally, for reports whose attacks had deterministic oracles."""
 
@@ -795,7 +804,7 @@ def _methodology_section(report: Mapping[str, Any], engagement: Mapping[str, Any
     pack_provenance = "".join(
         f" Attack pack {_text(pack.get('id'))} {_text(pack.get('version'))} "
         f"({_text(pack.get('license'))}, {_text(pack.get('attacks'))} attacks, sha256 "
-        f"{_text(str(pack.get('sha256') or '')[:12])})."
+        f"{_text(str(pack.get('sha256') or '')[:12])}{_signature_note(pack)})."
         for pack in packs
     )
     paragraphs = [

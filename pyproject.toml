@@ -39,7 +39,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.17,<0.18", "build>=1.2", "twine>=6.1"]
+# Pack signing (agentprobe packs sign / keygen, and verifying signed packs).
+signing = ["cryptography>=42"]
+dev = ["pytest>=8.0", "ruff>=0.17,<0.18", "build>=1.2", "twine>=6.1", "cryptography>=42"]
 
 [project.urls]
 Homepage = "https://github.com/nar1-frames/agentprobe"

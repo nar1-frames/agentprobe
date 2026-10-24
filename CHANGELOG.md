@@ -7,6 +7,24 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Signed attack packs.
+  - `agentprobe packs keygen` and `agentprobe packs sign` write an Ed25519
+    `manifest.sig` over the pack's content digest. `packs validate --trust`
+    checks it.
+  - A `packs_trust: {mode, keys}` config sets the policy. `require` refuses
+    unsigned or untrusted packs. `warn` (the default) records the status.
+    `off` skips checks.
+  - A pack whose content changed after signing is refused unless the mode
+    is `off`.
+  - `run.attack_packs` records `signed`, `signer_key_id`, and `verified`, and
+    the customer report names the verified signer.
+  - `cryptography` is an optional extra: `pip install
+    'agentprobe-security[signing]'`.
+  - `docs/PAID_PACKS.md` describes the distribution model: signed packs and
+    a trusted public key, with no license server and no phone-home.
+
 ## [2.1.0] - Unreleased (set the date when tagging v2.1.0)
 
 External attack packs, and deterministic oracles that count in verdicts.
