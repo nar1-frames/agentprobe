@@ -145,6 +145,45 @@ changes it. Reports never record where a pack was loaded from.
 - The customer report's methodology appendix names the packs whenever an
   external pack was used.
 
+## Signing packs
+
+A signed pack carries `manifest.sig` beside `manifest.yaml`. The signature is
+Ed25519 over the pack's content digest, which covers the manifest and every
+attack, so changing one byte of one attack breaks it. Signing and verifying
+need the optional extra: `pip install 'agentprobe-security[signing]'`.
+
+```bash
+agentprobe packs keygen --out keys/acme-packs     # acme-packs.key (secret, 0600) and acme-packs.pub
+agentprobe packs sign path/to/my-pack --key keys/acme-packs.key
+agentprobe packs validate path/to/my-pack --trust keys/acme-packs.pub
+```
+
+A scan's config decides how much a signature matters:
+
+```yaml
+packs_trust:
+  mode: warn            # require | warn (the default) | off
+  keys:                 # trusted signers: raw base64 (.pub file content) or PEM
+    - "GjO6rWBYq5q+be9oRola9/M1bey7sYcdPuH9w9nkmhg="
+```
+
+| Situation | `require` | `warn` | `off` |
+|---|---|---|---|
+| Signed by a listed key, content intact | loaded, `verified: true` | loaded, `verified: true` | loaded, not checked |
+| Signed by an unlisted key | refused | loaded, `verified: false` | loaded, not checked |
+| Unsigned | refused | loaded, `signed: false` | loaded |
+| Content changed after signing, or a bad signature | refused | refused | loaded, not checked |
+| `cryptography` not installed | refused | digest checked, `verified: false` | loaded |
+
+The built-in pack is never refused: it ships inside the package, whose
+releases carry their own signed provenance (see SECURITY.md). Every scan
+records `signed`, `signer_key_id`, and `verified` for each pack in
+`run.attack_packs`. The customer report's methodology says "signed by
+<key id>, verified" for a verified pack. With trusted keys configured, the
+scan prints a warning for every external pack that is not verified.
+[PAID_PACKS.md](PAID_PACKS.md) explains how signed packs are meant to be
+distributed.
+
 ## Attack IDs in reports
 
 Built-in attacks keep their historical IDs, `category:index` (for example

@@ -47,6 +47,7 @@ tooling.
 | `agentprobe.http_target` | `build_http_target`, `HttpTargetError` |
 | `agentprobe.checkpoints` | `ScanCheckpoint`, `CheckpointError` |
 | `agentprobe.packs` (2.1) | `load_pack`, `load_packs`, `resolve_pack`, `builtin_pack`, `available_packs`, `AttackPack`, `PackError`, `PACK_SCHEMA_VERSION`, `BUILTIN_PACK_ID`, `PACKS_PATH_ENV` |
+| `agentprobe.signing` (2.1) | `generate_keypair`, `sign_fields`, `write_signature`, `read_signature`, `check_signature`, `parse_public_key`, `key_id`, `trust_policy`, `TrustPolicy`, `SignatureError`, `SigningUnavailable`, `SIGNATURE_FILE` |
 
 ### CLI exit codes
 
@@ -101,6 +102,14 @@ version.
     comparable, and shows a minor difference as a non-blocking warning.
   - The rule is defined in `agentprobe/verdicts.py` and in
     [PACKS.md](PACKS.md).
+- **Signed packs (2.1, additive).**
+  - Each `run.attack_packs` entry also carries `signed`, `signer_key_id`, and
+    `verified`.
+  - `manifest.sig` has its own `schema_version` (1.0, algorithm `ed25519`).
+  - The `packs_trust` config key takes `mode` (`require`, `warn`, `off`) and
+    `keys`.
+  - These are part of scan schema 1.1, because 2.1 is the release that
+    introduces it.
 - **Attack packs in scan reports (2.1, additive).** `run.attack_packs` lists every pack a
   scan loaded (id, version, schema_version, license, attack count, sha256), never a
   path. Rows from external packs use the ID `pack-id:attack-id`; built-in rows keep

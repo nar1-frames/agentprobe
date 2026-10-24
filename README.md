@@ -313,7 +313,9 @@ agentprobe scan --non-interactive --config config.yaml --pack examples/packs/sup
 A pack is a folder holding a five-field `manifest.yaml` and YAML attack files,
 each attack with its own success oracle. Every scan records the id, version,
 license and digest of each pack it used. [docs/PACKS.md](docs/PACKS.md) is
-the authoring guide.
+the authoring guide. Packs can be signed (`agentprobe packs sign`), and a
+`packs_trust` config can require that every external pack carries a trusted
+signature.
 
 ## Attack library
 
