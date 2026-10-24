@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from types import SimpleNamespace
 import pytest
 
@@ -7,7 +8,7 @@ from agentprobe.reporting import (
     build_harness_provenance, build_harness_report, build_json_report, build_run_metadata,
     safe_filename_component, save_harness_report, save_json_report,
 )
-from agentprobe.html_report import build_summary, generate_html_report
+from agentprobe.html_report import build_summary, generate_html_report, save_html_report
 from agentprobe.legacy import v11
 from agentprobe import interactive as v12
 from agentprobe.models import parse_model_size_b, validate_judge_strength
@@ -383,3 +384,17 @@ def test_filtered_attack_numbers_and_html_provenance_are_auditable():
     assert 'name="agentprobe-run-id" content="run-123"' in html
     assert "0 prompts · 1 categories" in html
     assert 'name="agentprobe-config-sha256"' in html
+
+
+def test_html_report_filename_matches_the_json_report_shape(tmp_path):
+    html_path = save_html_report("<html></html>", "openai/gpt-oss-20b", str(tmp_path),
+                                 run_id="abcdef123456")
+    json_path = save_json_report(
+        build_json_report(_rows(), "openai/gpt-oss-20b", "judge",
+                          metadata={"run_id": "abcdef123456"}),
+        "openai/gpt-oss-20b", str(tmp_path),
+    )
+    pattern = r"scan_openai_gpt-oss-20b_\d{8}T\d{6}Z_abcdef12\.%s"
+    assert "_v11_" not in os.path.basename(html_path)
+    assert re.fullmatch(pattern % "html", os.path.basename(html_path))
+    assert re.fullmatch(pattern % "json", os.path.basename(json_path))

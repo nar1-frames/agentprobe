@@ -7,6 +7,14 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- HTML report filenames drop the historical `_v11_` infix. They are now
+  `scan_<model>_<UTC stamp>_<run id>.html`, the same shape as the JSON
+  report. Compatibility note: scripts that globbed `*_v11_*.html` should
+  match `scan_*.html` instead. The run ID suffix still pairs each HTML file
+  with its JSON report.
+
 ## [2.0.0] - 2026-10-23
 
 The first release published to PyPI, and the first covered by the
