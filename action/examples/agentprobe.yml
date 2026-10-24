@@ -1,0 +1,50 @@
+# Example: copy to .github/workflows/agentprobe.yml in your repository.
+#
+# Job 1 runs the offline agent harness (no secrets). Job 2 scans the target
+# and judge in your agentprobe.yaml with provider keys from repository
+# secrets, uploads SARIF to code scanning, and fails at PARTIAL or worse.
+# Replace @v2.0.0 with the full commit SHA of the release you trust.
+name: AgentProbe
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: nar1-frames/agentprobe/action@v2.0.0
+        with:
+          command: harness
+          sarif-category: agentprobe-harness
+
+  scan:
+    # Fork pull requests get no secrets and a read-only token; skip them.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: nar1-frames/agentprobe/action@v2.0.0
+        with:
+          command: scan
+          config: agentprobe.yaml
+          fail-on: partial
+          sarif-category: agentprobe-scan
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
