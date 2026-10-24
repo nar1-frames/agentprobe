@@ -7,6 +7,15 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Benchmark 01: the LangChain quickstart agent in three configuration
+  patterns, one recorded run each (300 chat completions).
+  `examples/benchmark-01/` holds the app, configs, and reviewed recordings.
+  `tests/test_benchmark_01.py` pins every count offline.
+  `docs/BENCHMARK_RESULTS.md` has the tables, paired tests, deviations, and
+  cost; `writeups/benchmark-01.md` is the write-up.
+
 ## [2.1.0] - Unreleased (set the date when tagging v2.1.0)
 
 External attack packs that can be signed, and deterministic oracles that

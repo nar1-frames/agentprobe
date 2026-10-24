@@ -29,6 +29,9 @@ _FORBIDDEN_NAMES = frozenset({
 _PUBLIC_DEMO_FILES = frozenset({
     "agentprobe/demo/scan.replay.json",
     "examples/langchain-quickstart-agent/scan.replay.json",
+    "examples/benchmark-01/shipped/scan.replay.json",
+    "examples/benchmark-01/hardened/scan.replay.json",
+    "examples/benchmark-01/filtered/scan.replay.json",
 })
 _SECRET_PATTERNS = (
     ("provider-key", re.compile(rb"(?i)\b(?:sk|gsk)[_-][A-Za-z0-9_-]{12,}\b")),

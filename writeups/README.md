@@ -20,6 +20,11 @@ documentation and should not be treated as current empirical results.
   on gpt-oss-20b, one recorded run, reproducible offline from
   [`examples/langchain-quickstart-agent/`](../examples/langchain-quickstart-agent/).
   It is a draft for review before posting.
+- [`benchmark-01.md`](benchmark-01.md): the same agent in three configuration
+  patterns (shipped, hardened prompt, and hardened plus allowlist and filter),
+  one recorded run each, reproducible offline from
+  [`examples/benchmark-01/`](../examples/benchmark-01/). It is a draft for
+  review before posting.
 
 Drafts may contain historical claims, old model names, or outdated commands.
 Before publishing anything from here, validate it against the current code and

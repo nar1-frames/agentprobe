@@ -1,6 +1,7 @@
 # Framework comparison benchmark: methodology (draft)
 
-**Status: methodology stub. No benchmark has been run yet.** This document
+**Status: methodology. Benchmark 01 has been run with documented deviations (one
+framework, k = 1). See [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md).** This document
 fixes how a comparison of agent frameworks will be run and reported, before
 any data exists, so the method cannot be tuned to the results.
 [`writeups/public-scan-01.md`](../writeups/public-scan-01.md) is a single
