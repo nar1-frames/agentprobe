@@ -1,0 +1,39 @@
+# AgentProbe scan of the LangChain quickstart agent served by app.py.
+# Start app.py first, then from the repository root:
+#   agentprobe scan --non-interactive --verbose \
+#     --config examples/langchain-quickstart-agent/agentprobe.yaml
+# One run sends each of the 49 attacks once (retries: 0) and records every
+# target and judge response, so the scan can be replayed offline.
+
+target:
+  provider: http
+  model: langchain-quickstart-agent   # report label; the agent runs openai/gpt-oss-20b
+  base_url: http://127.0.0.1:8765/chat
+  strength_rank: 1
+  timeout_seconds: 120
+  http:
+    request_template: {message: "{{prompt}}", session_id: "{{session_id}}"}
+    response_path: reply.text
+    session: fresh
+
+judge:
+  provider: groq
+  model: openai/gpt-oss-120b
+  api_key_env: GROQ_API_KEY
+  strength_rank: 2
+  timeout_seconds: 60
+  max_tokens: 120
+  temperature: 0.1
+  reasoning_effort: low
+
+scan:
+  categories: all
+  severity_filter: null
+  rate_limit_seconds: 5
+  retries: 0
+  retry_delay_seconds: 0
+  record_replay_path: reports/public-scan-01.replay.json
+
+output:
+  report_dir: reports
+  report_format: both
