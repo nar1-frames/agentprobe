@@ -31,8 +31,8 @@ from a maintainer's machine. Each release records:
 To check that a downloaded file came from this repository's release workflow:
 
 ```bash
-pip download agentprobe-security==2.0.0 --no-deps -d check/
-gh attestation verify check/agentprobe_security-2.0.0-py3-none-any.whl \
+pip download agentprobe-security==2.1.0 --no-deps -d check/
+gh attestation verify check/agentprobe_security-2.1.0-py3-none-any.whl \
   --repo nar1-frames/agentprobe
 ```
 

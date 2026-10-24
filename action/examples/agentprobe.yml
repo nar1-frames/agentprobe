@@ -3,7 +3,7 @@
 # Job 1 runs the offline agent harness (no secrets). Job 2 scans the target
 # and judge in your agentprobe.yaml with provider keys from repository
 # secrets, uploads SARIF to code scanning, and fails at PARTIAL or worse.
-# Replace @v2.0.0 with the full commit SHA of the release you trust.
+# Replace @v2.1.0 with the full commit SHA of the release you trust.
 name: AgentProbe
 
 on:
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: nar1-frames/agentprobe/action@v2.0.0
+      - uses: nar1-frames/agentprobe/action@v2.1.0
         with:
           command: harness
           sarif-category: agentprobe-harness
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: nar1-frames/agentprobe/action@v2.0.0
+      - uses: nar1-frames/agentprobe/action@v2.1.0
         with:
           command: scan
           config: agentprobe.yaml
