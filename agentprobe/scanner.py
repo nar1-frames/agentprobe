@@ -8,10 +8,10 @@ inside the package gives automation one supported execution path.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Mapping, Optional, Sequence
 
-from attacks.library import ATTACK_LIBRARY
 from agentprobe.attackpack import build_attack_pack
 from agentprobe.checkpoints import ScanCheckpoint
 from agentprobe.config import client_config, load_config
@@ -27,7 +27,10 @@ from agentprobe.models import validate_judge_strength
 from agentprobe.providers import build_client, preflight_model
 from agentprobe.reliability import is_retryable_error
 from agentprobe.replay import RecordingClient, ReplayRecording
-from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
+from agentprobe.packs import AttackPack, load_packs
+from agentprobe.reporting import (
+    build_json_report, build_run_metadata, save_json_report, scan_attack_id,
+)
 from agentprobe.termstyle import TAG_WIDTH, style, verdict_tag
 from agentprobe.html_report import generate_html_report, save_html_report
 
@@ -36,21 +39,42 @@ SEVERITY_LADDER = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 ERROR_METHODS = frozenset({"target-error", "judge-error"})
 
 
-def filter_attacks(config: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]]:
-    """Apply the validated category and severity filters to the attack library."""
+def _selection_entry(pack: AttackPack, attack: Mapping[str, Any]) -> dict[str, Any]:
+    entry = {field: attack[field] for field in ("prompt", "severity", "description")}
+    entry["_library_index"] = attack["index"]
+    if not pack.builtin:
+        # Part of the digest: the same prompt from a different pack is different evidence.
+        entry["_attack_id"] = f"{pack.id}:{attack['id']}"
+    return entry
 
+
+def filter_attacks(config: Mapping[str, Any],
+                   packs: Optional[Sequence[AttackPack]] = None) -> dict[str, list[dict[str, Any]]]:
+    """Apply the validated category and severity filters to the loaded attack packs.
+
+    ``packs`` defaults to the config's ``packs`` list (or the built-in pack),
+    with relative paths read from the working directory. With only the
+    built-in pack the selection is exactly the historical library selection.
+    """
+
+    if packs is None:
+        packs = load_packs(config.get("packs"))
     scan = config.get("scan", {})
     categories_setting = scan.get("categories", "all")
     severity_filter = scan.get("severity_filter")
-    active = list(ATTACK_LIBRARY) if categories_setting == "all" else categories_setting
+    available = list(dict.fromkeys(c for pack in packs for c in pack.categories))
+    if categories_setting == "all":
+        active = available
+    else:
+        missing = [c for c in categories_setting if c not in available]
+        if missing:
+            raise ValueError(f"scan.categories names {', '.join(missing)}, which no loaded "
+                             "attack pack provides")
+        active = list(categories_setting)
     filtered: dict[str, list[dict[str, Any]]] = {}
     for category in active:
-        if category not in ATTACK_LIBRARY:
-            continue
-        attacks = [
-            {**attack, "_library_index": index}
-            for index, attack in enumerate(ATTACK_LIBRARY[category], start=1)
-        ]
+        attacks = [_selection_entry(pack, attack)
+                   for pack in packs for attack in pack.attacks_in(category)]
         if severity_filter:
             minimum = SEVERITY_LADDER.index(severity_filter)
             attacks = [
@@ -231,7 +255,7 @@ def run_full_scan(
             print(f"\n[{category.upper()}] {len(attacks)} prompts")
         category_results = []
         for position, attack in enumerate(attacks, start=1):
-            attack_key = f"{category}:{attack.get('_library_index', position)}"
+            attack_key = scan_attack_id(category, attack, position)
             if checkpoint is not None and checkpoint.has(attack_key):
                 row = checkpoint.row(attack_key)
                 if not (repair_errors and row[5] in ERROR_METHODS):
@@ -333,8 +357,13 @@ def run_configured_scan(
     resume: bool = False,
     repair_errors: bool = False,
     verbose: bool = False,
+    packs: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """Run the validated, non-interactive scanner and persist configured reports."""
+    """Run the validated, non-interactive scanner and persist configured reports.
+
+    The config's ``packs`` list (relative paths next to the config file, default
+    the built-in pack) is extended by ``packs`` (relative to the working directory).
+    """
 
     if resume and not checkpoint_path:
         raise ValueError("resume requires checkpoint_path")
@@ -347,12 +376,14 @@ def run_configured_scan(
     scan = config.get("scan", {})
     output = config.get("output", {})
     validate_judge_strength(target["model"], judge["model"], target, judge)
-    attack_library = filter_attacks(config)
+    loaded = load_packs(config.get("packs"), os.path.dirname(os.path.abspath(config_path)),
+                        packs)
+    attack_library = filter_attacks(config, loaded)
     if not attack_library:
         raise ValueError("No attacks matched the configured scan filters")
-    # The pack always covers the full library; attack_library_sha256 records
-    # the filtered selection that this scan actually sends.
-    attack_pack = build_attack_pack()
+    # Each pack covers its full content; attack_library_sha256 records the
+    # filtered selection that this scan actually sends.
+    attack_pack = build_attack_pack() if any(pack.builtin for pack in loaded) else None
 
     metadata = build_run_metadata(
         target["model"],
@@ -364,6 +395,7 @@ def run_configured_scan(
         judge_prompt_version=JUDGE_PROMPT_VERSION,
         judge_prompt_sha256=JUDGE_PROMPT_SHA256,
         attack_pack=attack_pack,
+        attack_packs=[pack.provenance() for pack in loaded],
     )
     checkpoint = None
     if checkpoint_path:

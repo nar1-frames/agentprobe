@@ -1,0 +1,9 @@
+# A minimal example attack pack. See docs/PACKS.md for the format.
+schema_version: "1.0"
+id: support-desk-sample
+version: "1.0.0"
+license: MIT
+categories:
+  - indirect_injection
+  - data_extraction
+  - tool_misuse

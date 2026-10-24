@@ -48,6 +48,11 @@ def attack_id(category: str, attack: Mapping[str, Any], position: int) -> str:
         )
     if not isinstance(category, str) or not category.strip():
         raise CheckpointError("attack category must be a non-empty string")
+    external = attack.get("_attack_id")
+    if external is not None:
+        if not isinstance(external, str) or ":" not in external:
+            raise CheckpointError(f"attack {category!r} has an invalid pack attack ID: {external!r}")
+        return external
     return f"{category}:{index}"
 
 

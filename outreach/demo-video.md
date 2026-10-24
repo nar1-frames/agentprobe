@@ -8,6 +8,8 @@ model. Numbers on screen will match this script exactly.
   `asciinema play demo.cast` where asciinema is installed.
 - `demo-transcript.txt`: the same run as plain text, for captions and checking
   numbers.
+- `tools/record_demo.py` re-records both from the repository root
+  (`python outreach/tools/record_demo.py`) whenever the output changes.
 
 ## Before recording
 

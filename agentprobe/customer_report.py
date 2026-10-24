@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from agentprobe.compare import compare_scan_reports, validate_scan_report
 from agentprobe.mitigations import MITIGATIONS, OWASP_LLM_2025
+from agentprobe.packs import BUILTIN_PACK_ID
 
 
 SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
@@ -762,9 +763,22 @@ def _methodology_section(report: Mapping[str, Any], engagement: Mapping[str, Any
         "Findings are reported as the judge graded them; no analyst review was recorded "
         "for this report."
     )
+    packs = [pack for pack in run.get("attack_packs") or [] if isinstance(pack, Mapping)]
+    external = [pack for pack in packs if pack.get("id") != BUILTIN_PACK_ID]
+    if external:
+        source = "the attack packs " + ", ".join(
+            f"{_text(pack.get('id'))} {_text(pack.get('version'))}" for pack in packs)
+    else:
+        source = "AgentProbe's public attack library"
+    pack_provenance = "".join(
+        f" Attack pack {_text(pack.get('id'))} {_text(pack.get('version'))} "
+        f"({_text(pack.get('license'))}, {_text(pack.get('attacks'))} attacks, sha256 "
+        f"{_text(str(pack.get('sha256') or '')[:12])})."
+        for pack in packs
+    )
     paragraphs = [
-        f"<b>What was tested.</b> {_plural(total, 'attack', 'attacks')} from AgentProbe's "
-        f"public attack library ({_plural(categories, 'category', 'categories')}) were sent "
+        f"<b>What was tested.</b> {_plural(total, 'attack', 'attacks')} from {source} "
+        f"({_plural(categories, 'category', 'categories')}) were sent "
         f"to {_text(_system_label(report, engagement))} on {_text(scan_date(report))}, each "
         "as a separate conversation.",
         "<b>How responses are graded.</b> A keyword check first decides clear refusals and "
@@ -788,8 +802,8 @@ def _methodology_section(report: Mapping[str, Any], engagement: Mapping[str, Any
         "instrument with an error rate, not ground truth.",
         f"<b>Provenance.</b> Run {_text(run.get('run_id') or 'unknown')}; attack library "
         f"{_text(library)}; judge prompt {_text(judge_digest)}; AgentProbe "
-        f"{_text(run.get('tool_version') or 'unknown version')}. The full digests are in "
-        "the scan's JSON report.",
+        f"{_text(run.get('tool_version') or 'unknown version')}.{pack_provenance} The full "
+        "digests are in the scan's JSON report.",
     ]
     return ('<section class="method" aria-labelledby="method"><h2 id="method">Methodology'
             "</h2>" + "".join(f"<p>{text}</p>" for text in paragraphs) + "</section>")

@@ -60,11 +60,29 @@ def attack_library_digest(attack_library):
 _attack_library_digest = attack_library_digest
 
 
+def scan_attack_id(category, attack, position):
+    """The evidence ID of one attack in a scan.
+
+    Built-in attacks keep ``category:index``. Attacks from an external pack
+    carry ``_attack_id`` (``pack-id:attack-id``), which stays unique when two
+    packs use the same category.
+    """
+
+    if attack.get("_attack_id"):
+        return attack["_attack_id"]
+    return f"{category}:{attack.get('_library_index', position)}"
+
+
 def build_run_metadata(target_model, judge_model, target_provider=None,
                        judge_provider=None, config=None, attack_library=None,
                        run_id=None, judge_prompt_version=None,
-                       judge_prompt_sha256=None, attack_pack=None):
-    """Create provenance metadata without copying credentials into reports."""
+                       judge_prompt_sha256=None, attack_pack=None, attack_packs=None):
+    """Create provenance metadata without copying credentials into reports.
+
+    ``attack_pack`` is the built-in pack (recorded as attack_pack_schema_version
+    and attack_pack_sha256 when the built-in pack is part of the scan);
+    ``attack_packs`` lists every pack the scan drew from, by identity only.
+    """
 
     metadata = {
         "run_id": run_id or uuid.uuid4().hex,
@@ -109,6 +127,8 @@ def build_run_metadata(target_model, judge_model, target_provider=None,
         validate_attack_pack(attack_pack)
         metadata["attack_pack_schema_version"] = attack_pack["schema_version"]
         metadata["attack_pack_sha256"] = attack_pack_digest(attack_pack)
+    if attack_packs is not None:
+        metadata["attack_packs"] = [dict(pack) for pack in attack_packs]
     return metadata
 
 
@@ -140,7 +160,7 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
                 finding_counts[finding_severity] += 1
 
             rows.append({
-                "attack_id": f"{category}:{attack_index}",
+                "attack_id": scan_attack_id(category, attack, position),
                 "category": category,
                 "attack_index": attack_index,
                 "attack_severity": attack.get("severity"),

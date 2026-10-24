@@ -300,6 +300,21 @@ side-effect payloads, and known secrets before serialization.
 
 ---
 
+## Attack packs
+
+The built-in library below is the first of any number of attack packs. Add
+your own, or a third party's, without touching the code:
+
+```bash
+agentprobe packs validate examples/packs/support-desk-sample
+agentprobe scan --non-interactive --config config.yaml --pack examples/packs/support-desk-sample
+```
+
+A pack is a folder holding a five-field `manifest.yaml` and YAML attack files,
+each attack with its own success oracle. Every scan records the id, version,
+license and digest of each pack it used. [docs/PACKS.md](docs/PACKS.md) is
+the authoring guide.
+
 ## Attack library
 
 All 49 prompts AgentProbe sends, grouped by category. Each is a public prompt-injection pattern used to measure a model's own robustness. They live as pure data in [`attacks/library.py`](attacks/library.py).
