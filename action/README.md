@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: nar1-frames/agentprobe/action@v2.0.0   # pin a full commit SHA in practice
+      - uses: nar1-frames/agentprobe/action@v2.1.0   # pin a full commit SHA in practice
         with:
           command: harness
 ```
@@ -36,7 +36,7 @@ provider targets your own agent endpoint). Pass provider keys through `env`
 from repository secrets, never in the config.
 
 ```yaml
-      - uses: nar1-frames/agentprobe/action@v2.0.0
+      - uses: nar1-frames/agentprobe/action@v2.1.0
         with:
           command: scan
           config: agentprobe.yaml
@@ -64,7 +64,7 @@ A complete workflow with both jobs is in [examples/agentprobe.yml](examples/agen
 | `upload-sarif` | `true` | Upload SARIF to code scanning. Needs `security-events: write`; set `false` for fork pull requests or private repositories without code scanning |
 | `sarif-category` | `agentprobe` | Code scanning category; use a different one per job |
 | `output-dir` | `agentprobe-results` | Where the SARIF, JUnit, and harness JSON files go |
-| `package` | `agentprobe-security==2.0.0` | pip requirement to install; matches the release the Action ships with |
+| `package` | `agentprobe-security==2.1.0` | pip requirement to install; matches the release the Action ships with |
 | `python-version` | `3.12` | Python used to run AgentProbe |
 
 ## Outputs

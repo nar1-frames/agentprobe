@@ -475,6 +475,7 @@ reports, and completed study evidence.
 | v1.5 | strict judge-output parsing, protocol/provider provenance for study evidence, safer collection resume semantics |
 | v1.6 | live harness token-budget provenance, strict tool-call identity validation, and report-wide secret redaction |
 | v1.7 | provider model preflight, versioned GPT-OSS study protocol, pinned reasoning/text-only context, and wheel hygiene |
+| v2.1 | external attack packs (`--pack`, `packs:`, `agentprobe packs`), deterministic oracles in verdicts (rule oracle-precedence 1.0, marker rule fix), scan schema 1.1 |
 | v2.0 | first PyPI release (`agentprobe-security`): `http` target, engagement-ready customer report (analyst triage, OWASP 2025 mapping), offline demo, replay, compare, SARIF/JUnit, GitHub Action, attack packs, event schema, harness policy controls, compatibility policy, signed releases |
 
 Release-by-release detail is in [CHANGELOG.md](CHANGELOG.md).

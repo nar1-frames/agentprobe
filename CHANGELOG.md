@@ -7,6 +7,11 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.1.0] - Unreleased (set the date when tagging v2.1.0)
+
+External attack packs, and deterministic oracles that count in verdicts.
+Scan reports move to schema 1.1 (additive); 2.0 reports stay comparable.
+
 ### Added
 
 - Deterministic oracles count in scan verdicts (rule `oracle-precedence` 1.0).
@@ -216,6 +221,7 @@ published to PyPI.
 Versions 0.1 to 1.6 were developed in the repository without packaged
 releases. The README's version history table summarizes them.
 
-[Unreleased]: https://github.com/nar1-frames/agentprobe/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/nar1-frames/agentprobe/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/nar1-frames/agentprobe/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/nar1-frames/agentprobe/releases/tag/v2.0.0
 [1.7.0]: https://github.com/nar1-frames/agentprobe/commit/d30500a

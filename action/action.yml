@@ -47,7 +47,7 @@ inputs:
     description: >-
       pip requirement to install. Defaults to the agentprobe-security release
       this action ships with; set `.` to test a checkout of AgentProbe itself.
-    default: agentprobe-security==2.0.0
+    default: agentprobe-security==2.1.0
   python-version:
     description: Python version to run AgentProbe on.
     default: "3.12"
