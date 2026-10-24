@@ -104,6 +104,12 @@ listed in [`THREAT_MODEL.md`](THREAT_MODEL.md).
   `attack_library_sha256` pinned by the study manifest stays valid. Scan
   reports add `attack_pack_schema_version` and `attack_pack_sha256`, so a
   changed oracle shows up in provenance without changing the attack digest.
+- **Deterministic oracles outrank the judge, visibly.** `agentprobe/verdicts.py`
+  applies rule `oracle-precedence` 1.0 after detection: an oracle that sees the
+  attack succeed makes the row VULNERABLE, and an oracle that sees it fail
+  turns a judge VULNERABLE into PARTIAL. Rows keep both `oracle_result` and
+  `detector_verdict`, the summary tallies their agreement, and the run records
+  the rule. The judge is called exactly as before, so recordings still replay.
 - **Judge statistics are conservative.** Failed judge calls are excluded;
   Fleiss' κ is only computed for complete, fixed-k item groups. Ties are
   `SUSPICIOUS`, not row-order-dependent majorities.

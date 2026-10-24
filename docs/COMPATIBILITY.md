@@ -66,7 +66,7 @@ reports, `--json`, SARIF, or JUnit.
 
 | Artifact | Field | Current |
 |---|---|---|
-| Scan report (JSON) | `schema_version` | 1.0 |
+| Scan report (JSON) | `schema_version` | 1.1 (2.1; 1.0 in 2.0) |
 | Harness report (JSON) | `schema_version` | 1.4 |
 | Harness event vocabulary | `event_schema_version` (in harness reports) | 1.0 |
 | Attack pack | `schema_version` | 1.0 |
@@ -88,6 +88,19 @@ version.
   fields is removed or renamed; or verdict, severity, or status values change
   meaning. A major schema bump ships only in a major package release and is
   listed under "Breaking" in the changelog.
+- **Scan schema 1.1 (2.1, additive).**
+  - Every row gains `oracle_result` (`pass`, `fail`, `not_applicable`) and
+    `detector_verdict` (the keyword or judge verdict before the oracle
+    rule). `verdict` is the final verdict.
+  - `summary.oracle_agreement` tallies oracle against detector.
+  - `run.verdict_rule` names the rule: `oracle-precedence` 1.0, with marker
+    rule `outside-refusal-1.0`.
+  - `method` gains the value `oracle` for rows where a deterministic oracle
+    overrode the detector.
+  - `agentprobe compare` treats reports of the same schema major as
+    comparable, and shows a minor difference as a non-blocking warning.
+  - The rule is defined in `agentprobe/verdicts.py` and in
+    [PACKS.md](PACKS.md).
 - **Attack packs in scan reports (2.1, additive).** `run.attack_packs` lists every pack a
   scan loaded (id, version, schema_version, license, attack count, sha256), never a
   path. Rows from external packs use the ID `pack-id:attack-id`; built-in rows keep
