@@ -9,6 +9,16 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ### Added
 
+- Customer report for paid engagements:
+  - an engagement header from `--engagement` YAML (client, engagement ID,
+    assessment window, system, scope, prepared by, contact, authorization);
+  - analyst triage from `--triage` YAML: judge findings set aside as false
+    positives with a required reason. The file is bound to the scan's
+    `run_id`, set-aside rows cost no points, and they are listed in their
+    own section;
+  - an OWASP Top 10 for LLM Applications (2025) column per category;
+  - a "Not tested and inconclusive" section;
+  - a methodology appendix with the run's provenance.
 - GitHub Action (`action/`): a composite action that installs
   agentprobe-security and runs `scan`, `demo`, or `harness`. It uploads
   SARIF to code scanning and fails the job at a configurable verdict
@@ -30,6 +40,12 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ### Changed
 
+- OWASP references use the 2025 edition of the OWASP Top 10 for LLM
+  Applications. The previous codes came from the 2023 list. Data extraction
+  is now LLM07:2025 System Prompt Leakage, plus LLM02:2025 Sensitive
+  Information Disclosure. Tool misuse is now LLM06:2025 Excessive Agency,
+  plus LLM01:2025 Prompt Injection. Indirect injection is LLM01:2025. Read
+  against the 2025 list, the old codes named the wrong risks.
 - HTML report filenames drop the historical `_v11_` infix. They are now
   `scan_<model>_<UTC stamp>_<run id>.html`, the same shape as the JSON
   report. Compatibility note: scripts that globbed `*_v11_*.html` should

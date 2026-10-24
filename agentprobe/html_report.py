@@ -204,7 +204,7 @@ def render_mitigation_map(scan_results):
         m = MITIGATIONS.get(category, {
             "layer": "Model prompt",
             "mitigation": "Review attack prompts and harden system prompt instructions for this category.",
-            "owasp": "LLM01",
+            "owasp": "LLM01:2025",
         })
         zebra = ' class="zebra"' if i % 2 == 0 else ''
         rate_style = 'color:#8B0000;font-weight:700;' if rate >= 50 else 'color:#1a1a1a;font-weight:600;'
@@ -216,7 +216,7 @@ def render_mitigation_map(scan_results):
           <td class="td-mit-layer">{esc(m["layer"])}</td>
           <td class="td-mit-fix">
             {esc(m.get("mitigation", m.get("fix", "No mapping available.")))}
-            <span class="owasp-tag">{esc(m.get("owasp", "LLM01"))}</span>
+            <span class="owasp-tag">{esc(m.get("owasp", "LLM01:2025"))}</span>
           </td>
         </tr>"""
 
