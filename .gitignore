@@ -74,8 +74,8 @@ data/results.json
 *.label-packet.csv
 *.label-packet.csv.key.json
 
+# Local archive of retired scripts and notes.
 _archive/
 
-_archive/
-
-_archive/
+# Prompt God work orders, reports, and plans are workspace metadata.
+.promptgod/

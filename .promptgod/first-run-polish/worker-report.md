@@ -1,1 +1,0 @@
-Worker report sent 2026-10-21 to prompter manage-agents-command [31bf39]. Branch pg/first-run-polish, commits 2d4880b b044ac6 f9f5d6f 7591a98. 342 passed. Demo requires repo-root cwd (documented alternative, not BLOCKED). Awaiting debug round / merge decision.

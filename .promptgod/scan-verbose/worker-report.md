@@ -1,1 +1,0 @@
-Worker report sent 2026-10-21 to prompter manage-agents-command [31bf39]. Branch pg/scan-verbose, commits 2b93587 da94912 db31766. 339 passed. Deviations: existing test_interactive_scan_prints_summary_once stub updated to print the summary itself (forced by requirement 3); _ascii_preview added in scanner for ASCII output. Awaiting debug round / merge decision.

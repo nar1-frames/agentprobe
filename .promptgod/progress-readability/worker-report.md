@@ -1,1 +1,0 @@
-Worker report sent 2026-10-21 to prompter manage-agents-command [31bf39]. Branch pg/progress-readability, commits 1d483b2 efa20eb 9076e71 dd14555 b1d8554. 336 passed. Deviations: one-line return added to agentprobe_v12.py; compare change lines kept verbatim (test_compare.py:152). Awaiting debug round / merge decision.
