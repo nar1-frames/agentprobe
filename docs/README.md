@@ -41,6 +41,7 @@ Every document in the repository, one line each. Start with the
 - [COMPATIBILITY.md](COMPATIBILITY.md): what is stable: the public Python API, CLI exit codes, artifact schemas, and deprecation.
 - [../SECURITY.md](../SECURITY.md): safe testing, verifying a signed release, and reporting a vulnerability.
 - [../CHANGELOG.md](../CHANGELOG.md): release-by-release changes.
+- [RELEASE.md](RELEASE.md): the maintainer runbook for cutting, verifying, and patching a release.
 - [../GOALS.md](../GOALS.md): product, engineering, and research goals.
 - [../ROADMAP.md](../ROADMAP.md): the delivery roadmap, ordered by credibility.
 - [../CONTRIBUTING.md](../CONTRIBUTING.md): local setup, tests, and the review standard.
