@@ -33,6 +33,7 @@ that an agent is safe.
 - [Project goals](GOALS.md)
 - [Roadmap](ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Compatibility policy](docs/COMPATIBILITY.md) and [changelog](CHANGELOG.md)
 - [Threat model](docs/THREAT_MODEL.md)
 - [Research protocol](research/README.md)
 - [Contributing](CONTRIBUTING.md)
@@ -66,14 +67,13 @@ The method is simple and honest: freeze a corpus of real model responses once, j
 local model-backed scans.
 
 ```bash
-# 1. Get the code and install the development CLI
-git clone https://github.com/nar1-frames/agentprobe.git
-cd agentprobe
-python3 -m pip install -e ".[dev]"
+# 1. Install the CLI (the PyPI package is agentprobe-security; the command is agentprobe)
+python3 -m pip install agentprobe-security
+#    To develop instead: git clone https://github.com/nar1-frames/agentprobe.git
+#    && cd agentprobe && python3 -m pip install -e ".[dev]"
 
-# 2. Run the offline demo: replays a recorded scan, no keys or network needed
-#    (same as: agentprobe scan --non-interactive --verbose --config agentprobe/demo/replay.yaml;
-#    it runs from any folder and writes its reports to ./reports)
+# 2. Run the offline demo: replays a recorded scan, no keys or network needed.
+#    It runs from any folder and writes its reports to ./reports.
 agentprobe demo
 #   AgentProbe offline demo: replays a recorded scan of openai/gpt-oss-20b, no keys or network needed.
 #   ...
@@ -445,6 +445,9 @@ reports, and completed study evidence.
 | v1.5 | strict judge-output parsing, protocol/provider provenance for study evidence, safer collection resume semantics |
 | v1.6 | live harness token-budget provenance, strict tool-call identity validation, and report-wide secret redaction |
 | v1.7 | provider model preflight, versioned GPT-OSS study protocol, pinned reasoning/text-only context, and wheel hygiene |
+| v2.0 | first PyPI release (`agentprobe-security`): `http` target, customer report, offline demo, replay, compare, SARIF/JUnit, attack packs, event schema, harness policy controls, compatibility policy |
+
+Release-by-release detail is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -458,9 +461,11 @@ dead-`PARTIAL` bug found in the v1.1 review. Run them with:
 pytest
 ```
 
-237 tests currently pass in a clean checkout (detection routing, hedge-then-comply,
-severity mapping, research analysis invariants, report provenance, JSON reporting,
-and the agent harness).
+422 tests currently pass in a clean checkout, and CI runs them on Linux and
+Windows (detection
+routing, hedge-then-comply, severity mapping, research analysis invariants,
+report provenance, JSON reporting, exports, comparison, replay, the customer
+report, the offline demo, and the agent harness).
 
 ## Responsible use
 
