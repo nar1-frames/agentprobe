@@ -8,7 +8,7 @@ from agentprobe.customer_report import (
     DISCLAIMER, INCOMPARABLE_WARNING, SCORE_FORMULA, excerpt, render_customer_report,
     score_report,
 )
-from agentprobe.reporting import build_json_report
+from agentprobe.reporting import TOOL_VERSION, build_json_report
 
 
 def _row(category, index, verdict, finding=None, method="llm-judge", response=None,
@@ -284,7 +284,7 @@ def test_footer_has_version_run_id_disclaimer_and_formula():
     assert DISCLAIMER in footer
     assert SCORE_FORMULA in footer
     assert "run ID run-xyz" in footer
-    assert "AgentProbe 1." in footer
+    assert f"AgentProbe {TOOL_VERSION}" in footer
 
 
 def test_print_styles_present():

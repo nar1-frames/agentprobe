@@ -14,7 +14,7 @@ from typing import Any, Mapping, Optional, Sequence
 from attacks.library import ATTACK_LIBRARY
 from agentprobe.attackpack import build_attack_pack
 from agentprobe.checkpoints import ScanCheckpoint
-from agentprobe.config import load_config
+from agentprobe.config import client_config, load_config
 from agentprobe.detection import (
     JUDGE_PROMPT_SHA256,
     JUDGE_PROMPT_VERSION,
@@ -379,8 +379,8 @@ def run_configured_scan(
             metadata = dict(checkpoint.run_metadata)
 
     # The checkpoint is validated before provider clients are constructed.
-    target_client = build_client(target)
-    judge_client = build_client(judge)
+    target_client = build_client(client_config(target, config_path))
+    judge_client = build_client(client_config(judge, config_path))
     if scan.get("record_replay_path"):
         # One shared file: target and judge requests differ by model, so
         # their entries never collide.

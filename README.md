@@ -72,7 +72,8 @@ cd agentprobe
 python3 -m pip install -e ".[dev]"
 
 # 2. Run the offline demo: replays a recorded scan, no keys or network needed
-#    (same as: agentprobe scan --non-interactive --verbose --config demo/replay.yaml)
+#    (same as: agentprobe scan --non-interactive --verbose --config agentprobe/demo/replay.yaml;
+#    it runs from any folder and writes its reports to ./reports)
 agentprobe demo
 #   AgentProbe offline demo: replays a recorded scan of openai/gpt-oss-20b, no keys or network needed.
 #   ...

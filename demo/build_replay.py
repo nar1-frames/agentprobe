@@ -1,13 +1,13 @@
 """Re-cut a local scan JSON report into the committed demo replay recording.
 
 Usage (from the repository root):
-    python demo/build_replay.py reports/<scan>.json demo/scan.replay.json
+    python demo/build_replay.py reports/<scan>.json agentprobe/demo/scan.replay.json
 
 No model is called. Target responses come from the source report, trimmed to
 TRIM_CHARS; judge replies are rebuilt from the report's recorded verdict and
 reason in the two-line judge format. Requests are produced by the real
 scanner (run_full_scan) through RecordingClient, so the digests match exactly
-what `agentprobe scan --config demo/replay.yaml` sends.
+what `agentprobe demo` (agentprobe/demo/replay.yaml) sends.
 """
 
 import json
@@ -20,7 +20,7 @@ from agentprobe.detection import INTERNAL_TO_LABEL
 from agentprobe.replay import RecordingClient
 from agentprobe.scanner import filter_attacks, run_full_scan
 
-CONFIG_PATH = "demo/replay.yaml"
+CONFIG_PATH = "agentprobe/demo/replay.yaml"
 TRIM_CHARS = 900
 TRIM_MARKER = "\n\n[response trimmed for the demo]"
 

@@ -14,7 +14,9 @@ from agentprobe.exports import (
 )
 from agentprobe.harness import run_fixture_suite
 from agentprobe.providers import build_client
-from agentprobe.reporting import build_harness_report, build_json_report, build_run_metadata
+from agentprobe.reporting import (
+    TOOL_VERSION, build_harness_report, build_json_report, build_run_metadata,
+)
 from test_replay import _FakeProvider, _write_config
 
 
@@ -99,7 +101,7 @@ def test_scan_junit_counts_match_children_and_stay_data_minimized():
     suite_properties = {p.get("name"): p.get("value") for p in root.find("testsuite").iter("property")}
     assert suite_properties == {
         "run_id": "run-fixture", "target_model": "target-3b",
-        "judge_model": "judge-8b", "tool_version": "1.7.0",
+        "judge_model": "judge-8b", "tool_version": TOOL_VERSION,
     }
     assert "SENTINEL-RESPONSE" not in xml_text and "SENTINEL-REASON" not in xml_text
 

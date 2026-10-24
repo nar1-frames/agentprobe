@@ -6,20 +6,16 @@ from pathlib import Path
 import pytest
 
 from agentprobe import cli
+from agentprobe.config import client_config, load_config
 from agentprobe.replay import load_recording
 from research.public_hygiene import scan_content
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DEMO = ROOT / "demo"
+DEMO = ROOT / "agentprobe" / "demo"
 
 
-@pytest.fixture
-def demo_cwd(tmp_path, monkeypatch):
-    """Run from a copy of demo/ so reports land in a temp reports/ folder."""
-
-    shutil.copytree(DEMO, tmp_path / "demo")
-    monkeypatch.chdir(tmp_path)
+def _offline(monkeypatch):
     for name in ("GROQ_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.delenv(name, raising=False)
 
@@ -27,6 +23,15 @@ def demo_cwd(tmp_path, monkeypatch):
         raise AssertionError("the offline demo must not open a network connection")
 
     monkeypatch.setattr(socket.socket, "connect", no_network)
+
+
+@pytest.fixture
+def demo_cwd(tmp_path, monkeypatch):
+    """Run from a copy of the demo data so reports land in a temp reports/ folder."""
+
+    shutil.copytree(DEMO, tmp_path / "demo")
+    monkeypatch.chdir(tmp_path)
+    _offline(monkeypatch)
     return tmp_path
 
 
@@ -57,7 +62,7 @@ def test_demo_recording_is_valid_and_sanitized():
     text = path.read_text(encoding="utf-8")
     for needle in ("sk-", "gsk_", "C:\\", "/Users/", "@", "http://", "https://"):
         assert needle not in text, needle
-    assert scan_content("demo/scan.replay.json", text.encode("utf-8")) == []
+    assert scan_content("agentprobe/demo/scan.replay.json", text.encode("utf-8")) == []
 
 
 def test_committed_sample_report_shows_mixed_verdicts():
@@ -69,6 +74,8 @@ def test_committed_sample_report_shows_mixed_verdicts():
 
 
 def test_hygiene_allowlist_covers_only_the_demo_recording():
+    assert scan_content("agentprobe/demo/other.replay.json", b"{}") != []
+    assert scan_content("demo/scan.replay.json", b"{}") != []
     assert scan_content("demo/other.replay.json", b"{}") != []
     assert scan_content("scan.replay.json", b"{}") != []
 
@@ -121,5 +128,35 @@ def test_demo_command_reports_missing_files_clearly(tmp_path, monkeypatch, capsy
     out = capsys.readouterr().out
     assert str(missing) in out
     assert "demo files not found" in out
-    assert "repository root" in out
+    assert "reinstall" in out
     assert "Scan summary:" not in out
+
+
+def test_demo_command_runs_from_a_folder_without_demo_files(tmp_path, monkeypatch, capsys):
+    # The installed-package case: nothing demo-related in the working directory.
+    monkeypatch.chdir(tmp_path)
+    _offline(monkeypatch)
+    assert cli.main(["demo"]) == 0, capsys.readouterr().out
+    assert len(list((tmp_path / "reports").glob("*.json"))) == 1
+    assert not (DEMO / "reports").exists()
+
+
+def test_replay_path_resolves_next_to_the_config_file(tmp_path, monkeypatch):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    config_path = str(DEMO / "replay.yaml")
+    config = load_config(config_path)
+    # The validated config keeps the path as written, so its digest is portable.
+    assert config["target"]["replay_path"] == "scan.replay.json"
+    resolved = client_config(config["target"], config_path)
+    assert resolved["replay_path"] == str(DEMO / "scan.replay.json")
+    assert config["target"]["replay_path"] == "scan.replay.json"
+
+
+def test_client_config_keeps_absolute_and_missing_replay_paths(tmp_path):
+    absolute = str(tmp_path / "rec.replay.json")
+    block = {"provider": "replay", "model": "m", "replay_path": absolute}
+    assert client_config(block, "configs/scan.yaml")["replay_path"] == absolute
+    plain = {"provider": "openai", "model": "m"}
+    assert client_config(plain, "configs/scan.yaml") == plain

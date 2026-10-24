@@ -1,32 +1,68 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentprobe"
-version = "1.7.0"
-description = "A lightweight prompt-injection scanner and agent security research harness"
+name = "agentprobe-security"
+dynamic = ["version"]
+description = "Prompt-injection scanner and agent security harness for LLM-powered agents"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{name = "Naren Ranjith"}]
+keywords = [
+  "llm", "ai-security", "prompt-injection", "red-teaming", "agents",
+  "security-testing", "llm-as-judge", "sarif",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Testing",
+]
 dependencies = [
-  "groq>=0.11.0",
-  "openai>=1.0.0",
+  "groq>=0.11.0,<2",
+  "openai>=1.0.0,<4",
   "python-dotenv>=1.0.0",
   "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.17,<0.18", "build>=1.2", "twine>=6.1"]
+
+[project.urls]
+Homepage = "https://github.com/nar1-frames/agentprobe"
+Source = "https://github.com/nar1-frames/agentprobe"
+Issues = "https://github.com/nar1-frames/agentprobe/issues"
+Changelog = "https://github.com/nar1-frames/agentprobe/blob/main/CHANGELOG.md"
+Security = "https://github.com/nar1-frames/agentprobe/blob/main/SECURITY.md"
 
 [project.scripts]
 agentprobe = "agentprobe.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "agentprobe.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["agentprobe", "agentprobe.*", "attacks", "attacks.*",
            "disclosure", "disclosure.*", "research", "research.*"]
 exclude = ["agentprobe-backup*", "_variants_from_B*", "build*", "dist*"]
+
+[tool.setuptools.package-data]
+# The offline demo config and its sanitized recording, so `agentprobe demo`
+# works from an installed wheel.
+agentprobe = ["demo/replay.yaml", "demo/scan.replay.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

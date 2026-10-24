@@ -1,6 +1,6 @@
 # AgentProbe offline demo: replays a recorded scan with no network and no keys.
-# Run from the repository root:
-#   agentprobe scan --non-interactive --config demo/replay.yaml
+# Run it from any folder with `agentprobe demo`. replay_path is resolved
+# next to this file; reports go to ./reports under the current directory.
 # The model names are the ones the recording was made against. The judge
 # (120B) is larger than the target (20B), so the judge-strength gate passes on
 # parameter size alone; no strength_rank override is needed.
@@ -8,7 +8,7 @@
 target:
   provider: replay
   model: openai/gpt-oss-20b
-  replay_path: demo/scan.replay.json
+  replay_path: scan.replay.json
   max_tokens: 512
   temperature: 0.0
   reasoning_effort: low
@@ -17,7 +17,7 @@ target:
 judge:
   provider: replay
   model: openai/gpt-oss-120b
-  replay_path: demo/scan.replay.json
+  replay_path: scan.replay.json
   max_tokens: 120
   temperature: 0.1
   reasoning_effort: low
