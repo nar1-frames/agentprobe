@@ -170,8 +170,8 @@ unknown:
 4. Can network calls only reach allowlisted hosts over https?
 5. Is there a limit on chained tool calls per request?
 
-These five match AgentProbe's guarded fixture controls (see the README's
-harness section). Put each "no" or "unknown" in the delivery notes as an
+These five match AgentProbe's guarded fixture controls (see
+[HARNESS.md](HARNESS.md#the-guarded-policy)). Put each "no" or "unknown" in the delivery notes as an
 architecture-layer recommendation. These are the durable fixes; model-layer
 refusals are not.
 
@@ -249,7 +249,7 @@ agentprobe report --scan reports/<scan>.json --out deliverables/report.html \
 Open the HTML in a browser and print it to PDF (or use headless Edge or
 Chrome, as in `examples/sample-report/README.md`). Check the first screen:
 it shows the result, the score, the summary sentence, and the notice about
-attacks that could not run. `examples/sample-report/` shows what a finished
+attacks that could not be tested. `examples/sample-report/` shows what a finished
 report looks like.
 
 **Deliver:** the report as HTML and PDF, the scan and harness SARIF (data

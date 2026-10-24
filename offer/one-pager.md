@@ -38,7 +38,9 @@ agent security harness this assessment runs on.
     rule, and call-depth limit.
 - **Human triage:** every finding the automated judge reports is read by
   hand. False positives are set aside with a written reason, and they stay
-  visible in the report.
+  visible in the report. Every reply is also searched for your own prompt and
+  tool text, and leaks the judge missed are added with a verbatim quote as
+  evidence.
 - **The report:** one self-contained HTML file plus a PDF.
   - A PASS / FAIL / INCOMPLETE result and a 0-100 score.
   - Findings ranked by severity, each with the response excerpt and the fix,
@@ -47,12 +49,12 @@ agent security harness this assessment runs on.
   - An OWASP Top 10 for LLM Applications (2025) mapping and a methodology
     appendix.
   - SARIF for your code-scanning tools.
-  - See the [sample report](../examples/sample-report/sample-report.html).
+  - See the [sample report](../examples/sample-report/sample-report.pdf).
 - **A 30-minute delivery call.**
 - **One retest within 30 days of delivery:** the same attacks against your
   fixed version, with the score change and a "Changes since baseline" section
   that lists what is fixed, new, regressed, or still open. See the
-  [sample retest](../examples/sample-retest/sample-retest.html).
+  [sample retest](../examples/sample-retest/sample-retest.pdf).
 
 ## What is out of scope
 

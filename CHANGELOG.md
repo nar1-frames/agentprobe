@@ -236,8 +236,7 @@ compatibility policy. Install it with `pip install agentprobe-security`.
   disagree.
 - The test suite passes on Windows without weakening the POSIX permission
   checks.
-- Prompt God work orders (`.promptgod/`) are workspace metadata and are no
-  longer tracked.
+- Workspace metadata (`.promptgod/`) is untracked.
 
 ### Fixed
 
@@ -272,7 +271,7 @@ published to PyPI.
 ## Earlier versions
 
 Versions 0.1 to 1.6 were developed in the repository without packaged
-releases. The README's version history table summarizes them.
+releases. Their history is in Git.
 
 [Unreleased]: https://github.com/nar1-frames/agentprobe/compare/v2.1.0...HEAD
 [2.1.0]: https://github.com/nar1-frames/agentprobe/compare/v2.0.0...v2.1.0
