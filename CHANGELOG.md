@@ -9,6 +9,14 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ### Added
 
+- Assessment package:
+  - `docs/ASSESSMENT.md`, the end-to-end runbook for a fixed-fee assessment;
+  - `offer/one-pager.md`, the design-partner offer;
+  - `examples/sample-report/`, a sample customer report (HTML and PDF)
+    rendered from the public scan with an engagement header and analyst
+    triage, which a test keeps in sync with the code;
+  - `site/index.html`, a static landing page, published by a SHA-pinned
+    `pages.yml` workflow.
 - Customer report for paid engagements:
   - an engagement header from `--engagement` YAML (client, engagement ID,
     assessment window, system, scope, prepared by, contact, authorization);

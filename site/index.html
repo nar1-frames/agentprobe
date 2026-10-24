@@ -1,0 +1,224 @@
+<!doctype html>
+<!-- Before deploying: replace CONTACT_EMAIL@example.com (two places) with the
+     address that should receive scoping-call requests. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentProbe Assessments</title>
+<meta name="description" content="Fixed-fee AI agent security assessments built on AgentProbe, the open-source agent security harness: 49 prompt-injection attacks through your agent's own API, human-reviewed findings, fixes ranked by layer, one retest included.">
+<style>
+:root{--ink:#16191d;--muted:#566069;--line:#d9dee3;--paper:#ffffff;--panel:#f3f5f7;
+--accent:#0f5c6e;--accent-ink:#ffffff;--good:#156b33;--bad:#b0261c;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e7eaee;--muted:#a3adb7;
+--line:#2c333b;--paper:#111417;--panel:#1a1f24;--accent:#5fb3c6;--accent-ink:#0b1114;
+--good:#5cc184;--bad:#ef7a6f;color-scheme:dark}}
+:root[data-theme="dark"]{--ink:#e7eaee;--muted:#a3adb7;--line:#2c333b;--paper:#111417;
+--panel:#1a1f24;--accent:#5fb3c6;--accent-ink:#0b1114;--good:#5cc184;--bad:#ef7a6f;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);
+font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;overflow-wrap:anywhere}
+a{color:var(--accent)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+.top{border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 24px;
+padding-top:14px;padding-bottom:14px}
+.mark{font-weight:750;letter-spacing:-.01em;color:var(--ink);text-decoration:none;font-size:1.05rem}
+.mark span{color:var(--accent)}
+nav{display:flex;flex-wrap:wrap;gap:4px 20px;font-size:.95rem}
+nav a{color:var(--muted);text-decoration:none}
+nav a:hover{color:var(--ink)}
+.hero{padding-top:72px;padding-bottom:56px}
+.eyebrow{margin:0 0 12px;color:var(--muted);font-size:.85rem;font-weight:600;letter-spacing:.08em;
+text-transform:uppercase}
+h1{margin:0;max-width:20ch;font-size:clamp(2rem,5.2vw,3.35rem);line-height:1.08;letter-spacing:-.02em}
+.lede{max-width:62ch;margin:22px 0 0;color:var(--muted);font-size:1.12rem}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.button{display:inline-block;padding:12px 20px;border-radius:8px;border:1px solid var(--line);
+color:var(--ink);text-decoration:none;font-weight:600}
+.button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.button:hover{filter:brightness(1.07)}
+.fine{margin:16px 0 0;color:var(--muted);font-size:.92rem}
+section{padding:48px 0;border-top:1px solid var(--line)}
+h2{margin:0 0 8px;font-size:clamp(1.4rem,3vw,1.85rem);letter-spacing:-.01em}
+.intro{max-width:62ch;margin:0 0 28px;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px}
+.card{display:flex;flex-direction:column;padding:22px;border:1px solid var(--line);border-radius:12px;
+background:var(--panel)}
+.kicker{margin:0;color:var(--accent);font-size:.8rem;font-weight:700;letter-spacing:.08em;
+text-transform:uppercase}
+.card h3{margin:6px 0 10px;font-size:1.15rem;line-height:1.3}
+.card p{margin:0 0 16px}
+.card .more{margin-top:auto;font-weight:600}
+.stat{font-variant-numeric:tabular-nums;font-weight:700}
+.offer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:28px;align-items:start}
+.price{padding:24px;border:2px solid var(--accent);border-radius:12px}
+.price .amount{margin:0;font-size:2.6rem;font-weight:800;line-height:1;letter-spacing:-.02em}
+.price .list{margin:6px 0 14px;color:var(--muted)}
+.price .list s{color:var(--muted)}
+.price ul,.scope ul{margin:0;padding-left:1.15em}
+.price li,.scope li{margin:.3em 0}
+.scope h3{margin:0 0 8px;font-size:1.05rem}
+.scope h3+ul{margin-bottom:20px}
+.out{color:var(--muted)}
+ol.steps{margin:0;padding:0;list-style:none;display:grid;gap:12px;counter-reset:step}
+ol.steps li{display:grid;grid-template-columns:3.2rem minmax(0,1fr);gap:14px;align-items:baseline;
+padding:14px 0;border-bottom:1px solid var(--line)}
+ol.steps li:last-child{border-bottom:0}
+.day{color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
+.closing{text-align:left}
+footer{padding:28px 0 40px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
+footer p{margin:.3em 0}
+@media (max-width:720px){.hero{padding-top:48px;padding-bottom:40px}.offer{grid-template-columns:minmax(0,1fr)}
+section{padding:36px 0}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="#">Agent<span>Probe</span></a>
+    <nav aria-label="Sections">
+      <a href="#proof">Evidence</a>
+      <a href="#offer">Offer</a>
+      <a href="#how">How it works</a>
+      <a href="https://github.com/nar1-frames/agentprobe">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <p class="eyebrow">AI agent security assessment</p>
+    <h1>Find out if prompt injection can steer your AI agent, before your customers do.</h1>
+    <p class="lede">A fixed-fee assessment built on AgentProbe, the open-source agent
+      security harness. We send 49 attacks through your agent's own API, read every
+      finding by hand, and rank the fixes by where they actually hold. It takes five
+      business days, and one retest is included.</p>
+    <div class="cta">
+      <a class="button primary" href="mailto:CONTACT_EMAIL@example.com?subject=AgentProbe%20scoping%20call">Book a 30-minute scoping call</a>
+      <a class="button" href="#proof">See the evidence</a>
+    </div>
+    <p class="fine">Design-partner price $2,500 including one retest (list $6,000).</p>
+  </div>
+
+  <section id="proof" aria-labelledby="proof-title">
+    <div class="wrap">
+      <h2 id="proof-title">Evidence you can check</h2>
+      <p class="intro">Everything below is public, and anyone can reproduce it from the
+        repository.</p>
+      <div class="cards">
+        <article class="card">
+          <p class="kicker">Public scan</p>
+          <h3>The LangChain quickstart agent, scanned and replayable</h3>
+          <p><span class="stat">0 of 19</span> overt jailbreak, privilege, and injection
+            attacks worked. Asked politely, the agent disclosed its instructions and its
+            tool schema. The judge flagged <span class="stat">8</span> findings, and a human
+            read set aside <span class="stat">3</span> as false positives. Every verdict
+            replays offline from the committed recording.</p>
+          <a class="more" href="https://github.com/nar1-frames/agentprobe/blob/main/writeups/public-scan-01.md">Read the write-up &rarr;</a>
+        </article>
+        <article class="card">
+          <p class="kicker">GitHub Action</p>
+          <h3>A security gate on every pull request</h3>
+          <p>The open-source Action runs a scan or the offline agent harness, uploads SARIF
+            to GitHub code scanning, and fails the job at the verdict you choose. It is free
+            to use, with no account needed.</p>
+          <a class="more" href="https://github.com/nar1-frames/agentprobe/tree/main/action">Use the Action &rarr;</a>
+        </article>
+        <article class="card">
+          <p class="kicker">Sample report</p>
+          <h3>A report your buyer can forward</h3>
+          <p>The first screen shows PASS or FAIL and a 0-100 score. Fixes are split by
+            architecture and model layer and mapped to the OWASP Top 10 for LLM
+            Applications (2025). Every finding the analyst set aside is shown with its
+            reason.</p>
+          <a class="more" href="https://github.com/nar1-frames/agentprobe/blob/main/examples/sample-report/sample-report.pdf">Open the sample (PDF) &rarr;</a>
+          <a href="sample-report/sample-report.html">or the web version</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="offer" aria-labelledby="offer-title">
+    <div class="wrap">
+      <h2 id="offer-title">The design-partner offer</h2>
+      <p class="intro">One fixed price, one agent, one retest. You get the result in
+        five business days.</p>
+      <div class="offer">
+        <div class="price">
+          <p class="amount">$2,500</p>
+          <p class="list">Design-partner price, one retest included. List <s>$6,000</s>.</p>
+          <ul>
+            <li>Five business days</li>
+            <li>Retest within 30 days</li>
+            <li>Report as HTML, PDF, and SARIF</li>
+          </ul>
+        </div>
+        <div class="scope">
+          <h3>In scope</h3>
+          <ul>
+            <li>One agent reachable over HTTP, with up to two tools</li>
+            <li>49 prompt-injection attacks in 8 categories, sent through your agent's API</li>
+            <li>Harness policy checks: your model and system prompt against fixture tools,
+              and a five-control review of your two tools</li>
+            <li>Every finding read by hand; false positives set aside with reasons</li>
+            <li>A 30-minute walkthrough, then one retest with a since-last-scan comparison</li>
+          </ul>
+          <h3>Out of scope</h3>
+          <ul class="out">
+            <li>Infrastructure or web penetration testing; production data or accounts</li>
+            <li>Running your real tools; novel, multi-turn, or retrieval-poisoning attacks</li>
+            <li>Any certification or guarantee of safety</li>
+          </ul>
+          <h3>Before we start</h3>
+          <ul>
+            <li>A staging endpoint, a revocable scan token, and your two tool definitions</li>
+            <li>A signed statement of work authorizing the test: no request is sent before it</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <h2 id="how-title">How it works</h2>
+      <p class="intro">The procedure is published in full in the
+        <a href="https://github.com/nar1-frames/agentprobe/blob/main/docs/ASSESSMENT.md">assessment runbook</a>.</p>
+      <ol class="steps">
+        <li><span class="day">Day 0</span><span>A scoping call, then a statement of work
+          that authorizes the test.</span></li>
+        <li><span class="day">Day 1</span><span>Your staging endpoint is wired and
+          smoke-tested.</span></li>
+        <li><span class="day">Day 2</span><span>We run the attack scan, the live harness,
+          and the policy review of your tools.</span></li>
+        <li><span class="day">Day 3</span><span>Human triage of every finding, then the
+          report.</span></li>
+        <li><span class="day">Day 4</span><span>Report delivered, with a 30-minute
+          walkthrough. The retest follows within 30 days.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="closing" aria-labelledby="close-title">
+    <div class="wrap">
+      <h2 id="close-title">Ready when you are</h2>
+      <p class="intro">Tell us what your agent does and which tools it can call. We will
+        reply with a scoping-call slot.</p>
+      <a class="button primary" href="mailto:CONTACT_EMAIL@example.com?subject=AgentProbe%20scoping%20call">Book a 30-minute scoping call</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>AgentProbe is open source under the MIT license:
+      <a href="https://github.com/nar1-frames/agentprobe">github.com/nar1-frames/agentprobe</a>.
+      Assessments are run by Naren Ranjith.</p>
+    <p>An assessment is control testing of one configuration on the stated dates. It is
+      not a guarantee of safety.</p>
+  </div>
+</footer>
+</body>
+</html>
