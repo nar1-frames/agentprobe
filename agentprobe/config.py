@@ -167,6 +167,13 @@ def validate_config(config: Mapping[str, Any]) -> dict:
         if (not isinstance(packs, (list, tuple)) or not packs or len(packs) > 20
                 or not all(isinstance(spec, str) and spec.strip() for spec in packs)):
             raise ValueError("packs must be a list of 1 to 20 pack names or paths")
+    if config.get("packs_trust") is not None:
+        from agentprobe.signing import SignatureError, trust_policy
+
+        try:
+            trust_policy(config["packs_trust"])
+        except SignatureError as exc:
+            raise ValueError(str(exc)) from exc
     severity = scan.get("severity_filter")
     if severity is not None and severity not in VALID_SEVERITIES:
         raise ValueError(

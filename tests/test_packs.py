@@ -75,7 +75,8 @@ def test_builtin_pack_is_the_bundled_library():
     assert pack.sha256 == attack_pack_digest(build_attack_pack())
     assert pack.provenance() == {"id": "agentprobe-core", "version": "1.0.0",
                                  "schema_version": "1.0", "license": "MIT", "attacks": 49,
-                                 "sha256": pack.sha256}
+                                 "sha256": pack.sha256, "signed": False,
+                                 "signer_key_id": None, "verified": False}
 
 
 def test_builtin_only_selection_keeps_its_published_digests():

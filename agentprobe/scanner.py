@@ -28,6 +28,7 @@ from agentprobe.providers import build_client, preflight_model
 from agentprobe.reliability import is_retryable_error
 from agentprobe.replay import RecordingClient, ReplayRecording
 from agentprobe.packs import AttackPack, load_packs
+from agentprobe.signing import trust_policy
 from agentprobe.verdicts import VERDICT_RULE, apply_oracle
 from agentprobe.reporting import (
     build_json_report, build_run_metadata, save_json_report, scan_attack_id,
@@ -382,8 +383,18 @@ def run_configured_scan(
     scan = config.get("scan", {})
     output = config.get("output", {})
     validate_judge_strength(target["model"], judge["model"], target, judge)
+    trust = trust_policy(config.get("packs_trust"))
     loaded = load_packs(config.get("packs"), os.path.dirname(os.path.abspath(config_path)),
-                        packs)
+                        packs, trust=trust)
+    # With trusted keys configured, an external pack that is not verified is worth
+    # a visible line; without keys, provenance alone records the signature status.
+    pack_warnings = [
+        f"attack pack {pack.id} {pack.version} is "
+        + (f"signed by untrusted key {pack.signer_key_id}" if pack.signed else "not signed")
+        + f" (packs_trust mode {trust.mode})"
+        for pack in loaded
+        if trust.keys and not pack.builtin and not pack.verified
+    ]
     attack_library = filter_attacks(config, loaded)
     if not attack_library:
         raise ValueError("No attacks matched the configured scan filters")
@@ -463,4 +474,5 @@ def run_configured_scan(
         )
     if report_format in {"json", "both"}:
         json_path = save_json_report(report, target["model"], report_dir)
-    return {"results": results, "html_path": html_path, "json_path": json_path, "report": report}
+    return {"results": results, "html_path": html_path, "json_path": json_path, "report": report,
+            "pack_warnings": pack_warnings}

@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Sequence
 
 import yaml
@@ -444,6 +445,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate = packs_commands.add_parser("validate", help="check one pack directory")
     validate.add_argument("path", metavar="DIR", help="pack directory (holds manifest.yaml)")
+    validate.add_argument(
+        "--trust", action="append", default=[], metavar="PUBLIC_KEY",
+        help="a trusted public key (raw base64, or a .pub/PEM file path); repeatable",
+    )
+    sign = packs_commands.add_parser("sign", help="sign a pack directory (writes manifest.sig)")
+    sign.add_argument("path", metavar="DIR", help="pack directory (holds manifest.yaml)")
+    sign.add_argument("--key", required=True, metavar="FILE", help="Ed25519 private key (PEM)")
+    keygen = packs_commands.add_parser("keygen", help="create an Ed25519 signing key pair")
+    keygen.add_argument("--out", required=True, metavar="PREFIX",
+                        help="writes PREFIX.key (private, 0600) and PREFIX.pub (public)")
     packs.set_defaults(handler="packs")
     return parser
 
@@ -478,6 +489,8 @@ def _run_non_interactive_scan(args) -> int:
         print(f"HTML report saved to: {run['html_path']}")
     if run["json_path"]:
         print(f"JSON report saved to: {run['json_path']}")
+    for warning in run.get("pack_warnings") or []:
+        print(f"Warning: {warning}")
     try:
         _write_exports(args, run.get("report"), scan_report_to_sarif, scan_report_to_junit)
     except (OSError, TypeError, ValueError) as exc:
@@ -533,16 +546,59 @@ def _pack_line(pack) -> str:
             f"license {pack.license}; sha256 {pack.sha256}")
 
 
+def _signature_line(pack, trusted_keys: bool) -> str:
+    if not pack.signed:
+        return "Signature: none (unsigned pack)"
+    if pack.verified:
+        return f"Signature: signed by key {pack.signer_key_id}, verified against a trusted key"
+    if trusted_keys:
+        return f"Signature: signed by key {pack.signer_key_id}, which is not a trusted key"
+    return (f"Signature: signed by key {pack.signer_key_id}, intact; pass --trust with the "
+            "signer's public key to verify who signed it")
+
+
+def _trusted_key_text(value: str) -> str:
+    """A --trust value is a key, or a path to a file holding one."""
+    return Path(value).read_text(encoding="utf-8") if os.path.isfile(value) else value
+
+
 def _packs(args, parser) -> int:
     from agentprobe.packs import PackError, available_packs, load_pack
+    from agentprobe.signing import (
+        SignatureError, TrustPolicy, generate_keypair, parse_public_key, sign_fields,
+        write_signature,
+    )
 
     if args.packs_command == "validate":
         try:
-            pack = load_pack(args.path)
-        except PackError as exc:
+            keys = frozenset(parse_public_key(_trusted_key_text(key)) for key in args.trust)
+            pack = load_pack(args.path, TrustPolicy("warn", keys))
+        except (PackError, SignatureError, OSError) as exc:
             print(f"agentprobe: pack error: {exc}", file=sys.stderr)
             return 2
         print(f"Pack OK: {_pack_line(pack)}")
+        print(_signature_line(pack, bool(keys)))
+        return 0
+    if args.packs_command == "sign":
+        try:
+            pack = load_pack(args.path, TrustPolicy("off"))
+            path = write_signature(args.path, sign_fields(pack.id, pack.version, pack.sha256,
+                                                          args.key))
+        except (PackError, SignatureError, OSError) as exc:
+            print(f"agentprobe: signing error: {exc}", file=sys.stderr)
+            return 2
+        signature = json.loads(Path(path).read_text(encoding="utf-8"))
+        print(f"Signed {pack.id} {pack.version} (sha256 {pack.sha256}) with key "
+              f"{signature['key_id']}: wrote {path}")
+        return 0
+    if args.packs_command == "keygen":
+        try:
+            private_path, public_path, key_id = generate_keypair(args.out)
+        except (SignatureError, OSError) as exc:
+            print(f"agentprobe: keygen error: {exc}", file=sys.stderr)
+            return 2
+        print(f"Key {key_id}: private key {private_path} (keep it secret), "
+              f"public key {public_path} (share it; list it in packs_trust.keys)")
         return 0
     if args.packs_command == "list":
         problems = 0
@@ -553,7 +609,7 @@ def _packs(args, parser) -> int:
             else:
                 print(f"{_pack_line(found)}\n          source: {source}")
         return 2 if problems else 0
-    parser.error("packs needs a command: list or validate")
+    parser.error("packs needs a command: list, validate, sign, or keygen")
     return 2
 
 

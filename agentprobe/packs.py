@@ -25,7 +25,7 @@ import hashlib
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import yaml
@@ -34,6 +34,10 @@ from agentprobe.attackpack import (
     ATTACK_PACK_SCHEMA_VERSION, _validate_oracle, attack_pack_digest, build_attack_pack,
 )
 from agentprobe.reporting import SEVERITIES
+from agentprobe.signing import (
+    INSTALL_HINT, SignatureError, TrustPolicy, check_signature, parse_public_key,
+    read_signature,
+)
 
 
 PACK_SCHEMA_VERSION = "1.0"
@@ -71,6 +75,9 @@ class AttackPack:
     attacks: Tuple[Mapping[str, Any], ...]
     sha256: str
     builtin: bool = False
+    signed: bool = False
+    signer_key_id: Optional[str] = None
+    verified: bool = False
 
     def attacks_in(self, category: str) -> List[Mapping[str, Any]]:
         return [attack for attack in self.attacks if attack["category"] == category]
@@ -79,7 +86,9 @@ class AttackPack:
         """What a scan report records about this pack: identity, never location."""
 
         return {"id": self.id, "version": self.version, "schema_version": PACK_SCHEMA_VERSION,
-                "license": self.license, "attacks": len(self.attacks), "sha256": self.sha256}
+                "license": self.license, "attacks": len(self.attacks), "sha256": self.sha256,
+                "signed": self.signed, "signer_key_id": self.signer_key_id,
+                "verified": self.verified}
 
 
 def builtin_pack() -> AttackPack:
@@ -185,8 +194,48 @@ def _validate_attack(entry: Any, label: str, categories: Sequence[str]) -> Dict[
         "oracle": dict(entry["oracle"])}
 
 
-def load_pack(path: str) -> AttackPack:
-    """Load and validate the pack directory at ``path``."""
+def _apply_signature(pack: AttackPack, path: str, trust: TrustPolicy) -> AttackPack:
+    """Record the pack's signature status under ``trust``, or refuse the pack.
+
+    A signature that does not match the pack is refused in every mode but
+    ``off``. In ``require`` mode an unsigned pack, a pack signed by an untrusted
+    key, or a signature that cannot be checked is refused too.
+    """
+
+    try:
+        document = read_signature(path)
+    except SignatureError as exc:
+        if trust.mode == "off":
+            return pack
+        raise PackError(f"pack {pack.id}: {exc}") from exc
+    if trust.mode == "off":
+        return replace(pack, signed=document is not None,
+                       signer_key_id=document["key_id"] if document else None)
+    if document is None:
+        if trust.mode == "require":
+            raise PackError(f"pack {pack.id} is not signed, and packs_trust mode is require")
+        return pack
+    intact, reason = check_signature(document, pack.id, pack.version, pack.sha256)
+    if intact is False:
+        raise PackError(f"pack {pack.id} fails its signature check: {reason}")
+    trusted = trust.trusts(parse_public_key(document["public_key"]))
+    if trust.mode == "require":
+        if intact is None:
+            raise PackError(f"pack {pack.id} cannot be verified without the 'cryptography' "
+                            f"package: {INSTALL_HINT}")
+        if not trusted:
+            raise PackError(f"pack {pack.id} is signed by key {document['key_id']}, which "
+                            "packs_trust does not list")
+    return replace(pack, signed=True, signer_key_id=document["key_id"],
+                   verified=bool(intact and trusted))
+
+
+def load_pack(path: str, trust: Optional[TrustPolicy] = None) -> AttackPack:
+    """Load and validate the pack directory at ``path``, then check its signature.
+
+    ``trust`` defaults to ``warn`` with no trusted keys: a signature is still
+    checked for integrity, but no pack counts as verified.
+    """
 
     if not os.path.isdir(path):
         raise PackError(f"pack {path!r} is not a directory")
@@ -234,15 +283,17 @@ def load_pack(path: str) -> AttackPack:
     for attack in attacks:  # per-category index in pack order, like the built-in library
         counters[attack["category"]] = counters.get(attack["category"], 0) + 1
         indexed.append({**attack, "index": counters[attack["category"]]})
-    return AttackPack(manifest["id"], manifest["version"], manifest["license"],
+    pack = AttackPack(manifest["id"], manifest["version"], manifest["license"],
                       tuple(manifest["categories"]), tuple(indexed), sha256)
+    return _apply_signature(pack, path, trust or TrustPolicy())
 
 
 def _search_path() -> List[str]:
     return [entry for entry in os.environ.get(PACKS_PATH_ENV, "").split(os.pathsep) if entry]
 
 
-def resolve_pack(spec: str, base_dir: Optional[str] = None) -> AttackPack:
+def resolve_pack(spec: str, base_dir: Optional[str] = None,
+                 trust: Optional[TrustPolicy] = None) -> AttackPack:
     """Load a pack by name ("builtin"), by path, or by name from AGENTPROBE_PACKS_PATH.
 
     A relative path is resolved against ``base_dir`` (the config file's folder
@@ -252,15 +303,15 @@ def resolve_pack(spec: str, base_dir: Optional[str] = None) -> AttackPack:
     if not isinstance(spec, str) or not spec.strip():
         raise PackError("a pack must be named by a non-empty string")
     if spec in BUILTIN_ALIASES:
-        return builtin_pack()
+        return builtin_pack()  # ships inside the package; its release is signed instead
     candidate = spec if os.path.isabs(spec) else os.path.join(base_dir or os.getcwd(), spec)
     if os.path.isdir(candidate):
-        return load_pack(candidate)
+        return load_pack(candidate, trust)
     if _PACK_ID.match(spec):
         for root in _search_path():
             located = os.path.join(root, spec)
             if os.path.isfile(os.path.join(located, MANIFEST_NAME)):
-                return load_pack(located)
+                return load_pack(located, trust)
     raise PackError(f"pack {spec!r} not found: not 'builtin', not a directory, and not "
                     f"in {PACKS_PATH_ENV}")
 
@@ -275,16 +326,17 @@ def ensure_unique(packs: Sequence[AttackPack]) -> List[AttackPack]:
 
 
 def load_packs(config_specs: Optional[Iterable[str]] = None, config_dir: Optional[str] = None,
-               extra_specs: Iterable[str] = ()) -> List[AttackPack]:
+               extra_specs: Iterable[str] = (),
+               trust: Optional[TrustPolicy] = None) -> List[AttackPack]:
     """The packs for one scan: the config's list (default: built-in), then --pack additions."""
 
     specs = list(config_specs) if config_specs else ["builtin"]
-    packs = [resolve_pack(spec, config_dir) for spec in specs]
-    packs += [resolve_pack(spec) for spec in extra_specs]
+    packs = [resolve_pack(spec, config_dir, trust) for spec in specs]
+    packs += [resolve_pack(spec, None, trust) for spec in extra_specs]
     return ensure_unique(packs)
 
 
-def available_packs() -> List[Tuple[str, Any]]:
+def available_packs(trust: Optional[TrustPolicy] = None) -> List[Tuple[str, Any]]:
     """(source, pack or PackError) for the built-in pack and every AGENTPROBE_PACKS_PATH pack."""
 
     found: List[Tuple[str, Any]] = [("built-in", builtin_pack())]
@@ -295,7 +347,7 @@ def available_packs() -> List[Tuple[str, Any]]:
             path = os.path.join(root, name)
             if os.path.isfile(os.path.join(path, MANIFEST_NAME)):
                 try:
-                    found.append((path, load_pack(path)))
+                    found.append((path, load_pack(path, trust)))
                 except PackError as exc:
                     found.append((path, exc))
     return found
