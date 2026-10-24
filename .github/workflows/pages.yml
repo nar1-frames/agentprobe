@@ -1,14 +1,15 @@
 name: Pages
 
 # Publishes site/ to GitHub Pages, with the sample report copied in at
-# sample-report/. Pages must be enabled with "GitHub Actions" as the source
-# (repository Settings, then Pages).
+# sample-report/ and the sample retest at sample-retest/. Pages must be enabled
+# with "GitHub Actions" as the source (repository Settings, then Pages).
 on:
   push:
     branches: [main]
     paths:
       - "site/**"
       - "examples/sample-report/**"
+      - "examples/sample-retest/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -30,10 +31,12 @@ jobs:
 
       - name: Assemble the site
         run: |
-          mkdir -p _site/sample-report
+          mkdir -p _site/sample-report _site/sample-retest
           cp site/index.html _site/
           cp examples/sample-report/sample-report.html examples/sample-report/sample-report.pdf \
             _site/sample-report/
+          cp examples/sample-retest/sample-retest.html examples/sample-retest/sample-retest.pdf \
+            _site/sample-retest/
 
       - name: Upload the site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

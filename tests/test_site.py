@@ -34,3 +34,4 @@ def test_linked_repository_files_exist():
         relative = link.split("/main/", 1)[1]
         assert (ROOT / relative).exists(), relative
     assert (ROOT / "examples" / "sample-report" / "sample-report.html").exists()
+    assert (ROOT / "examples" / "sample-retest" / "sample-retest.html").exists()

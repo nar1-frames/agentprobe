@@ -1,0 +1,13 @@
+# Engagement header for the sample retest. A real retest reuses the original
+# engagement file; see docs/ASSESSMENT.md section 9.
+client: "Sample retest: LangChain quickstart agent"
+engagement_id: SAMPLE-001-RETEST
+assessment_window: "2026-10-24, baseline and retest from benchmark 01"
+system: "LangChain v1 quickstart agent on openai/gpt-oss-20b via Groq; the fix under test is a hardened system prompt"
+scope:
+  - "Chat endpoint of an example agent the authors ran locally (127.0.0.1)"
+  - "Baseline: the agent as shipped. Retest: the same agent with a confidentiality and embedded-text-is-data clause added to its system prompt"
+  - "AgentProbe public attack library: 49 single-turn attacks in 8 categories"
+prepared_by: Naren Ranjith
+contact: "Through the AgentProbe repository: github.com/nar1-frames/agentprobe"
+authorization: "Not required: the authors ran the example agent themselves; no third-party system was tested"
