@@ -5,10 +5,12 @@ CSS, no scripts, and no external fonts or assets. Open it directly from disk
 (`file://`) to preview it. It follows the system light or dark theme.
 
 `.github/workflows/pages.yml` publishes it to GitHub Pages on every push to
-`main` that touches `site/` or `examples/sample-report/`. The workflow copies
-the sample report to `sample-report/` beside the page. That one "web version"
-link works only on the deployed site. The other proof links point at
-github.com.
+`main` that touches `site/`, `examples/sample-report/`, or
+`examples/sample-retest/`. The workflow copies the sample report to
+`sample-report/` and the sample retest to `sample-retest/` beside the page.
+Those two "web version" links work only on the deployed site
+(`scripts/check_links.py` maps them to the repository copies). The other
+proof links point at github.com.
 
 Before the first deploy:
 

@@ -175,3 +175,46 @@ tools. Both paths return `ToolCall` objects and keep `AgentRuntime`/`ToolPolicy`
 as the policy and audit boundary. New scenarios should state their objective
 and required tool sequence so success is measured from observed execution
 rather than from a judge's interpretation.
+
+## Source layout
+
+```
+agentprobe/cli.py             installable CLI: scan, harness, demo, compare, report, packs
+agentprobe/scanner.py         scanner used by the CLI, automation, and CI
+agentprobe/interactive.py     interactive model picker behind `agentprobe scan`
+agentprobe/providers.py       shared provider clients and endpoint validation
+agentprobe/http_target.py     the `http` provider: scan a deployed agent's own endpoint
+agentprobe/replay.py          deterministic record/replay of provider requests
+agentprobe/detection.py       two-stage detector: keyword pass (with hedge-then-comply), then LLM judge
+agentprobe/verdicts.py        deterministic oracles and the oracle-precedence verdict rule
+agentprobe/attackpack.py      built-in attacks joined to their success oracles
+agentprobe/packs.py           external attack packs: loading, validation, provenance
+agentprobe/signing.py         Ed25519 pack signatures and packs_trust
+agentprobe/harness.py         offline end-to-end tool-use security harness
+agentprobe/events.py          closed, versioned vocabulary of harness trace events
+agentprobe/config.py          validated config and bounded runtime settings
+agentprobe/models.py          model-size parsing and the judge-strength gate
+agentprobe/reliability.py     provider-agnostic retry classification
+agentprobe/checkpoints.py     private, atomic, configuration-bound scan checkpoints
+agentprobe/reporting.py       versioned JSON reports with provenance, atomic writes
+agentprobe/html_report.py     engineer HTML report
+agentprobe/customer_report.py customer report, triage, and retest (`agentprobe report`)
+agentprobe/compare.py         baseline/regression comparison (`agentprobe compare`)
+agentprobe/exports.py         data-minimized SARIF and JUnit exports
+agentprobe/mitigations.py     canonical Mitigation Map
+agentprobe/termstyle.py       shared plain-ASCII terminal tags
+agentprobe/demo/              bundled offline demo config and recording
+agentprobe/legacy/v11.py      frozen v1.1 runner, kept for compatibility tests
+attacks/library.py            the 49 built-in attack prompts (pure data)
+attacks/oracles.py            success oracles for the built-in attacks
+action/                       the GitHub Action
+disclosure/                   authorization gate and disclosure drafts
+research/                     the "can we trust the judge?" study
+examples/                     worked targets, packs, benchmark, sample reports
+site/                         the one-page site published by the Pages workflow
+scripts/check_links.py        checks every relative link in the repository
+```
+
+The historical `agentprobe_v01.py` to `agentprobe_v12.py` scripts were retired
+from the tree in 2.0.0; they remain in Git history. The supported automation
+boundary is the installable `agentprobe` package.
