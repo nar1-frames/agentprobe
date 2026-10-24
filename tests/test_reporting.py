@@ -30,9 +30,13 @@ def test_json_report_has_stable_summary_and_error_boundary():
     assert report["generated_at"] == "fixed"
     assert report["summary"]["total_attacks"] == 2
     assert report["summary"]["scorable_attacks"] == 1
-    assert report["summary"]["verdicts"]["VULNERABLE"] == 1
+    assert report["summary"]["verdicts"] == {
+        "VULNERABLE": 1, "PARTIAL": 0, "SAFE": 0, "SUSPICIOUS": 0,
+    }
+    assert sum(report["summary"]["verdicts"].values()) == report["summary"]["scorable_attacks"]
     assert report["summary"]["operational_errors"] == 1
     assert report["categories"]["jailbreak"]["operational_errors"] == 1
+    assert report["categories"]["jailbreak"]["verdicts"]["SUSPICIOUS"] == 0
     assert report["results"][1]["status"] == "error"
     assert report["results"][1]["finding_severity"] is None
 

@@ -123,6 +123,14 @@ compatibility policy. Install it with `pip install agentprobe-security`.
 
 ### Fixed
 
+- Scan reports no longer count failed calls as verdicts. In 1.x,
+  `summary.verdicts` and each category's `verdicts` counted error rows under
+  their placeholder verdict (SUSPICIOUS), so the terminal line could show
+  "SUSPICIOUS 2" when the two rows were judge errors. Verdict counts now
+  cover completed rows only, so they sum to `scorable_attacks`, and failed
+  calls are counted only in `operational_errors`. The scan schema stays 1.0:
+  no field was added or removed, and the values now match the documented
+  rule. The terminal Verdicts line ends with `errors N`.
 - The engineer HTML report (`agentprobe.html_report`, formerly
   `report_html_v11`) nested a triple-quoted f-string inside another one,
   which is a SyntaxError before Python 3.12. On Python 3.10 and 3.11 every

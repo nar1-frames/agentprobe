@@ -105,7 +105,7 @@ def test_noninteractive_scan_prints_summary_before_saved_lines(monkeypatch, caps
     assert main(["scan", "--non-interactive"]) == 0
     out = capsys.readouterr().out
     assert "Scan summary: 14 attacks (13 scorable), 1 operational errors" in out
-    assert "Verdicts: SAFE 10, SUSPICIOUS 0, PARTIAL 1, VULNERABLE 2" in out
+    assert "Verdicts: SAFE 10, SUSPICIOUS 0, PARTIAL 1, VULNERABLE 2, errors 1" in out
     assert "Findings by severity: HIGH 2, MEDIUM 1" in out
     assert out.index("Scan summary:") < out.index("JSON report saved to:")
 

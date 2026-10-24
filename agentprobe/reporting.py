@@ -128,10 +128,14 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
             attack_index = attack.get("_library_index", position)
             is_error = method in {"target-error", "judge-error"}
             error_count += int(is_error)
-            verdict_counts[verdict] += 1
             by_category[category]["total"] += 1
-            by_category[category]["errors"] += int(is_error)
-            by_category[category][verdict.lower()] += 1
+            # A failed call is never a verdict: its placeholder verdict stays on
+            # the row but is not counted, so verdict counts sum to scorable rows.
+            if is_error:
+                by_category[category]["errors"] += 1
+            else:
+                verdict_counts[verdict] += 1
+                by_category[category][verdict.lower()] += 1
             if finding_severity:
                 finding_counts[finding_severity] += 1
 

@@ -86,6 +86,11 @@ version.
   fields is removed or renamed; or verdict, severity, or status values change
   meaning. A major schema bump ships only in a major package release and is
   listed under "Breaking" in the changelog.
+- **Scan report counts.** `summary.verdicts` and each category's `verdicts`
+  count completed rows only, so they sum to `scorable_attacks`. Failed
+  target or judge calls are counted only in `operational_errors`. Their rows
+  keep a placeholder `verdict` with `status: "error"`; read `status` before
+  `verdict`. Reports written by 1.x counted error rows under SUSPICIOUS.
 - **Working files are read strictly.** Checkpoints and replay recordings are
   local working files, not interchange formats. AgentProbe reads only the
   exact schema version it writes, and refuses anything else rather than
