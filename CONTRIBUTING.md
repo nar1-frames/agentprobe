@@ -17,6 +17,7 @@ attack library.
 python3 -m pip install -e ".[dev]"
 pytest
 ruff check .
+python scripts/check_links.py   # every relative link resolves (also run by pytest)
 agentprobe harness --mode guarded
 ```
 
