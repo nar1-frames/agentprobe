@@ -18,8 +18,10 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [2.1.0] - Unreleased (set the date when tagging v2.1.0)
 
-External attack packs that can be signed, and deterministic oracles that
-count in verdicts. Scan reports move to schema 1.1 (additive); 2.0 reports
+External attack packs that can be signed, deterministic oracles that count
+in verdicts, a `python` target that scans an agent function in-process, and a
+customer report that records findings the judge missed and compares a retest
+with its baseline. Scan reports move to schema 1.1 (additive); 2.0 reports
 stay comparable.
 
 ### Added
