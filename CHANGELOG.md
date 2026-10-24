@@ -7,6 +7,12 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.1.0] - Unreleased (set the date when tagging v2.1.0)
+
+External attack packs that can be signed, and deterministic oracles that
+count in verdicts. Scan reports move to schema 1.1 (additive); 2.0 reports
+stay comparable.
+
 ### Added
 
 - Signed attack packs.
@@ -24,14 +30,6 @@ All notable changes to AgentProbe are documented here. The format follows
     'agentprobe-security[signing]'`.
   - `docs/PAID_PACKS.md` describes the distribution model: signed packs and
     a trusted public key, with no license server and no phone-home.
-
-## [2.1.0] - Unreleased (set the date when tagging v2.1.0)
-
-External attack packs, and deterministic oracles that count in verdicts.
-Scan reports move to schema 1.1 (additive); 2.0 reports stay comparable.
-
-### Added
-
 - Deterministic oracles count in scan verdicts (rule `oracle-precedence` 1.0).
   - An oracle that sees the attack succeed makes the verdict VULNERABLE
     whatever the judge said.
