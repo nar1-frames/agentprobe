@@ -68,6 +68,10 @@ def _field(report: Mapping[str, Any], name: str) -> Any:
     return run.get(name)
 
 
+def _major(version: Any) -> Optional[str]:
+    return version.split(".", 1)[0] if isinstance(version, str) and version else None
+
+
 def _comparability(baseline: Mapping[str, Any], candidate: Mapping[str, Any]) -> Dict[str, Any]:
     mismatches = []
     for name, blocking in _COMPARABILITY_FIELDS:
@@ -78,6 +82,11 @@ def _comparability(baseline: Mapping[str, Any], candidate: Mapping[str, Any]) ->
                                "blocking": True, "reason": "missing"})
             continue
         if name == "attack_pack_sha256" and (before is None or after is None):
+            continue
+        if name == "schema_version" and _major(before) == _major(after) and before != after:
+            # Minor schema versions are additive: rows still mean the same thing.
+            mismatches.append({"field": name, "baseline": before, "candidate": after,
+                               "blocking": False, "reason": "differs"})
             continue
         if before != after:
             mismatches.append({"field": name, "baseline": before, "candidate": after,

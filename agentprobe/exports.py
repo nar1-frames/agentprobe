@@ -31,7 +31,7 @@ SCAN_SARIF_OUTCOMES = {
 }
 # Only these method names are exported; anything else is reported as
 # "unknown" so free text can never travel in the method field.
-_METHODS = frozenset({"keyword", "llm-judge", "target-error", "judge-error"})
+_METHODS = frozenset({"keyword", "llm-judge", "oracle", "target-error", "judge-error"})
 _XML_INVALID = re.compile("[^\u0009\u000a\u000d -퟿-�\U00010000-\U0010ffff]")
 
 

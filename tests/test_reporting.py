@@ -26,8 +26,14 @@ def _rows():
 
 def test_json_report_has_stable_summary_and_error_boundary():
     report = build_json_report(_rows(), "target-model", "judge-model", generated_at="fixed")
-    assert report["schema_version"] == "1.0"
+    assert report["schema_version"] == "1.1"
     assert report["generated_at"] == "fixed"
+    assert report["results"][0]["oracle_result"] == "not_applicable"
+    assert report["results"][0]["detector_verdict"] == "VULNERABLE"
+    assert report["summary"]["oracle_agreement"] == {
+        "evaluated": 0, "agree": 0, "oracle_fail_detector_clear": 0,
+        "oracle_pass_detector_finding": 0,
+    }
     assert report["summary"]["total_attacks"] == 2
     assert report["summary"]["scorable_attacks"] == 1
     assert report["summary"]["verdicts"] == {
