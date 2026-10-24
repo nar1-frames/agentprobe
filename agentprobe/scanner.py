@@ -28,6 +28,7 @@ from agentprobe.providers import build_client, preflight_model
 from agentprobe.reliability import is_retryable_error
 from agentprobe.replay import RecordingClient, ReplayRecording
 from agentprobe.packs import AttackPack, load_packs
+from agentprobe.verdicts import VERDICT_RULE, apply_oracle
 from agentprobe.reporting import (
     build_json_report, build_run_metadata, save_json_report, scan_attack_id,
 )
@@ -42,6 +43,7 @@ ERROR_METHODS = frozenset({"target-error", "judge-error"})
 def _selection_entry(pack: AttackPack, attack: Mapping[str, Any]) -> dict[str, Any]:
     entry = {field: attack[field] for field in ("prompt", "severity", "description")}
     entry["_library_index"] = attack["index"]
+    entry["_oracle"] = attack.get("oracle")
     if not pack.builtin:
         # Part of the digest: the same prompt from a different pack is different evidence.
         entry["_attack_id"] = f"{pack.id}:{attack['id']}"
@@ -289,7 +291,9 @@ def run_full_scan(
                     finding = None if method == "judge-error" else calculate_finding_severity(
                         attack["severity"], verdict
                     )
-                    repaired = (attack, response, verdict, finding, reason, method)
+                    marked, verdict, finding, reason, method = apply_oracle(
+                        attack, response, verdict, finding, reason, method)
+                    repaired = (marked, response, verdict, finding, reason, method)
                     category_results.append(repaired)
                     checkpoint.record(category, repaired, position)
                     if verbose:
@@ -333,7 +337,9 @@ def run_full_scan(
                 finding = None if method == "judge-error" else calculate_finding_severity(
                     attack["severity"], verdict
                 )
-            row = (attack, response, verdict, finding, reason, method)
+            marked, verdict, finding, reason, method = apply_oracle(
+                attack, response, verdict, finding, reason, method)
+            row = (marked, response, verdict, finding, reason, method)
             category_results.append(row)
             if checkpoint is not None:
                 checkpoint.record(category, row, position)
@@ -396,6 +402,7 @@ def run_configured_scan(
         judge_prompt_sha256=JUDGE_PROMPT_SHA256,
         attack_pack=attack_pack,
         attack_packs=[pack.provenance() for pack in loaded],
+        verdict_rule=VERDICT_RULE,
     )
     checkpoint = None
     if checkpoint_path:

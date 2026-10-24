@@ -17,10 +17,11 @@ from collections import Counter, defaultdict
 from typing import Any, Mapping
 
 from agentprobe import __version__
+from agentprobe.verdicts import agreement_tally
 from agentprobe.events import EVENT_SCHEMA_VERSION, validate_events
 
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 HARNESS_SCHEMA_VERSION = "1.4"
 TOOL_VERSION = __version__
 VERDICTS = ("VULNERABLE", "PARTIAL", "SAFE", "SUSPICIOUS")
@@ -43,12 +44,17 @@ def _digest(value):
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+# Selection metadata that is not attack content: the per-category index, and the
+# oracle (pinned separately by attack_pack_sha256 and run.attack_packs).
+_NOT_DIGESTED = frozenset({"_library_index", "_oracle"})
+
+
 def attack_library_digest(attack_library):
     """Digest attack content, excluding runtime-only selection metadata."""
 
     canonical = {
         category: [
-            {key: value for key, value in attack.items() if key != "_library_index"}
+            {key: value for key, value in attack.items() if key not in _NOT_DIGESTED}
             for attack in attacks
         ]
         for category, attacks in attack_library.items()
@@ -76,7 +82,8 @@ def scan_attack_id(category, attack, position):
 def build_run_metadata(target_model, judge_model, target_provider=None,
                        judge_provider=None, config=None, attack_library=None,
                        run_id=None, judge_prompt_version=None,
-                       judge_prompt_sha256=None, attack_pack=None, attack_packs=None):
+                       judge_prompt_sha256=None, attack_pack=None, attack_packs=None,
+                       verdict_rule=None):
     """Create provenance metadata without copying credentials into reports.
 
     ``attack_pack`` is the built-in pack (recorded as attack_pack_schema_version
@@ -129,6 +136,8 @@ def build_run_metadata(target_model, judge_model, target_provider=None,
         metadata["attack_pack_sha256"] = attack_pack_digest(attack_pack)
     if attack_packs is not None:
         metadata["attack_packs"] = [dict(pack) for pack in attack_packs]
+    if verdict_rule is not None:
+        metadata["verdict_rule"] = dict(verdict_rule)
     return metadata
 
 
@@ -172,6 +181,10 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
                 "reason": reason,
                 "method": method,
                 "status": "error" if is_error else "complete",
+                # Schema 1.1: the deterministic oracle's result and the detector's
+                # own verdict before rule oracle-precedence (see agentprobe.verdicts).
+                "oracle_result": attack.get("_oracle_result", "not_applicable"),
+                "detector_verdict": attack.get("_detector_verdict", verdict),
             })
 
     total = len(rows)
@@ -195,6 +208,7 @@ def build_json_report(scan_results, target_model, judge_model, generated_at=None
                 severity: finding_counts[severity] for severity in SEVERITIES
             },
             "operational_errors": error_count,
+            "oracle_agreement": agreement_tally(rows),
         },
         "categories": {
             category: {
