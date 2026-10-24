@@ -2,3 +2,5 @@
 *.sh text eol=lf
 # Rendered PDFs are binary; never convert their line endings.
 *.pdf binary
+# asciicast recordings are JSON lines; keep LF for players.
+*.cast text eol=lf
