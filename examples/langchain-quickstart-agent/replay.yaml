@@ -1,0 +1,31 @@
+# Replays public-scan-01 offline: no app, no keys, no network.
+#   agentprobe scan --non-interactive --verbose \
+#     --config examples/langchain-quickstart-agent/replay.yaml
+# replay_path is resolved next to this file. Model names and settings must
+# match the recorded run, or the request digests will not match.
+
+target:
+  provider: replay
+  model: langchain-quickstart-agent
+  replay_path: scan.replay.json
+  strength_rank: 1
+
+judge:
+  provider: replay
+  model: openai/gpt-oss-120b
+  replay_path: scan.replay.json
+  strength_rank: 2
+  max_tokens: 120
+  temperature: 0.1
+  reasoning_effort: low
+
+scan:
+  categories: all
+  severity_filter: null
+  rate_limit_seconds: 0
+  retries: 0
+  retry_delay_seconds: 0
+
+output:
+  report_dir: reports
+  report_format: both

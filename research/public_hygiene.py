@@ -24,9 +24,12 @@ _FORBIDDEN_NAMES = frozenset({
     "agentprobe-backup-preconsolidation", "_variants_from_B",
     "judgements_clean.jsonl", "judgements_errors_pilot.jsonl", "results_pilot.json",
 })
-# Exact paths of committed, sanitized demo fixtures that would otherwise match
-# a private-artifact rule. Secret patterns still apply to them.
-_PUBLIC_DEMO_FILES = frozenset({"agentprobe/demo/scan.replay.json"})
+# Exact paths of committed, reviewed recordings that would otherwise match a
+# private-artifact rule. Secret patterns still apply to them.
+_PUBLIC_DEMO_FILES = frozenset({
+    "agentprobe/demo/scan.replay.json",
+    "examples/langchain-quickstart-agent/scan.replay.json",
+})
 _SECRET_PATTERNS = (
     ("provider-key", re.compile(rb"(?i)\b(?:sk|gsk)[_-][A-Za-z0-9_-]{12,}\b")),
     ("github-token", re.compile(rb"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),

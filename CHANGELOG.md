@@ -17,6 +17,13 @@ All notable changes to AgentProbe are documented here. The format follows
   summary. The gate (`action/gate.py`) reads only the data-minimized SARIF,
   so it works with any 2.x release. A self-test workflow exercises the
   action offline on Ubuntu and Windows.
+- `examples/langchain-quickstart-agent/`: the LangChain v1 quickstart agent
+  behind a local HTTP endpoint, a scan config, and a reviewed recording of one
+  live run with a replay config that reproduces it offline. It backs
+  `writeups/public-scan-01.md`, and `tests/test_public_scan.py` checks the
+  replay on every CI run. The hygiene allowlist names this one recording.
+- `docs/BENCHMARK.md`: the methodology, fixed before any data, for a future
+  framework comparison.
 - CodeQL code scanning (`codeql.yml`) on pushes to main, on pull requests,
   and weekly, with the `security-extended` query suite. Its actions are
   pinned to commit SHAs.

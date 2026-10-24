@@ -15,6 +15,7 @@ reports/
 *.replay.json
 # The sanitized offline demo recording is the one public exception.
 !agentprobe/demo/scan.replay.json
+!examples/langchain-quickstart-agent/scan.replay.json
 .DS_Store
 
 # Disclosure workflow (v1.2) — real engagements + unpatched vulns stay local.
