@@ -76,6 +76,11 @@ compatibility policy. Install it with `pip install agentprobe-security`.
   the wheel, and installs it into a fresh virtualenv to run the demo. Every
   action is pinned to a commit SHA, and Dependabot proposes pip and
   GitHub Actions updates weekly.
+- Release workflow (`release.yml`, triggered by `v*` tags). It checks that
+  the tag matches the package version, tests, builds, audits the wheel,
+  writes an SPDX SBOM, attests build provenance with Sigstore, and publishes
+  to PyPI through trusted publishing from the `pypi` environment.
+  `SECURITY.md` explains how to verify a release.
 
 ### Changed
 

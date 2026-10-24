@@ -1,0 +1,101 @@
+name: Release
+
+# Runs when a version tag is pushed (for example v2.0.0). It builds once,
+# records an SBOM and a signed build-provenance attestation for the exact
+# files it built, then publishes those files to PyPI through trusted
+# publishing. No API token is stored in the repository.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write      # Sigstore signing for the provenance attestation
+      attestations: write  # store the attestation with the repository
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install package and release tools
+        run: python -m pip install -e ".[dev]"
+
+      - name: Check the tag matches the package version
+        run: |
+          version="$(python -c 'import agentprobe; print(agentprobe.__version__)')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version ${version}" >&2
+            exit 1
+          fi
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check distribution metadata
+        run: python -m twine check --strict dist/*
+
+      - name: Audit wheel contents
+        run: python -m research.public_hygiene --wheel dist/*.whl
+
+      - name: Install the wheel into a clean environment for the SBOM
+        run: |
+          python -m venv "$RUNNER_TEMP/sbom-env"
+          "$RUNNER_TEMP/sbom-env/bin/python" -m pip install dist/*.whl
+
+      # The SBOM lists the package and every dependency it resolved to. It is
+      # kept out of dist/ so PyPI only receives the sdist and wheel.
+      - name: Generate SBOM (SPDX JSON)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: ${{ runner.temp }}/sbom-env
+          format: spdx-json
+          output-file: sbom/agentprobe-security.spdx.json
+          artifact-name: agentprobe-security.spdx.json
+          upload-release-assets: false
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/agentprobe-security/
+    permissions:
+      id-token: write  # PyPI trusted publishing; nothing else
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      # Trusted publishing exchanges this job's OIDC token for a short-lived
+      # PyPI upload credential. PEP 740 attestations are uploaded by default.
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
