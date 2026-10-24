@@ -38,6 +38,18 @@ stay comparable.
     and uncomparable attacks.
   - `--baseline-triage` applies the earlier report's analyst review, so both
     sides are compared as the analyst left them.
+- A `python` target scans an agent by calling its function in-process, with
+  no server: `provider: python` and `python: {callable: "package.module:function"}`.
+  - The function takes the attack text, or the message list with
+    `messages: true`, and returns the reply. `async` functions work.
+  - `cwd` (default: the config file's folder) goes first on `sys.path` for
+    the import. The scanner's working directory does not change.
+  - A function that cannot be imported stops the scan before any request
+    (exit 2). An exception or a non-text reply is that attack's operational
+    error, and transient errors keep their retry classification.
+  - It works with record and replay. `docs/TARGETS.md` describes every target
+    type, and `examples/langchain-quickstart-agent` scans the same agent
+    through both the http and python targets.
 - Signed attack packs.
   - `agentprobe packs keygen` and `agentprobe packs sign` write an Ed25519
     `manifest.sig` over the pack's content digest. `packs validate --trust`

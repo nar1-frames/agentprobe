@@ -45,6 +45,7 @@ tool invocation.
 |---|---|---|---|
 | Spoofing | Fake system/admin instructions | Model behavior tests; no privilege from text alone | A model may still request an unsafe action |
 | Tampering | Config and attack selection | YAML validation before client creation | Local filesystem permissions remain the operator's responsibility |
+| Elevation of privilege | A config that names a `python` target | The function is named only by the operator's config and imported once, before any attack; an import failure stops the scan, and a call failure is recorded as an operational error | The named code runs in the scanner process with the operator's permissions; a config from an untrusted source is untrusted code |
 | Repudiation | Tool actions and disclosure workflow | Structured traces; disclosure history transitions | Logs are not remotely tamper-evident |
 | Information disclosure | Secrets, files, system prompts | Fixture-only tools; tool allowlist; path rules; confirmation gates | Real integrations need their own data-loss controls |
 | Denial of service | Provider calls and token spend | Timeouts, bounded retries, rate limits, max steps | Provider quotas and costs still apply |

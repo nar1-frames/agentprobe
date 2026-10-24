@@ -45,6 +45,7 @@ tooling.
 | `agentprobe.attackpack` | `build_attack_pack`, `validate_attack_pack`, `attack_pack_digest`, `attack_pack_id`, `ATTACK_PACK_SCHEMA_VERSION` |
 | `agentprobe.replay` | `ReplayClient`, `ReplayRecording`, `RecordingClient`, `ReplayMiss`, `load_recording`, `REPLAY_SCHEMA_VERSION` |
 | `agentprobe.http_target` | `build_http_target`, `HttpTargetError` |
+| `agentprobe.python_target` (2.1) | `build_python_target`, `load_callable`, `validate_python_block`, `PythonTargetClient`, `PythonTargetError` |
 | `agentprobe.checkpoints` | `ScanCheckpoint`, `CheckpointError` |
 | `agentprobe.packs` (2.1) | `load_pack`, `load_packs`, `resolve_pack`, `builtin_pack`, `available_packs`, `AttackPack`, `PackError`, `PACK_SCHEMA_VERSION`, `BUILTIN_PACK_ID`, `PACKS_PATH_ENV` |
 | `agentprobe.signing` (2.1) | `generate_keypair`, `sign_fields`, `write_signature`, `read_signature`, `check_signature`, `parse_public_key`, `key_id`, `trust_policy`, `TrustPolicy`, `SignatureError`, `SigningUnavailable`, `SIGNATURE_FILE` |

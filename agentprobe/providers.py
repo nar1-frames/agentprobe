@@ -11,8 +11,9 @@ from agentprobe.replay import ReplayClient
 
 
 # "replay" serves a local recording and never transmits content, so it is
-# deliberately absent here. "http" sends every attack to a deployed agent.
-EXTERNAL_PROVIDERS = frozenset({"groq", "openai", "custom", "http"})
+# deliberately absent here. "http" sends every attack to a deployed agent;
+# "python" runs the operator's own code, which may send it anywhere.
+EXTERNAL_PROVIDERS = frozenset({"groq", "openai", "custom", "http", "python"})
 
 
 def requires_external_consent(provider: str) -> bool:
@@ -52,6 +53,11 @@ def build_client(provider_config: Mapping[str, Any]):
     provider = provider_config.get("provider", "groq")
     if provider == "replay":
         return ReplayClient(provider_config.get("replay_path"))
+    if provider == "python":
+        # An in-process function; see agentprobe/python_target.py.
+        from agentprobe.python_target import build_python_target
+
+        return build_python_target(provider_config)
     base_url = provider_config.get("base_url")
     _validate_base_url(provider, base_url)
     if provider == "http":

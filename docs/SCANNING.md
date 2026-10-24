@@ -4,7 +4,9 @@
 each reply, and writes an HTML report and a versioned JSON report to
 `reports/`. Both are local because they contain model outputs. This page
 covers the interactive picker, scripted and CI runs, deployed-agent targets,
-regression gates, long runs, and replay. For the customer-facing report see
+regression gates, long runs, and replay. Every target type, including the
+`python` target that calls your agent's code directly, is in
+[TARGETS.md](TARGETS.md). For the customer-facing report see
 [REPORTS.md](REPORTS.md); for the attacks themselves see
 [ATTACKS.md](ATTACKS.md) and [PACKS.md](PACKS.md).
 
@@ -96,7 +98,8 @@ The `http` provider sends each attack to an endpoint you own, in the
 endpoint's own JSON shape, so the system prompt, tools, retrieval, and
 guardrails are all in the loop. Every attack gets a fresh session ID by
 default. Only the `target` block may use it; the judge stays a model you
-control. See the commented example at the bottom of `config.yaml`, and
+control. See the commented example at the bottom of `config.yaml`,
+[TARGETS.md](TARGETS.md#a-deployed-agent-http) for every setting, and
 [examples/langchain-quickstart-agent](../examples/langchain-quickstart-agent/README.md)
 for a complete run against a LangChain agent.
 

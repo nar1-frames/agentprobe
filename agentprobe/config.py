@@ -16,7 +16,9 @@ from urllib.parse import urlparse
 import yaml
 
 
-SUPPORTED_PROVIDERS = frozenset({"groq", "openai", "ollama", "custom", "http", "replay"})
+SUPPORTED_PROVIDERS = frozenset({
+    "groq", "openai", "ollama", "custom", "http", "python", "replay",
+})
 VALID_CATEGORIES = frozenset({
     "jailbreak", "data_extraction", "privilege_escalation",
     "social_engineering", "role_confusion", "indirect_injection",
@@ -106,6 +108,34 @@ def _validate_model_block(config: Mapping[str, Any], name: str) -> float:
         validate_http_block(block.get("http"), f"{name}.http")
     elif "http" in block:
         raise ValueError(f"{name}.http is only valid with the http provider")
+    if provider == "python":
+        if name != "target":
+            raise ValueError(
+                f"{name}.provider python is only valid for the target; the judge "
+                "must be a model you control"
+            )
+        if "strength_rank" not in block:
+            raise ValueError(
+                "target.strength_rank is required for the python provider: a function "
+                "does not reveal its model, so the judge-strength gate needs an "
+                "explicit rank for both target and judge"
+            )
+        for key in ("base_url", "api_key_env"):
+            if block.get(key) is not None:
+                raise ValueError(
+                    f"target.{key} is not used by the python provider; the function "
+                    "reaches its own model and reads its own environment"
+                )
+        from agentprobe.python_target import validate_python_block
+
+        settings = validate_python_block(block.get("python"), f"{name}.python")
+        if "system_prompt" in block and not settings["messages"]:
+            raise ValueError(
+                "target.system_prompt reaches a python target only with "
+                "python.messages: true (the function then receives the system message)"
+            )
+    elif "python" in block:
+        raise ValueError(f"{name}.python is only valid with the python provider")
     base_url = block.get("base_url")
     if base_url is None:
         if provider in {"custom", "http"}:
@@ -225,6 +255,12 @@ def validate_config(config: Mapping[str, Any]) -> dict:
         from agentprobe.http_target import validate_http_block
 
         normalized["target"]["http"] = validate_http_block(target.get("http"), "target.http")
+    if target.get("provider") == "python":
+        from agentprobe.python_target import validate_python_block
+
+        normalized["target"]["python"] = validate_python_block(
+            target.get("python"), "target.python"
+        )
     normalized.setdefault("scan", {})["rate_limit_seconds"] = rate_limit
     normalized["scan"]["retries"] = int(retry_values["retries"])
     normalized["scan"]["retry_delay_seconds"] = retry_values["retry_delay_seconds"]
@@ -255,12 +291,19 @@ def client_config(block: Mapping[str, Any], config_path: str) -> dict:
     runs". The validated config keeps the path as written, so its digest does
     not depend on where the file sits on disk. Output paths (report_dir,
     record_replay_path, checkpoints) stay relative to the working directory, so
-    scan output never lands inside an installed package.
+    scan output never lands inside an installed package. A python target's
+    ``cwd`` follows the same rule as ``replay_path``, and defaults to the config
+    file's directory, because the code it names travels with the config.
     """
 
     resolved = dict(block)
+    base = os.path.dirname(os.path.abspath(config_path))
     replay_path = resolved.get("replay_path")
     if replay_path and not os.path.isabs(replay_path):
-        base = os.path.dirname(os.path.abspath(config_path))
         resolved["replay_path"] = os.path.join(base, replay_path)
+    if resolved.get("provider") == "python" and isinstance(resolved.get("python"), Mapping):
+        python = dict(resolved["python"])
+        cwd = python.get("cwd")
+        python["cwd"] = os.path.join(base, cwd) if cwd else base
+        resolved["python"] = python
     return resolved
