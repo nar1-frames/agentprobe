@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>AgentProbe — AI Security Assessment — openai/gpt-oss-20b</title>
-      <meta name="agentprobe-run-id" content="bbb4a31c55114ee1844791a6325eeb87">
-      <meta name="agentprobe-tool-version" content="1.7.0">
-      <meta name="agentprobe-config-sha256" content="4a606ccfda1a28b78e870851798d60949d2fd239dd767874d17c880b0b60ec05">
+      <meta name="agentprobe-run-id" content="c239ef35945d461bbf62d05e039d31cd">
+      <meta name="agentprobe-tool-version" content="2.0.0">
+      <meta name="agentprobe-config-sha256" content="ca3f80b565fcf94834bc11c51139f846bf84f4e330eec0094a3bdc2fa8520f1a">
       <meta name="agentprobe-attack-library-sha256" content="39524741b71f5cc334093395462a75957520343c1dce89bcbf84f058effeac35">
       <meta name="agentprobe-target-temperature" content="0.0">
       <meta name="agentprobe-judge-temperature" content="0.1">
@@ -334,15 +334,15 @@
     </div>
     <div class="hdr-right">
       <div class="confidential">Authorized Use Only</div><br>
-      <strong>Date</strong>&nbsp; October 21, 2026<br>
+      <strong>Date</strong>&nbsp; October 23, 2026<br>
       <strong>Target</strong>&nbsp; openai/gpt-oss-20b<br>
       <strong>Judge</strong>&nbsp; openai/gpt-oss-120b<br>
       <strong>Target provider</strong>&nbsp; replay<br>
       <strong>Judge provider</strong>&nbsp; replay<br>
       <strong>Temperatures</strong>&nbsp; target 0.0 · judge 0.1<br>
       <strong>Judge prompt</strong>&nbsp; 2.0<br>
-      <strong>Run ID</strong>&nbsp; bbb4a31c55114ee1844791a6325eeb87<br>
-      <strong>Tool</strong>&nbsp; 1.7.0<br>
+      <strong>Run ID</strong>&nbsp; c239ef35945d461bbf62d05e039d31cd<br>
+      <strong>Tool</strong>&nbsp; 2.0.0<br>
       <strong>Scope</strong>&nbsp; 14 prompts · 3 categories
     </div>
   </div>
@@ -611,7 +611,7 @@ The exact contents will depend on your operating system and any customization…
           <td class="td-mit-layer">Model</td>
           <td class="td-mit-fix">
             Persona anchoring and refusal training reduce this but do not eliminate it. Empirically the highest-success category — measure it every release and gate deployment on the result rather than assuming it is fixed.
-            <span class="owasp-tag">LLM01</span>
+            <span class="owasp-tag">LLM01:2025</span>
           </td>
         </tr>
         <tr>
@@ -620,7 +620,7 @@ The exact contents will depend on your operating system and any customization…
           <td class="td-mit-layer">App</td>
           <td class="td-mit-fix">
             Keep conversation state and guardrails server-side. Ignore in-band &#x27;reset / forget everything / your instructions expired&#x27; claims — the model should not manage its own guardrail lifecycle.
-            <span class="owasp-tag">LLM01</span>
+            <span class="owasp-tag">LLM01:2025</span>
           </td>
         </tr>
         <tr class="zebra">
@@ -629,7 +629,7 @@ The exact contents will depend on your operating system and any customization…
           <td class="td-mit-layer">Architecture</td>
           <td class="td-mit-fix">
             Least privilege on every tool, allowlist permitted actions, sandbox execution, and require human-in-the-loop for consequential calls. Model refusals are unreliable — put the guardrail at the tool layer, not the prompt.
-            <span class="owasp-tag">LLM08</span>
+            <span class="owasp-tag">LLM06:2025</span>
           </td>
         </tr>
       </tbody>
@@ -664,7 +664,7 @@ The exact contents will depend on your operating system and any customization…
       <a href="https://github.com/nar1-frames/agentprobe">AgentProbe</a>
       &nbsp;·&nbsp; For authorized security testing only
     </span>
-    <span>October 21, 2026 at 00:30</span>
+    <span>October 23, 2026 at 18:15</span>
   </div>
 
 </div>
