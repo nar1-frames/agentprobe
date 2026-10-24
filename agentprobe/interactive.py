@@ -7,14 +7,12 @@ a judge, enforces the judge-strength rule, and runs the package scanner.
 import os
 import sys
 import json
-import time
 import urllib.request
 import webbrowser
 
 # Reuse the package scanner and report — one supported execution path.
 from agentprobe.scanner import (
     build_client, filter_attacks, load_config,
-    send_prompt, is_error_response, assess_vulnerability, calculate_finding_severity,
     run_full_scan,
 )
 from agentprobe.html_report import generate_html_report, save_html_report

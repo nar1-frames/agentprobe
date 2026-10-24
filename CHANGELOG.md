@@ -71,6 +71,11 @@ compatibility policy. Install it with `pip install agentprobe-security`.
 - `agentprobe.termstyle`: shared terminal helpers with a console-aware glyph
   fallback for cp1252 consoles.
 - `CHANGELOG.md` and `docs/COMPATIBILITY.md`.
+- CI tests on Ubuntu and Windows (Python 3.10 and 3.12, plus 3.11 on
+  Ubuntu), runs ruff, builds the sdist and wheel, runs `twine check`, audits
+  the wheel, and installs it into a fresh virtualenv to run the demo. Every
+  action is pinned to a commit SHA, and Dependabot proposes pip and
+  GitHub Actions updates weekly.
 
 ### Changed
 
@@ -84,6 +89,10 @@ compatibility policy. Install it with `pip install agentprobe-security`.
 
 ### Fixed
 
+- The engineer HTML report (`agentprobe.html_report`, formerly
+  `report_html_v11`) nested a triple-quoted f-string inside another one,
+  which is a SyntaxError before Python 3.12. On Python 3.10 and 3.11 every
+  scan path that writes HTML failed to import. The output is unchanged.
 - Customer report: inconclusive responses are explained, the notice uses
   correct plurals, and the report refuses to overwrite its own input files.
 - Interactive runner: emoji show on UTF-8 consoles and fall back to ASCII

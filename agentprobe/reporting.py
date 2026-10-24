@@ -14,7 +14,7 @@ import re
 import tempfile
 import uuid
 from collections import Counter, defaultdict
-from typing import Any, Dict, Mapping
+from typing import Any, Mapping
 
 from agentprobe import __version__
 from agentprobe.events import EVENT_SCHEMA_VERSION, validate_events

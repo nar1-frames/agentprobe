@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Mapping
 
 from agentprobe.config import load_config as _load_validated_config
-from agentprobe.providers import build_client
+from agentprobe.providers import build_client  # noqa: F401 - re-exported for research scripts
 
 # Make the repo root importable whether you run `python research/foo.py`
 # or `python -m research.foo`.

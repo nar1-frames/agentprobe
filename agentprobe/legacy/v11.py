@@ -23,7 +23,6 @@
 #   FIX  send_prompt() now retries transient API errors instead of
 #        crashing the entire scan on a single timeout.
 # ============================================================
-import datetime
 import time
 from attacks.library import ATTACK_LIBRARY
 from agentprobe.html_report import generate_html_report, save_html_report

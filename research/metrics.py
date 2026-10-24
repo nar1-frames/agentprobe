@@ -75,7 +75,7 @@ def cohens_kappa(pairs, labels=None):
     p_o = accuracy(pairs)
     a_marg = Counter(a for a, _ in pairs)
     b_marg = Counter(b for _, b in pairs)
-    p_e = sum((a_marg[l] / n) * (b_marg[l] / n) for l in labels)
+    p_e = sum((a_marg[label] / n) * (b_marg[label] / n) for label in labels)
     if p_e == 1.0:
         return 1.0
     return (p_o - p_e) / (1 - p_e)
@@ -84,15 +84,15 @@ def cohens_kappa(pairs, labels=None):
 def per_class_prf(pairs, labels):
     """Precision/recall/F1 per class, treating the first element as gold."""
     out = {}
-    for l in labels:
-        tp = sum(1 for g, p in pairs if g == l and p == l)
-        fp = sum(1 for g, p in pairs if g != l and p == l)
-        fn = sum(1 for g, p in pairs if g == l and p != l)
+    for label in labels:
+        tp = sum(1 for g, p in pairs if g == label and p == label)
+        fp = sum(1 for g, p in pairs if g != label and p == label)
+        fn = sum(1 for g, p in pairs if g == label and p != label)
         prec = tp / (tp + fp) if (tp + fp) else 0.0
         rec = tp / (tp + fn) if (tp + fn) else 0.0
         f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
-        out[l] = {"precision": prec, "recall": rec, "f1": f1,
-                  "support": sum(1 for g, _ in pairs if g == l)}
+        out[label] = {"precision": prec, "recall": rec, "f1": f1,
+                      "support": sum(1 for g, _ in pairs if g == label)}
     return out
 
 
@@ -108,7 +108,7 @@ def fleiss_kappa(item_ratings, labels):
     items = [r for r in item_ratings if sum(r.values()) > 0]
     if not items:
         return float("nan")
-    counts = [sum(r.get(l, 0) for l in labels) for r in items]
+    counts = [sum(r.get(label, 0) for label in labels) for r in items]
     if len(set(counts)) != 1:
         raise ValueError(
             "Fleiss' kappa requires the same number of raters for every item; "
@@ -122,13 +122,13 @@ def fleiss_kappa(item_ratings, labels):
     # P_i: agreement within item i
     P = []
     for r in items:
-        s = sum(r.get(l, 0) * (r.get(l, 0) - 1) for l in labels)
+        s = sum(r.get(label, 0) * (r.get(label, 0) - 1) for label in labels)
         P.append(s / (n * (n - 1)))
     P_bar = sum(P) / N
 
     # p_j: proportion of all assignments to category j
     total = N * n
-    p_j = {l: sum(r.get(l, 0) for r in items) / total for l in labels}
+    p_j = {label: sum(r.get(label, 0) for r in items) / total for label in labels}
     P_e = sum(v * v for v in p_j.values())
 
     if P_e == 1.0:

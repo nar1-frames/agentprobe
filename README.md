@@ -462,10 +462,10 @@ pytest
 ```
 
 422 tests currently pass in a clean checkout, and CI runs them on Linux and
-Windows (detection
-routing, hedge-then-comply, severity mapping, research analysis invariants,
-report provenance, JSON reporting, exports, comparison, replay, the customer
-report, the offline demo, and the agent harness).
+Windows. They cover detection routing, hedge-then-comply, severity mapping,
+research analysis invariants, report provenance, JSON reporting, exports,
+comparison, replay, the customer report, the offline demo, and the agent
+harness. `ruff check .` is the lint gate.
 
 ## Responsible use
 

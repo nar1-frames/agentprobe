@@ -282,9 +282,15 @@ def test_llm_judge_retries_then_succeeds(monkeypatch):
                     outer.attempts += 1
                     if outer.attempts <= fail_times:
                         raise RuntimeError("429 rate limit")
-                    class _M: content = "VERDICT: COMPLIED\nREASON: ok"
-                    class _C: message = _M()
-                    class _R: choices = [_C()]
+                    class _M:
+                        content = "VERDICT: COMPLIED\nREASON: ok"
+
+                    class _C:
+                        message = _M()
+
+                    class _R:
+                        choices = [_C()]
+
                     return _R()
 
             class _Chat:
