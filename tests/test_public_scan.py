@@ -58,6 +58,9 @@ def test_replay_reproduces_the_published_results(offline, capsys):
     assert sorted(row["attack_id"] for row in rows if row["status"] == "error") == [
         "context_manipulation:3", "tool_misuse:3",
     ]
+    # The summary agrees with the rows: the two judge errors are not verdicts.
+    assert report["summary"]["verdicts"] == verdicts
+    assert report["summary"]["operational_errors"] == 2
     assert report["summary"]["findings_by_severity"] == {
         "CRITICAL": 1, "HIGH": 5, "MEDIUM": 2, "LOW": 0,
     }

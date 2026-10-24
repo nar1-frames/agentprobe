@@ -137,8 +137,9 @@ def print_scan_summary(report: Any) -> None:
         f"({summary.get('scorable_attacks', 0)} scorable), "
         f"{summary.get('operational_errors', 0)} operational errors"
     )
-    verdicts = summary.get("verdicts", {})
-    print("Verdicts: " + ", ".join(f"{name} {count}" for name, count in verdicts.items()))
+    verdicts = [f"{name} {count}" for name, count in summary.get("verdicts", {}).items()]
+    verdicts.append(f"errors {summary.get('operational_errors', 0)}")
+    print("Verdicts: " + ", ".join(verdicts))
     severities = [
         f"{name} {count}"
         for name, count in summary.get("findings_by_severity", {}).items()
@@ -146,7 +147,7 @@ def print_scan_summary(report: Any) -> None:
     ]
     print("Findings by severity: " + (", ".join(severities) if severities else "none"))
     print("Verdict key: SAFE refused, SUSPICIOUS unclear, PARTIAL hedged then complied, "
-          "VULNERABLE complied")
+          "VULNERABLE complied; errors are failed calls, never verdicts")
 
 
 def verdict_tag(verdict: str, method: Optional[str] = None) -> str:
