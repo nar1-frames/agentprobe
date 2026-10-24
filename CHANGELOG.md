@@ -7,60 +7,7 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
-### Added
-
-- Assessment package:
-  - `docs/ASSESSMENT.md`, the end-to-end runbook for a fixed-fee assessment;
-  - `offer/one-pager.md`, the design-partner offer;
-  - `examples/sample-report/`, a sample customer report (HTML and PDF)
-    rendered from the public scan with an engagement header and analyst
-    triage, which a test keeps in sync with the code;
-  - `site/index.html`, a static landing page, published by a SHA-pinned
-    `pages.yml` workflow.
-- Customer report for paid engagements:
-  - an engagement header from `--engagement` YAML (client, engagement ID,
-    assessment window, system, scope, prepared by, contact, authorization);
-  - analyst triage from `--triage` YAML: judge findings set aside as false
-    positives with a required reason. The file is bound to the scan's
-    `run_id`, set-aside rows cost no points, and they are listed in their
-    own section;
-  - an OWASP Top 10 for LLM Applications (2025) column per category;
-  - a "Not tested and inconclusive" section;
-  - a methodology appendix with the run's provenance.
-- GitHub Action (`action/`): a composite action that installs
-  agentprobe-security and runs `scan`, `demo`, or `harness`. It uploads
-  SARIF to code scanning and fails the job at a configurable verdict
-  threshold (`fail-on`: vulnerable, partial, suspicious, never), optionally
-  also on operational errors. It writes counts as step outputs and a job
-  summary. The gate (`action/gate.py`) reads only the data-minimized SARIF,
-  so it works with any 2.x release. A self-test workflow exercises the
-  action offline on Ubuntu and Windows.
-- `examples/langchain-quickstart-agent/`: the LangChain v1 quickstart agent
-  behind a local HTTP endpoint, a scan config, and a reviewed recording of one
-  live run with a replay config that reproduces it offline. It backs
-  `writeups/public-scan-01.md`, and `tests/test_public_scan.py` checks the
-  replay on every CI run. The hygiene allowlist names this one recording.
-- `docs/BENCHMARK.md`: the methodology, fixed before any data, for a future
-  framework comparison.
-- CodeQL code scanning (`codeql.yml`) on pushes to main, on pull requests,
-  and weekly, with the `security-extended` query suite. Its actions are
-  pinned to commit SHAs.
-
-### Changed
-
-- OWASP references use the 2025 edition of the OWASP Top 10 for LLM
-  Applications. The previous codes came from the 2023 list. Data extraction
-  is now LLM07:2025 System Prompt Leakage, plus LLM02:2025 Sensitive
-  Information Disclosure. Tool misuse is now LLM06:2025 Excessive Agency,
-  plus LLM01:2025 Prompt Injection. Indirect injection is LLM01:2025. Read
-  against the 2025 list, the old codes named the wrong risks.
-- HTML report filenames drop the historical `_v11_` infix. They are now
-  `scan_<model>_<UTC stamp>_<run id>.html`, the same shape as the JSON
-  report. Compatibility note: scripts that globbed `*_v11_*.html` should
-  match `scan_*.html` instead. The run ID suffix still pairs each HTML file
-  with its JSON report.
-
-## [2.0.0] - 2026-10-23
+## [2.0.0] - Unreleased (set the date when tagging v2.0.0)
 
 The first release published to PyPI, and the first covered by the
 compatibility policy. Install it with `pip install agentprobe-security`.
@@ -86,6 +33,11 @@ compatibility policy. Install it with `pip install agentprobe-security`.
   needs setuptools 77 or newer.
 - The historical `agentprobe_v01.py` to `agentprobe_v10.py` scripts and the
   `lessons/` directory were removed from the tree. They remain in Git history.
+- HTML report filenames drop the historical `_v11_` infix. They are now
+  `scan_<model>_<UTC stamp>_<run id>.html`, the same shape as the JSON
+  report. Compatibility note: scripts that globbed `*_v11_*.html` should
+  match `scan_*.html` instead. The run ID suffix still pairs each HTML file
+  with its JSON report.
 
 ### Added
 
@@ -134,9 +86,51 @@ compatibility policy. Install it with `pip install agentprobe-security`.
   writes an SPDX SBOM, attests build provenance with Sigstore, and publishes
   to PyPI through trusted publishing from the `pypi` environment.
   `SECURITY.md` explains how to verify a release.
+- Assessment package:
+  - `docs/ASSESSMENT.md`, the end-to-end runbook for a fixed-fee assessment;
+  - `offer/one-pager.md`, the design-partner offer;
+  - `examples/sample-report/`, a sample customer report (HTML and PDF)
+    rendered from the public scan with an engagement header and analyst
+    triage, which a test keeps in sync with the code;
+  - `site/index.html`, a static landing page, published by a SHA-pinned
+    `pages.yml` workflow.
+- Customer report for paid engagements:
+  - an engagement header from `--engagement` YAML (client, engagement ID,
+    assessment window, system, scope, prepared by, contact, authorization);
+  - analyst triage from `--triage` YAML: judge findings set aside as false
+    positives with a required reason. The file is bound to the scan's
+    `run_id`, set-aside rows cost no points, and they are listed in their
+    own section;
+  - an OWASP Top 10 for LLM Applications (2025) column per category;
+  - a "Not tested and inconclusive" section;
+  - a methodology appendix with the run's provenance.
+- GitHub Action (`action/`): a composite action that installs
+  agentprobe-security and runs `scan`, `demo`, or `harness`. It uploads
+  SARIF to code scanning and fails the job at a configurable verdict
+  threshold (`fail-on`: vulnerable, partial, suspicious, never), optionally
+  also on operational errors. It writes counts as step outputs and a job
+  summary. The gate (`action/gate.py`) reads only the data-minimized SARIF,
+  so it works with any 2.x release. A self-test workflow exercises the
+  action offline on Ubuntu and Windows.
+- `examples/langchain-quickstart-agent/`: the LangChain v1 quickstart agent
+  behind a local HTTP endpoint, a scan config, and a reviewed recording of one
+  live run with a replay config that reproduces it offline. It backs
+  `writeups/public-scan-01.md`, and `tests/test_public_scan.py` checks the
+  replay on every CI run. The hygiene allowlist names this one recording.
+- `docs/BENCHMARK.md`: the methodology, fixed before any data, for a future
+  framework comparison.
+- CodeQL code scanning (`codeql.yml`) on pushes to main, on pull requests,
+  and weekly, with the `security-extended` query suite. Its actions are
+  pinned to commit SHAs.
 
 ### Changed
 
+- OWASP references use the 2025 edition of the OWASP Top 10 for LLM
+  Applications. The previous codes came from the 2023 list. Data extraction
+  is now LLM07:2025 System Prompt Leakage, plus LLM02:2025 Sensitive
+  Information Disclosure. Tool misuse is now LLM06:2025 Excessive Agency,
+  plus LLM01:2025 Prompt Injection. Indirect injection is LLM01:2025. Read
+  against the 2025 list, the old codes named the wrong risks.
 - `reporting.TOOL_VERSION` now follows `agentprobe.__version__`, and the
   package version is read from it, so reports and package metadata cannot
   disagree.
