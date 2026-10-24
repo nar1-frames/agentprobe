@@ -7,9 +7,9 @@ from agentprobe.reporting import (
     build_harness_provenance, build_harness_report, build_json_report, build_run_metadata,
     safe_filename_component, save_harness_report, save_json_report,
 )
-from report_html_v11 import build_summary, generate_html_report
-import agentprobe_v11 as v11
-import agentprobe_v12 as v12
+from agentprobe.html_report import build_summary, generate_html_report
+from agentprobe.legacy import v11
+from agentprobe import interactive as v12
 from agentprobe.models import parse_model_size_b, validate_judge_strength
 
 

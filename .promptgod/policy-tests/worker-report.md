@@ -1,1 +1,0 @@
-Worker report sent 2026-10-21 to prompter manage-agents-command [31bf39]. Branch pg/policy-tests, commits 6b8930c 032c673 31423b8. 325 passed. Control scenario kept out of SCENARIOS (ALLOWLISTED_FETCH_CONTROL) because tests/test_cli.py pins controls_passed == 1. Awaiting debug round / merge decision from prompter.

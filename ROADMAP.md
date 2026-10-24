@@ -41,9 +41,15 @@ come before breadth.
 
 ## Release maturity
 
-- [ ] Stable Python API and schema compatibility policy
-- [ ] Signed release artifacts, SBOM, and build provenance
-- [ ] Pinned CI actions, dependency automation, and static analysis
+- [x] Stable Python API and schema compatibility policy
+  ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): public API list, MAJOR.MINOR
+  schema rules, semver, and a deprecation window of one minor release and 90 days)
+- [x] Signed release artifacts, SBOM, and build provenance (`release.yml`:
+  Sigstore build-provenance attestation, PEP 740 attestations through trusted
+  publishing, SPDX SBOM; first exercised by the v2.0.0 tag)
+- [x] Pinned CI actions, dependency automation, and static analysis (every
+  action pinned to a commit SHA, weekly Dependabot for pip and actions, ruff
+  lint gate; CodeQL not yet added)
 - [ ] Maintainer and contribution governance
 - [ ] Independent security review of the live integration boundary
 

@@ -14,14 +14,15 @@ import re
 import tempfile
 import uuid
 from collections import Counter, defaultdict
-from typing import Any, Dict, Mapping
+from typing import Any, Mapping
 
+from agentprobe import __version__
 from agentprobe.events import EVENT_SCHEMA_VERSION, validate_events
 
 
 SCHEMA_VERSION = "1.0"
 HARNESS_SCHEMA_VERSION = "1.4"
-TOOL_VERSION = "1.7.0"
+TOOL_VERSION = __version__
 VERDICTS = ("VULNERABLE", "PARTIAL", "SAFE", "SUSPICIOUS")
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
 

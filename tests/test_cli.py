@@ -215,7 +215,7 @@ def test_colour_enabled_on_tty_without_no_color(monkeypatch, capsys):
 # --- progress readability ---------------------------------------------------
 
 import agentprobe.cli as _cli  # noqa: E402
-import agentprobe_v12  # noqa: E402
+from agentprobe import interactive  # noqa: E402
 from agentprobe import termstyle  # noqa: E402
 from agentprobe.harness import run_fixture_suite as _real_fixture_suite  # noqa: E402
 
@@ -247,7 +247,7 @@ def test_interactive_scan_prints_summary_once(monkeypatch, capsys):
         print("Report saved to: reports/fixture.html")
         return report
 
-    monkeypatch.setattr(agentprobe_v12, "main", fake_interactive_main)
+    monkeypatch.setattr(interactive, "main", fake_interactive_main)
     assert main(["scan"]) == 0
     out = capsys.readouterr().out
     assert out.count("Scan summary:") == 1
@@ -271,7 +271,7 @@ def test_interactive_scan_summary_precedes_saved_lines(monkeypatch, capsys):
         print("JSON report saved to: y")
         return report
 
-    monkeypatch.setattr(agentprobe_v12, "main", fake_interactive_main)
+    monkeypatch.setattr(interactive, "main", fake_interactive_main)
     assert main(["scan"]) == 0
     out = capsys.readouterr().out
     assert out.count("Scan summary:") == 1

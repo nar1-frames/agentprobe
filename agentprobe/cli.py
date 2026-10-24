@@ -7,6 +7,7 @@ import sys
 from typing import Sequence
 
 from agentprobe.compare import compare_scan_reports, format_comparison_text
+from agentprobe.config import client_config
 from agentprobe.customer_report import render_customer_report
 from agentprobe.exports import (
     harness_report_to_junit, harness_report_to_sarif, scan_report_to_junit,
@@ -261,7 +262,7 @@ def _live_harness(args) -> int:
         target = config["target"]
         model = args.model or target["model"]
         max_tokens = target.get("max_tokens", 512) if args.max_tokens is None else args.max_tokens
-        client = scanner.build_client({**target, "model": model})
+        client = scanner.build_client(client_config({**target, "model": model}, args.config))
         results = run_live_fixture_suite(
             client, model, mode=args.mode, system_prompt=args.system_prompt,
             max_steps=args.max_steps, temperature=args.temperature,
@@ -370,7 +371,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     demo = subparsers.add_parser(
         "demo",
-        help="run the offline replay demo verbosely (no keys or network; run from the repo root)",
+        help="run the offline replay demo verbosely (no keys or network needed)",
     )
     demo.add_argument("--no-color", action="store_true", help="never emit ANSI colour")
     _add_export_arguments(demo)
@@ -456,11 +457,12 @@ def _run_non_interactive_scan(args) -> int:
     return 0
 
 
-# The demo config refers to its recording and report folder with paths
-# relative to the current directory, so `agentprobe demo` runs from the
-# repository root (where demo/ lives) rather than from an installed package.
-DEMO_CONFIG = os.path.join("demo", "replay.yaml")
-DEMO_REPLAY = os.path.join("demo", "scan.replay.json")
+# The demo config and its recording ship inside the package, so `agentprobe
+# demo` runs from any folder. The config names the recording relative to
+# itself; reports still go to ./reports under the current directory.
+DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo")
+DEMO_CONFIG = os.path.join(DEMO_DIR, "replay.yaml")
+DEMO_REPLAY = os.path.join(DEMO_DIR, "scan.replay.json")
 _DEMO_INTRO = (
     "AgentProbe offline demo: replays a recorded scan of openai/gpt-oss-20b, "
     "no keys or network needed.",
@@ -471,13 +473,13 @@ _DEMO_INTRO = (
 
 
 def _demo(args) -> int:
-    """`agentprobe demo` == `scan --non-interactive --verbose --config demo/replay.yaml`."""
+    """`agentprobe demo` == `scan --non-interactive --verbose --config <package>/demo/replay.yaml`."""
     missing = [path for path in (DEMO_CONFIG, DEMO_REPLAY) if not os.path.isfile(path)]
     if missing:
         shown = ", ".join(os.path.abspath(path) for path in missing)
         print(f"agentprobe: demo files not found: {shown}")
-        print("Run `agentprobe demo` from the repository root, the folder that "
-              "contains demo/replay.yaml (git clone the repo first if needed).")
+        print("The installed package is missing its demo data; reinstall it with "
+              "`pip install --force-reinstall agentprobe-security`.")
         return 2
     for line in _DEMO_INTRO:
         print(line)
@@ -521,7 +523,7 @@ def main(argv: Sequence[str] = None) -> int:
             # Keep the existing interactive UX while making it installable.
             # The runner prints the shared scan summary itself, before its
             # "saved" lines, so nothing is printed here afterwards.
-            from agentprobe_v12 import main as scan_main
+            from agentprobe.interactive import main as scan_main
             scan_main()
         return 0
     parser.error("unknown command")

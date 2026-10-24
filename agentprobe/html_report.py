@@ -25,7 +25,7 @@ import html as html_module
 import os
 import re
 import tempfile
-from mitigations import MITIGATIONS
+from agentprobe.mitigations import MITIGATIONS
 
 
 def esc(text):
@@ -270,7 +270,6 @@ def generate_html_report(scan_results, target_model, judge_model, metadata=None)
 
     worst_cat, worst_rate = "", 0
     for cat, results in scan_results.items():
-        n = len(results)
         usable = sum(
             1 for _, _, _, _, _, method in results
             if method not in {"target-error", "judge-error"}
@@ -320,6 +319,27 @@ def generate_html_report(scan_results, target_model, judge_model, metadata=None)
     category_rows   = render_category_table(scan_results)
     findings_rows   = render_findings_table(findings)
     mitigation_html = render_mitigation_map(scan_results)
+    # Built outside the page template: a triple-quoted f-string nested inside
+    # another one is a SyntaxError before Python 3.12.
+    if findings_rows:
+        findings_html = f"""
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:right">#</th>
+          <th>Severity</th>
+          <th>Verdict</th>
+          <th>Category</th>
+          <th>Attack prompt — click to expand</th>
+        </tr>
+      </thead>
+      <tbody>
+        {findings_rows}
+      </tbody>
+    </table>
+    """
+    else:
+        findings_html = '<p style="color:#737373;padding:8px 0;">No confirmed findings detected.</p>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -726,22 +746,7 @@ def generate_html_report(scan_results, target_model, judge_model, metadata=None)
       Confirmed Findings — {total_findings} total
       &nbsp;({vulnerable_count} vulnerable, {partial_count} partial)
     </div>
-    {'<p style="color:#737373;padding:8px 0;">No confirmed findings detected.</p>' if not findings_rows else f"""
-    <table>
-      <thead>
-        <tr>
-          <th style="text-align:right">#</th>
-          <th>Severity</th>
-          <th>Verdict</th>
-          <th>Category</th>
-          <th>Attack prompt — click to expand</th>
-        </tr>
-      </thead>
-      <tbody>
-        {findings_rows}
-      </tbody>
-    </table>
-    """}
+    {findings_html}
   </div>
 
   <!-- MITIGATION MAP -->

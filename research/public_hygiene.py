@@ -26,7 +26,7 @@ _FORBIDDEN_NAMES = frozenset({
 })
 # Exact paths of committed, sanitized demo fixtures that would otherwise match
 # a private-artifact rule. Secret patterns still apply to them.
-_PUBLIC_DEMO_FILES = frozenset({"demo/scan.replay.json"})
+_PUBLIC_DEMO_FILES = frozenset({"agentprobe/demo/scan.replay.json"})
 _SECRET_PATTERNS = (
     ("provider-key", re.compile(rb"(?i)\b(?:sk|gsk)[_-][A-Za-z0-9_-]{12,}\b")),
     ("github-token", re.compile(rb"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),

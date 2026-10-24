@@ -1,7 +1,7 @@
 """Production scan orchestration for the AgentProbe package.
 
-The historical ``agentprobe_v11.py`` script remains available for backwards
-compatibility, but the installable CLI uses this module.  Keeping provider
+The historical v1.1 runner (``agentprobe.legacy.v11``) remains available for
+backwards compatibility, but the installable CLI uses this module.  Keeping provider
 construction, attack selection, retries, checkpointing, and report emission
 inside the package gives automation one supported execution path.
 """
@@ -14,7 +14,7 @@ from typing import Any, Mapping, Optional, Sequence
 from attacks.library import ATTACK_LIBRARY
 from agentprobe.attackpack import build_attack_pack
 from agentprobe.checkpoints import ScanCheckpoint
-from agentprobe.config import load_config
+from agentprobe.config import client_config, load_config
 from agentprobe.detection import (
     JUDGE_PROMPT_SHA256,
     JUDGE_PROMPT_VERSION,
@@ -29,7 +29,7 @@ from agentprobe.reliability import is_retryable_error
 from agentprobe.replay import RecordingClient, ReplayRecording
 from agentprobe.reporting import build_json_report, build_run_metadata, save_json_report
 from agentprobe.termstyle import TAG_WIDTH, style, verdict_tag
-from report_html_v11 import generate_html_report, save_html_report
+from agentprobe.html_report import generate_html_report, save_html_report
 
 
 SEVERITY_LADDER = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
@@ -379,8 +379,8 @@ def run_configured_scan(
             metadata = dict(checkpoint.run_metadata)
 
     # The checkpoint is validated before provider clients are constructed.
-    target_client = build_client(target)
-    judge_client = build_client(judge)
+    target_client = build_client(client_config(target, config_path))
+    judge_client = build_client(client_config(judge, config_path))
     if scan.get("record_replay_path"):
         # One shared file: target and judge requests differ by model, so
         # their entries never collide.

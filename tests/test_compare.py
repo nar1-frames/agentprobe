@@ -1,6 +1,5 @@
 import json
 
-import pytest
 
 from agentprobe import scanner
 from agentprobe.cli import main

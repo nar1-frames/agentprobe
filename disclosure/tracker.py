@@ -12,7 +12,6 @@
 # ============================================================
 import os
 import json
-import glob
 import tempfile
 
 # Lifecycle. A finding starts as DRAFT and ends DISCLOSED (public,

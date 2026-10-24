@@ -17,6 +17,25 @@ The built-in agent harness uses in-memory fixture tools. It is safe to run
 locally, but connecting it to real tools requires a separate least-privilege,
 network-egress, authentication, and side-effect review.
 
+## Verifying a release
+
+Releases are built by `.github/workflows/release.yml` from a version tag, never
+from a maintainer's machine. Each release records:
+
+- a Sigstore-signed build-provenance attestation for the sdist and wheel,
+  stored with the repository;
+- PEP 740 publish attestations on PyPI, uploaded through trusted publishing;
+- an SPDX SBOM of the installed package and its resolved dependencies, kept
+  as a workflow artifact of the release run.
+
+To check that a downloaded file came from this repository's release workflow:
+
+```bash
+pip download agentprobe-security==2.0.0 --no-deps -d check/
+gh attestation verify check/agentprobe_security-2.0.0-py3-none-any.whl \
+  --repo nar1-frames/agentprobe
+```
+
 ## Reporting a vulnerability in this repository
 
 Please avoid public disclosure of credentials, private model outputs, target

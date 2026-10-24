@@ -14,7 +14,7 @@ reports/
 # Replay recordings hold raw prompts and model output.
 *.replay.json
 # The sanitized offline demo recording is the one public exception.
-!demo/scan.replay.json
+!agentprobe/demo/scan.replay.json
 .DS_Store
 
 # Disclosure workflow (v1.2) — real engagements + unpatched vulns stay local.
@@ -74,8 +74,8 @@ data/results.json
 *.label-packet.csv
 *.label-packet.csv.key.json
 
+# Local archive of retired scripts and notes.
 _archive/
 
-_archive/
-
-_archive/
+# Prompt God work orders, reports, and plans are workspace metadata.
+.promptgod/

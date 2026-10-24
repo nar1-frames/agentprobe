@@ -414,10 +414,12 @@ def test_live_loop_rejects_duplicate_tool_call_ids():
     class _DuplicateClient:
         class _Completions:
             def create(self, **_kwargs):
-                call = lambda name: SimpleNamespace(
-                    id="duplicate",
-                    function=SimpleNamespace(name=name, arguments="{}"),
-                )
+                def call(name):
+                    return SimpleNamespace(
+                        id="duplicate",
+                        function=SimpleNamespace(name=name, arguments="{}"),
+                    )
+
                 return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
                     content=None,
                     tool_calls=[call("read_secret"), call("read_secret")],

@@ -119,7 +119,7 @@ This pilot shows that a lightweight, structured, open-source scanner can produce
 git clone https://github.com/nar1-frames/agentprobe
 # add GROQ_API_KEY to .env
 pip install -r requirements.txt
-python agentprobe_v11.py
+python -m agentprobe.legacy.v11
 ```
 
 ## References

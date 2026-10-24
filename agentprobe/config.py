@@ -228,3 +228,22 @@ def load_config(path="config.yaml") -> dict:
     with open(path, encoding="utf-8") as f:
         loaded = yaml.safe_load(f) or {}
     return validate_config(loaded)
+
+
+def client_config(block: Mapping[str, Any], config_path: str) -> dict:
+    """Return a provider block for build_client with input paths made absolute.
+
+    A replay recording travels with the config that names it, so a relative
+    ``replay_path`` means "next to the config file", not "wherever the command
+    runs". The validated config keeps the path as written, so its digest does
+    not depend on where the file sits on disk. Output paths (report_dir,
+    record_replay_path, checkpoints) stay relative to the working directory, so
+    scan output never lands inside an installed package.
+    """
+
+    resolved = dict(block)
+    replay_path = resolved.get("replay_path")
+    if replay_path and not os.path.isabs(replay_path):
+        base = os.path.dirname(os.path.abspath(config_path))
+        resolved["replay_path"] = os.path.join(base, replay_path)
+    return resolved

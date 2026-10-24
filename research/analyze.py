@@ -201,7 +201,7 @@ def fmt_kappa(k):
 
 def print_confusion(title, cm, labels):
     print(f"  {title}")
-    header = "    gold\\pred  " + "".join(f"{l[:7]:>9}" for l in labels)
+    header = "    gold\\pred  " + "".join(f"{label[:7]:>9}" for label in labels)
     print(header)
     for g in labels:
         row = "".join(f"{cm[g][p]:>9}" for p in labels)
@@ -292,7 +292,7 @@ def rq2_reliability(judgements, out, expected_response_ids=None):
             rid for (rid, values) in item_runs
             if len(values) == expected_k and len(set(values)) > 1
         ]
-        item_ratings = [{l: v.count(l) for l in labels_all} for v in runs]
+        item_ratings = [{label: v.count(label) for label in labels_all} for v in runs]
         fk = fleiss_kappa(item_ratings, labels_all) if runs else float("nan")
         sar = self_agreement_rate(runs)
         pw = pairwise_agreement(runs)
@@ -300,7 +300,7 @@ def rq2_reliability(judgements, out, expected_response_ids=None):
         fk_ci = bootstrap_ci(
             runs,
             lambda sample: fleiss_kappa(
-                [{l: v.count(l) for l in labels_all} for v in sample], labels_all
+                [{label: v.count(label) for label in labels_all} for v in sample], labels_all
             ),
             seed=31,
         )

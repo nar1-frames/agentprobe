@@ -16,6 +16,7 @@ attack library.
 ```bash
 python3 -m pip install -e ".[dev]"
 pytest
+ruff check .
 agentprobe harness --mode guarded
 ```
 
