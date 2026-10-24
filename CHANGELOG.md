@@ -7,6 +7,12 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- CodeQL code scanning (`codeql.yml`) on pushes to main, on pull requests,
+  and weekly, with the `security-extended` query suite. Its actions are
+  pinned to commit SHAs.
+
 ### Changed
 
 - HTML report filenames drop the historical `_v11_` infix. They are now
