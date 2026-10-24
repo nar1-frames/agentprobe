@@ -127,6 +127,8 @@ agentprobe scan --non-interactive --config config.yaml --fail-on-error
 # CI exports omit model responses and judge reasoning; publish them as artifacts.
 agentprobe scan --non-interactive --config config.yaml --sarif reports/scan.sarif --junit reports/scan.junit.xml
 agentprobe harness --mode guarded --sarif reports/harness.sarif --junit reports/harness.junit.xml
+# Or use the GitHub Action, which runs the same commands, uploads SARIF, and gates
+# the job on a verdict threshold: see action/README.md.
 # Gate on regressions against a stored baseline report from the same attack library.
 agentprobe compare --baseline baseline.json --candidate reports/scan.json --fail-on-regression --fail-on-incomparable
 #   Comparable: yes

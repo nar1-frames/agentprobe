@@ -791,7 +791,8 @@ def save_html_report(html, target_model, report_dir, run_id=None):
     safe_name = safe_filename_component(target_model)
     safe_run_id = safe_filename_component(run_id)[:8] if run_id else ""
     suffix = f"_{safe_run_id}" if safe_run_id else ""
-    filename = os.path.join(report_dir, f"scan_{safe_name}_v11_{run_stamp}{suffix}.html")
+    # Same shape as the JSON report name, so a run's two files sort together.
+    filename = os.path.join(report_dir, f"scan_{safe_name}_{run_stamp}{suffix}.html")
     fd, temp_path = tempfile.mkstemp(prefix=".agentprobe-", suffix=".html", dir=report_dir)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:

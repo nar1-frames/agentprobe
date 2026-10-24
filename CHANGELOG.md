@@ -7,6 +7,28 @@ All notable changes to AgentProbe are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Action (`action/`): a composite action that installs
+  agentprobe-security and runs `scan`, `demo`, or `harness`. It uploads
+  SARIF to code scanning and fails the job at a configurable verdict
+  threshold (`fail-on`: vulnerable, partial, suspicious, never), optionally
+  also on operational errors. It writes counts as step outputs and a job
+  summary. The gate (`action/gate.py`) reads only the data-minimized SARIF,
+  so it works with any 2.x release. A self-test workflow exercises the
+  action offline on Ubuntu and Windows.
+- CodeQL code scanning (`codeql.yml`) on pushes to main, on pull requests,
+  and weekly, with the `security-extended` query suite. Its actions are
+  pinned to commit SHAs.
+
+### Changed
+
+- HTML report filenames drop the historical `_v11_` infix. They are now
+  `scan_<model>_<UTC stamp>_<run id>.html`, the same shape as the JSON
+  report. Compatibility note: scripts that globbed `*_v11_*.html` should
+  match `scan_*.html` instead. The run ID suffix still pairs each HTML file
+  with its JSON report.
+
 ## [2.0.0] - 2026-10-23
 
 The first release published to PyPI, and the first covered by the

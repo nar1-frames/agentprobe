@@ -1,0 +1,129 @@
+name: AgentProbe
+description: >-
+  Run an AgentProbe prompt-injection scan or the offline agent security
+  harness, upload SARIF to code scanning, and fail the job at a verdict
+  threshold.
+author: Naren Ranjith
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  command:
+    description: >-
+      scan runs the attack library against the target and judge in `config`;
+      demo replays the bundled offline recording (no keys or network);
+      harness runs the offline agent security harness.
+    default: scan
+  config:
+    description: Scan configuration (YAML). Used by `scan` only.
+    default: config.yaml
+  harness-mode:
+    description: >-
+      Harness mode for `harness`: guarded, vulnerable, model_only_guarded, or
+      architecture_only_guarded.
+    default: guarded
+  fail-on:
+    description: >-
+      Lowest scan verdict that fails the job: vulnerable, partial, suspicious,
+      or never. For `harness`, any value except never fails the job when an
+      attack reaches its objective or a benign control is blocked.
+    default: vulnerable
+  fail-on-error:
+    description: Fail the job when a target or judge call errored (true or false).
+    default: "true"
+  upload-sarif:
+    description: >-
+      Upload the SARIF log to GitHub code scanning (true or false). Needs
+      `security-events: write`; set false for pull requests from forks.
+    default: "true"
+  sarif-category:
+    description: Code scanning category, so several AgentProbe runs do not overwrite each other.
+    default: agentprobe
+  output-dir:
+    description: Folder for the SARIF, JUnit, and harness JSON files.
+    default: agentprobe-results
+  package:
+    description: >-
+      pip requirement to install. Defaults to the agentprobe-security release
+      this action ships with; set `.` to test a checkout of AgentProbe itself.
+    default: agentprobe-security==2.0.0
+  python-version:
+    description: Python version to run AgentProbe on.
+    default: "3.12"
+
+outputs:
+  result:
+    description: pass or fail.
+    value: ${{ steps.gate.outputs.result }}
+  sarif-file:
+    description: Path of the SARIF log.
+    value: ${{ steps.run.outputs.sarif-file }}
+  junit-file:
+    description: Path of the JUnit XML report.
+    value: ${{ steps.run.outputs.junit-file }}
+  vulnerable:
+    description: Scan results with verdict VULNERABLE.
+    value: ${{ steps.gate.outputs.vulnerable }}
+  partial:
+    description: Scan results with verdict PARTIAL.
+    value: ${{ steps.gate.outputs.partial }}
+  suspicious:
+    description: Scan results with verdict SUSPICIOUS.
+    value: ${{ steps.gate.outputs.suspicious }}
+  safe:
+    description: Scan results with verdict SAFE.
+    value: ${{ steps.gate.outputs.safe }}
+  attacks-succeeded:
+    description: Harness attacks that reached their objective.
+    value: ${{ steps.gate.outputs.attacks-succeeded }}
+  controls-failed:
+    description: Harness benign controls that were wrongly blocked.
+    value: ${{ steps.gate.outputs.controls-failed }}
+  operational-errors:
+    description: Target, judge, tool, or provider failures (never counted as verdicts).
+    value: ${{ steps.gate.outputs.operational-errors }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install AgentProbe
+      shell: bash
+      env:
+        AP_PACKAGE: ${{ inputs.package }}
+      run: python -m pip install --disable-pip-version-check "$AP_PACKAGE"
+
+    - name: Run AgentProbe
+      id: run
+      shell: bash
+      env:
+        AP_COMMAND: ${{ inputs.command }}
+        AP_CONFIG: ${{ inputs.config }}
+        AP_HARNESS_MODE: ${{ inputs.harness-mode }}
+        AP_OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: bash "$GITHUB_ACTION_PATH/run.sh"
+
+    - name: Upload SARIF to code scanning
+      if: ${{ inputs.upload-sarif == 'true' && steps.run.outputs.sarif-written == 'true' }}
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      with:
+        sarif_file: ${{ steps.run.outputs.sarif-file }}
+        category: ${{ inputs.sarif-category }}
+
+    - name: Gate on verdicts
+      id: gate
+      shell: bash
+      env:
+        AP_COMMAND: ${{ inputs.command }}
+        AP_FAIL_ON: ${{ inputs.fail-on }}
+        AP_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        AP_SARIF: ${{ steps.run.outputs.sarif-file }}
+        AP_EXIT_CODE: ${{ steps.run.outputs.exit-code }}
+      run: >-
+        python "$GITHUB_ACTION_PATH/gate.py" --sarif "$AP_SARIF" --command "$AP_COMMAND"
+        --fail-on "$AP_FAIL_ON" --fail-on-error "$AP_FAIL_ON_ERROR" --exit-code "$AP_EXIT_CODE"

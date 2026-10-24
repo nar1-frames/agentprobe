@@ -49,7 +49,7 @@ come before breadth.
   publishing, SPDX SBOM; first exercised by the v2.0.0 tag)
 - [x] Pinned CI actions, dependency automation, and static analysis (every
   action pinned to a commit SHA, weekly Dependabot for pip and actions, ruff
-  lint gate; CodeQL not yet added)
+  lint gate, CodeQL security-extended scanning)
 - [ ] Maintainer and contribution governance
 - [ ] Independent security review of the live integration boundary
 

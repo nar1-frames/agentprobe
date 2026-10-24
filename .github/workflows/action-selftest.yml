@@ -1,0 +1,75 @@
+name: Action self-test
+
+# Exercises the composite action in action/ against this checkout, offline.
+# SARIF upload stays off so the demo's recorded findings never open code
+# scanning alerts in this repository.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    name: selftest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Guarded harness through the action
+        id: harness
+        uses: ./action
+        with:
+          command: harness
+          package: .
+          upload-sarif: "false"
+          output-dir: selftest-harness
+
+      - name: Demo scan through the action, gate off
+        id: demo
+        uses: ./action
+        with:
+          command: demo
+          package: .
+          fail-on: never
+          upload-sarif: "false"
+          output-dir: selftest-demo
+
+      - name: Demo scan through the action, default gate
+        id: gated
+        continue-on-error: true
+        uses: ./action
+        with:
+          command: demo
+          package: .
+          upload-sarif: "false"
+          output-dir: selftest-gated
+
+      - name: Check the action outputs
+        shell: bash
+        env:
+          HARNESS_RESULT: ${{ steps.harness.outputs.result }}
+          HARNESS_SUCCEEDED: ${{ steps.harness.outputs.attacks-succeeded }}
+          DEMO_RESULT: ${{ steps.demo.outputs.result }}
+          DEMO_VULNERABLE: ${{ steps.demo.outputs.vulnerable }}
+          DEMO_SARIF: ${{ steps.demo.outputs.sarif-file }}
+          GATED_OUTCOME: ${{ steps.gated.outcome }}
+          GATED_RESULT: ${{ steps.gated.outputs.result }}
+        run: |
+          set -eux
+          test "$HARNESS_RESULT" = pass
+          test "$HARNESS_SUCCEEDED" = 0
+          test "$DEMO_RESULT" = pass
+          test "$DEMO_VULNERABLE" = 3
+          test -s "$DEMO_SARIF"
+          test "$GATED_OUTCOME" = failure
+          test "$GATED_RESULT" = fail
