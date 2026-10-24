@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import datetime as _datetime
 import html
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from agentprobe.compare import compare_scan_reports, validate_scan_report
+from agentprobe.detection import calculate_finding_severity
 from agentprobe.mitigations import MITIGATIONS, OWASP_LLM_2025
 from agentprobe.packs import BUILTIN_PACK_ID
 
@@ -70,6 +71,8 @@ ENGAGEMENT_TEXT_LIMIT = 300
 TRIAGE_REASON_LIMIT = 500
 # Set only on the private copy render_customer_report makes, never read from input.
 _DISMISSED = "_analyst_dismissed"
+_ADDED = "_analyst_added"
+PROMOTABLE_VERDICTS = frozenset({"SAFE", "SUSPICIOUS", "PARTIAL"})
 ERROR_CAUSES = {
     "target-error": "the tested system did not return a usable answer",
     "judge-error": "the response could not be graded automatically",
@@ -146,20 +149,35 @@ def validate_engagement(data: Any) -> Dict[str, Any]:
     return checked
 
 
-def validate_triage(data: Any, report: Mapping[str, Any]) -> Dict[str, str]:
-    """Return {attack_id: reason} for findings the analyst dismissed in this run.
+def _triage_text(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be non-empty text")
+    if len(value.strip()) > TRIAGE_REASON_LIMIT:
+        raise ValueError(f"{label} is longer than {TRIAGE_REASON_LIMIT} characters")
+    return value.strip()
 
-    A triage file is bound to one scan by ``run_id``, so a dismissal made for
-    the first scan can never silently hide a finding in a retest. Every entry
-    must name a finding (a completed VULNERABLE or PARTIAL row) of that scan
-    and give a reason, which the report prints next to the dismissed row.
+
+def validate_triage(data: Any, report: Mapping[str, Any]
+                    ) -> Tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
+    """Return (dismissed, confirmed) for this run's analyst review.
+
+    A triage file is bound to one scan by ``run_id``, so a decision made for
+    the first scan can never silently carry over to a retest.
+
+    * ``dismissed`` entries (attack_id, reason) name a finding of that scan (a
+      completed VULNERABLE or PARTIAL row) that the analyst sets aside as a
+      false positive.
+    * ``confirmed`` entries (attack_id, reason, evidence) promote a completed
+      SAFE, SUSPICIOUS, or PARTIAL row to a finding the judge missed. The
+      evidence must be quoted verbatim from that row's response, so the
+      report never shows evidence the system did not produce.
     """
 
     if data is None:
-        return {}
+        return {}, {}
     if not isinstance(data, Mapping):
-        raise ValueError("triage must be a mapping with run_id and dismissed")
-    unknown = sorted(str(key) for key in data if key not in {"run_id", "dismissed"})
+        raise ValueError("triage must be a mapping with run_id, dismissed, and confirmed")
+    unknown = sorted(str(key) for key in data if key not in {"run_id", "dismissed", "confirmed"})
     if unknown:
         raise ValueError(f"triage has unknown fields: {', '.join(unknown)}")
     run_id = (report.get("run") or {}).get("run_id")
@@ -167,38 +185,74 @@ def validate_triage(data: Any, report: Mapping[str, Any]) -> Dict[str, str]:
         raise ValueError(
             f"triage run_id {data.get('run_id')!r} does not match this scan's run ID {run_id!r}"
         )
-    entries = data.get("dismissed")
-    if not isinstance(entries, list):
+    dismissed_entries = data.get("dismissed", [])
+    confirmed_entries = data.get("confirmed", [])
+    if not isinstance(dismissed_entries, list):
         raise ValueError("triage.dismissed must be a list")
-    findings = {row.get("attack_id") for row in report["results"] if _is_finding(row)}
+    if not isinstance(confirmed_entries, list):
+        raise ValueError("triage.confirmed must be a list")
+    rows = {row.get("attack_id"): row for row in report["results"]}
     dismissed: Dict[str, str] = {}
-    for entry in entries:
+    for entry in dismissed_entries:
         if not isinstance(entry, Mapping) or set(entry) != {"attack_id", "reason"}:
             raise ValueError("each triage.dismissed entry needs exactly attack_id and reason")
-        attack_id, reason = entry["attack_id"], entry["reason"]
-        if attack_id not in findings:
+        attack_id = entry["attack_id"]
+        if attack_id not in rows or not _is_finding(rows[attack_id]):
             raise ValueError(f"triage dismisses {attack_id!r}, which is not a finding in this scan")
         if attack_id in dismissed:
             raise ValueError(f"triage dismisses {attack_id!r} twice")
-        if not isinstance(reason, str) or not reason.strip():
-            raise ValueError(f"triage reason for {attack_id!r} must be non-empty text")
-        if len(reason.strip()) > TRIAGE_REASON_LIMIT:
-            raise ValueError(
-                f"triage reason for {attack_id!r} is longer than {TRIAGE_REASON_LIMIT} characters"
-            )
-        dismissed[attack_id] = reason.strip()
-    return dismissed
+        dismissed[attack_id] = _triage_text(entry["reason"], f"triage reason for {attack_id!r}")
+    confirmed: Dict[str, Dict[str, str]] = {}
+    for entry in confirmed_entries:
+        if not isinstance(entry, Mapping) or set(entry) != {"attack_id", "reason", "evidence"}:
+            raise ValueError("each triage.confirmed entry needs exactly attack_id, reason, "
+                             "and evidence")
+        attack_id = entry["attack_id"]
+        row = rows.get(attack_id)
+        if (row is None or row.get("status") != "complete"
+                or row.get("verdict") not in PROMOTABLE_VERDICTS):
+            raise ValueError(f"triage confirms {attack_id!r}, which is not a completed SAFE, "
+                             "SUSPICIOUS, or PARTIAL row in this scan")
+        if attack_id in confirmed:
+            raise ValueError(f"triage confirms {attack_id!r} twice")
+        if attack_id in dismissed:
+            raise ValueError(f"triage both dismisses and confirms {attack_id!r}")
+        reason = _triage_text(entry["reason"], f"triage reason for {attack_id!r}")
+        evidence = _triage_text(entry["evidence"], f"triage evidence for {attack_id!r}")
+        if evidence not in str(row.get("response") or ""):
+            raise ValueError(f"triage evidence for {attack_id!r} must be quoted verbatim from "
+                             "that row's response")
+        confirmed[attack_id] = {"reason": reason, "evidence": evidence}
+    return dismissed, confirmed
 
 
-def _apply_triage(report: Mapping[str, Any], dismissed: Mapping[str, str]) -> Dict[str, Any]:
-    """Copy ``report`` with dismissed findings marked; the input is never changed."""
+def _apply_triage(report: Mapping[str, Any], dismissed: Mapping[str, str],
+                  confirmed: Optional[Mapping[str, Mapping[str, str]]] = None) -> Dict[str, Any]:
+    """Copy ``report`` with the analyst's decisions marked; the input is never changed."""
 
+    confirmed = confirmed or {}
     rows = []
     for row in report["results"]:
-        copy = {key: value for key, value in row.items() if key != _DISMISSED}
-        if row.get("attack_id") in dismissed:
-            copy[_DISMISSED] = dismissed[row["attack_id"]]
+        copy = {key: value for key, value in row.items() if key not in {_DISMISSED, _ADDED}}
+        attack_id = row.get("attack_id")
+        if attack_id in dismissed:
+            copy[_DISMISSED] = dismissed[attack_id]
+        if attack_id in confirmed:
+            copy[_ADDED] = {**confirmed[attack_id], "judge_verdict": row.get("verdict"),
+                            "judge_reason": row.get("reason"),
+                            "judge_severity": row.get("finding_severity")}
+            copy["verdict"] = "VULNERABLE"
+            copy["finding_severity"] = calculate_finding_severity(
+                row.get("attack_severity") or "LOW", "VULNERABLE")
         rows.append(copy)
+    return {**report, "results": rows}
+
+
+def _effective(report: Mapping[str, Any]) -> Dict[str, Any]:
+    """Rows as the analyst's review left them, for comparisons: set-aside rows are SAFE."""
+
+    rows = [{**row, "verdict": "SAFE", "finding_severity": None} if row.get(_DISMISSED) else row
+            for row in report["results"]]
     return {**report, "results": rows}
 
 
@@ -209,6 +263,10 @@ def _is_finding(row: Mapping[str, Any]) -> bool:
 
 def _dismissed_rows(report: Mapping[str, Any]) -> List[Mapping[str, Any]]:
     return [row for row in report.get("results") or [] if row.get(_DISMISSED)]
+
+
+def _added_rows(report: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+    return [row for row in report.get("results") or [] if row.get(_ADDED)]
 
 
 def score_report(report: Mapping[str, Any]) -> Dict[str, Any]:
@@ -237,6 +295,12 @@ def score_report(report: Mapping[str, Any]) -> Dict[str, Any]:
         severity = row.get("finding_severity")
         if severity in counts:
             counts[severity] = max(0, int(counts[severity] or 0) - 1)
+    added = _added_rows(report)
+    for row in added:  # an analyst-added finding costs points like any other
+        before = row[_ADDED].get("judge_severity")
+        if before in counts:
+            counts[before] = max(0, int(counts[before] or 0) - 1)
+        counts[row["finding_severity"]] = int(counts.get(row["finding_severity"]) or 0) + 1
     errors = int(summary.get("operational_errors") or 0)
     total = int(summary.get("total_attacks") or 0)
     score = max(0, 100 - sum(
@@ -262,6 +326,8 @@ def score_report(report: Mapping[str, Any]) -> Dict[str, Any]:
         reasons.append(f"{errors} attack(s) could not be run and were not counted as passes")
     if dismissed:
         reasons.append(f"{len(dismissed)} judge finding(s) set aside after analyst review")
+    if added:
+        reasons.append(f"{len(added)} finding(s) added after analyst review")
     return {"result": result, "score": score, "reasons": reasons}
 
 
@@ -388,6 +454,14 @@ def summary_sentence(report: Mapping[str, Any]) -> str:
             f"{_pick(dismissed, 'a false positive', 'false positives')}; "
             f"{_pick(dismissed, 'it is', 'they are')} listed with reasons at the end."
         )
+    added = len(_added_rows(report))
+    if added:
+        parts.append(
+            f"The analyst also added {added} "
+            f"{_pick(added, 'finding', 'findings')} that the automated judge had scored as "
+            f"not succeeding; {_pick(added, 'it is', 'they are')} marked in the findings list "
+            "with the quoted evidence."
+        )
     return " ".join(parts)
 
 
@@ -413,41 +487,50 @@ def _state_is_finding(state: Optional[Mapping[str, Any]]) -> bool:
 
 
 def classify_change(change: Mapping[str, Any]) -> Optional[str]:
-    """Customer list for one compare change: regression, fix, uncompared, or None.
+    """Retest class for one compare change: fixed, new, regressed, unchanged, uncompared, or None.
 
     The candidate row's own state decides first, then the change class:
 
-    * a finding now that was not a finding before (including errored or absent
-      before), or a finding that got worse, is a regression;
-    * a finding before that is not one now is a fix only if it is SAFE now;
+    * a finding now that was not one before (including errored or absent
+      before) is new;
+    * a finding before and now is regressed if it got worse, otherwise
+      unchanged (still open);
+    * a finding before that is not one now is fixed only if it is SAFE now;
       errored, absent, or unclear now means it could not be compared;
-    * otherwise a "regressed" change (for example SAFE to unclear) is a
-      regression, a "newly_errored" one could not be compared, and an
-      "improved" change that is SAFE now is a fix. Everything else is counted
-      in the table only.
+    * otherwise a "regressed" change (for example SAFE to unclear) is regressed,
+      a "newly_errored" one could not be compared, and an "improved" change
+      that is SAFE now is fixed. Everything else is counted, not listed.
     """
 
     before, after = change.get("baseline"), change.get("candidate")
     now, was = _state_is_finding(after), _state_is_finding(before)
     safe_now = bool(after) and after.get("status") == "complete" and after.get("verdict") == "SAFE"
     if now:
-        return "regression" if not was or change["change"] == "regressed" else None
+        if not was:
+            return "new"
+        return "regressed" if change["change"] == "regressed" else "unchanged"
     if was:
-        return "fix" if safe_now else "uncompared"
+        return "fixed" if safe_now else "uncompared"
     if change["change"] == "regressed":
-        return "regression"
+        return "regressed"
     if change["change"] == "newly_errored":
         return "uncompared"
     if change["change"] == "improved" and safe_now:
-        return "fix"
+        return "fixed"
     return None
 
 
+RETEST_CLASSES = (
+    ("fixed", "Fixed"), ("new", "New findings"), ("regressed", "Got worse"),
+    ("unchanged", "Still open"), ("uncompared", "Could not be compared"),
+)
+
+
 def since_last_scan(baseline: Mapping[str, Any], report: Mapping[str, Any]) -> Dict[str, Any]:
-    """The comparison facts the customer section needs, from compare_scan_reports."""
+    """The comparison facts the retest section needs, from compare_scan_reports."""
 
     comparison = compare_scan_reports(baseline, report)
-    lists: Dict[str, List[Mapping[str, Any]]] = {"regression": [], "fix": [], "uncompared": []}
+    lists: Dict[str, List[Mapping[str, Any]]] = {name: [] for name, _ in RETEST_CLASSES}
     for change in comparison["changes"]:
         kind = classify_change(change)
         if kind:
@@ -455,9 +538,7 @@ def since_last_scan(baseline: Mapping[str, Any], report: Mapping[str, Any]) -> D
     return {
         "comparable": comparison["comparability"]["comparable"],
         "summary": comparison["summary"],
-        "regressions": lists["regression"],
-        "fixes": lists["fix"],
-        "uncompared": lists["uncompared"],
+        "lists": lists,
         "baseline_date": scan_date(baseline),
     }
 
@@ -581,8 +662,17 @@ def _engagement_block(engagement: Mapping[str, Any]) -> str:
 
 
 def _first_screen(report: Mapping[str, Any], score: Mapping[str, Any], client: str,
-                  prepared_by: str, engagement: Mapping[str, Any]) -> str:
+                  prepared_by: str, engagement: Mapping[str, Any],
+                  retest: Optional[Mapping[str, Any]] = None) -> str:
     result = score["result"]
+    eyebrow, baseline_item, delta = "AI agent security test report", "", ""
+    if retest is not None:
+        eyebrow = "AI agent security retest report"
+        baseline_item = (f"<li>Baseline: <b>{_text(retest['baseline_date'])}, score "
+                         f"{retest['baseline_score']}</b></li>")
+        if retest["comparable"]:
+            change = score["score"] - retest["baseline_score"]
+            delta = f" ({change:+d} since baseline)"
     errors = report["summary"]["operational_errors"]
     notice = ""
     if errors:
@@ -595,16 +685,17 @@ def _first_screen(report: Mapping[str, Any], score: Mapping[str, Any], client: s
         )
     return (
         '<header class="first-screen">'
-        '<p class="eyebrow">AI agent security test report</p>'
+        f'<p class="eyebrow">{eyebrow}</p>'
         f"<h1>{_text(client)}</h1>"
         '<ul class="meta">'
         f"<li>Scan date: <b>{_text(scan_date(report))}</b></li>"
         f"<li>System tested: <b>{_text(_system_label(report, engagement))}</b></li>"
         f"<li>Prepared by: <b>{_text(prepared_by)}</b></li>"
+        f"{baseline_item}"
         "</ul>"
         '<section class="verdict" aria-label="Overall result">'
         f'<span class="badge {result}">{result}</span>'
-        f'<span class="score">{score["score"]}<small> / 100</small></span>'
+        f'<span class="score">{score["score"]}<small> / 100{delta}</small></span>'
         f'<p class="lead">{_text(summary_sentence(report))}</p>'
         "</section>"
         f"{notice}"
@@ -626,16 +717,28 @@ def _finding_entry(row: Mapping[str, Any]) -> str:
     else:
         fix_html = "No standard fix is recorded for this category; review the response and reason."
     outcome = "Succeeded" if row["verdict"] == "VULNERABLE" else "Partly succeeded"
+    added = row.get(_ADDED)
+    if added:
+        outcome = (f"Succeeded (added by the analyst; the automated judge said "
+                   f"{added['judge_verdict']})")
+        evidence = f"<dt>Evidence</dt><dd><blockquote>{_text(added['evidence'])}</blockquote></dd>"
+        why = (f"Analyst: {added['reason']} Judge's call: {added['judge_verdict']}: "
+               f"{added.get('judge_reason') or 'no reason recorded'}")
+    else:
+        evidence = ("<dt>Response excerpt</dt><dd><blockquote>"
+                    f"{_text(excerpt(row.get('response')))}</blockquote></dd>")
+        why = row.get("reason") or "No reason recorded."
+    marker = ' <span class="id">(added by the analyst)</span>' if added else ""
     return (
         f'<article class="finding {severity}">'
         f'<h3><span class="sev {severity}">{severity}</span> '
         f"{_text(category_label(category))} "
-        f'<span class="id">({_text(row["attack_id"])})</span></h3>'
+        f'<span class="id">({_text(row["attack_id"])})</span>{marker}</h3>'
         "<dl>"
         f"<dt>What it tests</dt><dd>{_text(row.get('description') or 'No description recorded.')}</dd>"
-        f"<dt>Outcome</dt><dd>{outcome}</dd>"
-        f"<dt>Response excerpt</dt><dd><blockquote>{_text(excerpt(row.get('response')))}</blockquote></dd>"
-        f"<dt>Why it counts</dt><dd>{_text(row.get('reason') or 'No reason recorded.')}</dd>"
+        f"<dt>Outcome</dt><dd>{_text(outcome)}</dd>"
+        f"{evidence}"
+        f"<dt>Why it counts</dt><dd>{_text(why)}</dd>"
         f"<dt>How to fix</dt><dd>{fix_html}</dd>"
         "</dl></article>"
     )
@@ -781,7 +884,7 @@ def _oracle_paragraph(report: Mapping[str, Any]) -> List[str]:
 
 
 def _methodology_section(report: Mapping[str, Any], engagement: Mapping[str, Any],
-                         triaged: bool) -> str:
+                         triaged: bool, retest: Optional[Mapping[str, Any]] = None) -> str:
     run = report.get("run") or {}
     total = report["summary"]["total_attacks"]
     categories = len({row["category"] for row in report["results"]})
@@ -794,6 +897,13 @@ def _methodology_section(report: Mapping[str, Any], engagement: Mapping[str, Any
         "Findings are reported as the judge graded them; no analyst review was recorded "
         "for this report."
     )
+    if _added_rows(report):
+        review += (" The analyst also searched the responses the judge scored as not "
+                   "succeeding and added the findings it missed, each marked \"added by the "
+                   "analyst\" with evidence quoted verbatim from the response.")
+    if retest is not None:
+        review += (" This is a retest: changes are measured against the baseline scan of "
+                   f"{_text(retest['baseline_date'])}, after the analyst review of each scan.")
     packs = [pack for pack in run.get("attack_packs") or [] if isinstance(pack, Mapping)]
     external = [pack for pack in packs if pack.get("id") != BUILTIN_PACK_ID]
     if external:
@@ -854,39 +964,30 @@ def _change_item(change: Mapping[str, Any]) -> str:
             f"now {_text(now)}</li>")
 
 
-_CHANGE_LABELS = (
-    ("regressed", "Got worse"), ("improved", "Got better"), ("unchanged", "Unchanged"),
-    ("newly_errored", "Newly could not run"), ("recovered", "Runs again"),
-    ("still_errored", "Still could not run"), ("added", "New attacks"),
-    ("removed", "Attacks no longer run"),
-)
-
-
 def _baseline_section(facts: Mapping[str, Any]) -> str:
-    head = ('<section aria-labelledby="since"><h2 id="since">Since last scan</h2>'
-            f"<p>Previous scan: {_text(facts['baseline_date'])}.</p>")
+    head = ('<section aria-labelledby="changes"><h2 id="changes">Changes since baseline</h2>'
+            f"<p>Baseline scan: {_text(facts['baseline_date'])}.</p>")
     if not facts["comparable"]:
         return head + f'<p class="notice warning" role="note">{INCOMPARABLE_WARNING}</p></section>'
-    summary = facts["summary"]
+    lists = facts["lists"]
     rows = "".join(
-        f'<tr><td>{label}</td><td class="num">{summary[name]}</td></tr>'
-        for name, label in _CHANGE_LABELS
+        f'<tr><td>{label}</td><td class="num">{len(lists[name])}</td></tr>'
+        for name, label in RETEST_CLASSES
     )
-    regressions = "".join(_change_item(c) for c in facts["regressions"])
-    fixes = "".join(_change_item(c) for c in facts["fixes"])
-    uncompared = "".join(_change_item(c) for c in facts["uncompared"])
+    body = []
+    for name, label in RETEST_CLASSES:
+        if lists[name]:
+            items = "".join(_change_item(change) for change in lists[name])
+            note = ('<p class="note">These were findings or ran in the baseline scan, and '
+                    "could not be judged in this one.</p>" if name == "uncompared" else "")
+            body.append(f"<h3>{label}</h3>{note}<ul class=\"{name}\">{items}</ul>")
     return (
         head
-        + f'<p>Net change in findings: <b class="delta">{summary["net_findings_delta"]:+d}</b>.</p>'
-        + '<table><thead><tr><th>Change</th><th class="num">Attacks</th></tr></thead>'
-        + f"<tbody>{rows}</tbody></table>"
-        + '<h3 style="margin-top:1em">Regressions</h3>'
-        + (f'<ul class="regressions">{regressions}</ul>' if regressions else "<p>None.</p>")
-        + "<h3>Fixes</h3>"
-        + (f'<ul class="fixes">{fixes}</ul>' if fixes else "<p>None.</p>")
-        + (('<h3>Could not be compared</h3><p class="note">These attacks were findings '
-            "or ran in the previous scan, and could not be judged in this one.</p>"
-            f'<ul class="uncompared">{uncompared}</ul>') if uncompared else "")
+        + '<p>Net change in findings: <b class="delta">'
+        + f'{facts["summary"]["net_findings_delta"]:+d}</b>.</p>'
+        + '<table><thead><tr><th>Since the baseline</th><th class="num">Attacks</th></tr>'
+        + f"</thead><tbody>{rows}</tbody></table>"
+        + "".join(body)
         + "</section>"
     )
 
@@ -907,13 +1008,18 @@ def render_customer_report(report: Mapping[str, Any], baseline: Optional[Mapping
                            client: Optional[str] = None,
                            prepared_by: Optional[str] = None,
                            engagement: Optional[Mapping[str, Any]] = None,
-                           triage: Optional[Mapping[str, Any]] = None) -> str:
+                           triage: Optional[Mapping[str, Any]] = None,
+                           baseline_triage: Optional[Mapping[str, Any]] = None) -> str:
     """Return the self-contained customer HTML for ``report``.
 
     ``engagement`` adds the header block (see ENGAGEMENT_FIELDS); explicit
     ``client`` and ``prepared_by`` arguments win over its values. ``triage``
-    sets aside judge findings the analyst dismissed for this exact run (see
-    validate_triage). The since-last-scan comparison still uses raw verdicts.
+    records the analyst's review of this exact run: findings set aside and
+    findings added (see validate_triage). With ``baseline`` the report becomes
+    a retest: the header shows the baseline date and score delta, and a
+    "Changes since baseline" section lists fixed, new, regressed, still-open,
+    and uncomparable attacks. ``baseline_triage`` applies the earlier report's
+    review to the baseline, so both sides are compared as the analyst left them.
 
     Raises ValueError if ``report`` (or ``baseline``) is not a usable scan
     report, or if ``engagement`` or ``triage`` is malformed.
@@ -921,28 +1027,36 @@ def render_customer_report(report: Mapping[str, Any], baseline: Optional[Mapping
 
     validate_customer_input(report, "scan")
     engagement = validate_engagement(engagement)
-    dismissed = validate_triage(triage, report)
-    facts = None
+    dismissed, confirmed = validate_triage(triage, report)
+    report = _apply_triage(report, dismissed, confirmed)
+    facts, retest = None, None
     if baseline is not None:
         validate_customer_input(baseline, "baseline")
-        facts = since_last_scan(baseline, report)
-    report = _apply_triage(report, dismissed)
+        base_dismissed, base_confirmed = validate_triage(baseline_triage, baseline)
+        baseline = _apply_triage(baseline, base_dismissed, base_confirmed)
+        facts = since_last_scan(_effective(baseline), _effective(report))
+        retest = {"baseline_date": facts["baseline_date"],
+                  "baseline_score": score_report(baseline)["score"],
+                  "comparable": facts["comparable"]}
+    elif baseline_triage is not None:
+        raise ValueError("baseline triage needs a baseline scan")
     client = (client or "").strip() or engagement.get("client") or DEFAULT_CLIENT
     prepared_by = ((prepared_by or "").strip() or engagement.get("prepared_by")
                    or DEFAULT_PREPARED_BY)
     score = score_report(report)
-    title = f"{client} - AI agent security test - {score['result']}"
+    kind = "retest" if retest is not None else "test"
+    title = f"{client} - AI agent security {kind} - {score['result']}"
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{_text(title)}</title><style>{_CSS}</style></head><body><main>"
-        + _first_screen(report, score, client, prepared_by, engagement)
+        + _first_screen(report, score, client, prepared_by, engagement, retest)
         + _findings_section(report)
         + _category_section(report)
         + _not_tested_section(report)
         + (_baseline_section(facts) if facts is not None else "")
         + _set_aside_section(report)
-        + _methodology_section(report, engagement, triaged=triage is not None)
+        + _methodology_section(report, engagement, triaged=triage is not None, retest=retest)
         + _footer(report)
         + "</main></body></html>\n"
     )
