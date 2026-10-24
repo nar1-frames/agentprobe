@@ -9,6 +9,7 @@ entry point shares the same contract.
 from copy import deepcopy
 import math
 import os
+import re
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
@@ -22,6 +23,7 @@ VALID_CATEGORIES = frozenset({
     "context_manipulation", "tool_misuse",
 })
 VALID_SEVERITIES = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+_CATEGORY_NAME = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
 VALID_REASONING_EFFORTS = frozenset({
     "none", "default", "minimal", "low", "medium", "high", "xhigh", "max",
 })
@@ -154,9 +156,17 @@ def validate_config(config: Mapping[str, Any]) -> dict:
             raise ValueError("scan.categories must be 'all' or a non-empty list")
         if not all(isinstance(category, str) for category in categories):
             raise ValueError("scan.categories entries must be strings")
-        unknown = sorted(set(categories) - VALID_CATEGORIES)
+        # Which categories exist depends on the loaded attack packs, so this
+        # checks the name shape; selection rejects a category no pack provides.
+        unknown = sorted(c for c in categories if not _CATEGORY_NAME.match(c))
         if unknown:
-            raise ValueError(f"scan.categories contains unknown values: {', '.join(unknown)}")
+            raise ValueError(f"scan.categories contains unknown values: {', '.join(unknown)} "
+                             "(category names are lowercase snake_case)")
+    packs = config.get("packs")
+    if packs is not None:
+        if (not isinstance(packs, (list, tuple)) or not packs or len(packs) > 20
+                or not all(isinstance(spec, str) and spec.strip() for spec in packs)):
+            raise ValueError("packs must be a list of 1 to 20 pack names or paths")
     severity = scan.get("severity_filter")
     if severity is not None and severity not in VALID_SEVERITIES:
         raise ValueError(

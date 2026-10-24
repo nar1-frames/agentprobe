@@ -341,6 +341,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="with --resume, retry checkpointed target/judge failures only",
     )
+    scan.add_argument(
+        "--pack", action="append", default=[], metavar="PATH_OR_NAME",
+        help="add an attack pack (a pack directory, or a name in AGENTPROBE_PACKS_PATH) "
+             "to the config's packs; repeatable; requires --non-interactive",
+    )
     _add_export_arguments(scan)
     scan.set_defaults(handler="scan")
 
@@ -431,6 +436,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--prepared-by", metavar="NAME", help="who prepared the report (default: AgentProbe)",
     )
     report.set_defaults(handler="report")
+
+    packs = subparsers.add_parser("packs", help="list or validate attack packs")
+    packs_commands = packs.add_subparsers(dest="packs_command")
+    packs_commands.add_parser(
+        "list", help="show the built-in pack and the packs found in AGENTPROBE_PACKS_PATH",
+    )
+    validate = packs_commands.add_parser("validate", help="check one pack directory")
+    validate.add_argument("path", metavar="DIR", help="pack directory (holds manifest.yaml)")
+    packs.set_defaults(handler="packs")
     return parser
 
 
@@ -451,6 +465,8 @@ def _run_non_interactive_scan(args) -> int:
             scan_kwargs["repair_errors"] = True
         if args.verbose:
             scan_kwargs["verbose"] = True
+        if getattr(args, "pack", None):
+            scan_kwargs["packs"] = list(args.pack)
         run = scanner.run_configured_scan(args.config, **scan_kwargs)
     except (OSError, KeyError, ValueError) as exc:
         print(f"agentprobe: configuration/scan error: {exc}")
@@ -511,6 +527,36 @@ def _demo(args) -> int:
     return _run_non_interactive_scan(args)
 
 
+def _pack_line(pack) -> str:
+    return (f"{pack.id} {pack.version}: {len(pack.attacks)} attacks in "
+            f"{len(pack.categories)} categories ({', '.join(pack.categories)}); "
+            f"license {pack.license}; sha256 {pack.sha256}")
+
+
+def _packs(args, parser) -> int:
+    from agentprobe.packs import PackError, available_packs, load_pack
+
+    if args.packs_command == "validate":
+        try:
+            pack = load_pack(args.path)
+        except PackError as exc:
+            print(f"agentprobe: pack error: {exc}", file=sys.stderr)
+            return 2
+        print(f"Pack OK: {_pack_line(pack)}")
+        return 0
+    if args.packs_command == "list":
+        problems = 0
+        for source, found in available_packs():
+            if isinstance(found, Exception):
+                problems += 1
+                print(f"[INVALID] {source}: {found}")
+            else:
+                print(f"{_pack_line(found)}\n          source: {source}")
+        return 2 if problems else 0
+    parser.error("packs needs a command: list or validate")
+    return 2
+
+
 def main(argv: Sequence[str] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -527,6 +573,8 @@ def main(argv: Sequence[str] = None) -> int:
         return _demo(args)
     if args.handler == "report":
         return _report(args)
+    if args.handler == "packs":
+        return _packs(args, parser)
     if args.handler == "scan":
         if args.resume and not args.checkpoint:
             parser.error("--resume requires --checkpoint")
@@ -543,6 +591,8 @@ def main(argv: Sequence[str] = None) -> int:
                 )
             if args.sarif or args.junit:
                 parser.error("--sarif/--junit currently require --non-interactive")
+            if args.pack:
+                parser.error("--pack currently requires --non-interactive")
             # Keep the existing interactive UX while making it installable.
             # The runner prints the shared scan summary itself, before its
             # "saved" lines, so nothing is printed here afterwards.
