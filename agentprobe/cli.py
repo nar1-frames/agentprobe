@@ -6,6 +6,8 @@ import os
 import sys
 from typing import Sequence
 
+import yaml
+
 from agentprobe.compare import compare_scan_reports, format_comparison_text
 from agentprobe.config import client_config
 from agentprobe.customer_report import render_customer_report
@@ -61,17 +63,29 @@ def _compare(args) -> int:
     return exit_code
 
 
+def _load_yaml(path, label):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{label} {path} is not valid YAML: {_one_line(exc)}") from exc
+
+
 def _report(args) -> int:
     """Render the customer HTML report; on any input problem write nothing, exit 2."""
-    if _same_file(args.out, args.scan) or (args.baseline and _same_file(args.out, args.baseline)):
-        print("agentprobe: report error: --out must not be the scan or baseline file",
+    inputs = [path for path in (args.scan, args.baseline, args.engagement, args.triage) if path]
+    if any(_same_file(args.out, path) for path in inputs):
+        print("agentprobe: report error: --out must not be one of the input files",
               file=sys.stderr)
         return 2
     try:
         scan = _load_report(args.scan, "scan")
         baseline = _load_report(args.baseline, "baseline") if args.baseline else None
+        engagement = _load_yaml(args.engagement, "engagement") if args.engagement else None
+        triage = _load_yaml(args.triage, "triage") if args.triage else None
         page = render_customer_report(
             scan, baseline, client=args.client, prepared_by=args.prepared_by,
+            engagement=engagement, triage=triage,
         )
     except (OSError, ValueError) as exc:
         print(f"agentprobe: report input error: {_one_line(exc)}", file=sys.stderr)
@@ -404,6 +418,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report.add_argument("--out", required=True, metavar="PATH", help="HTML file to write")
     report.add_argument("--client", metavar="NAME", help="client or system name for the title")
+    report.add_argument(
+        "--engagement", metavar="PATH",
+        help="engagement header YAML (client, engagement_id, assessment_window, system, "
+             "scope, prepared_by, contact, authorization)",
+    )
+    report.add_argument(
+        "--triage", metavar="PATH",
+        help="analyst triage YAML for this scan's run_id: findings set aside with reasons",
+    )
     report.add_argument(
         "--prepared-by", metavar="NAME", help="who prepared the report (default: AgentProbe)",
     )

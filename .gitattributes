@@ -1,2 +1,4 @@
 # Shell scripts run under bash on every runner, including Windows; keep LF.
 *.sh text eol=lf
+# Rendered PDFs are binary; never convert their line endings.
+*.pdf binary

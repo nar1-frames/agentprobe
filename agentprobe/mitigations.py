@@ -23,6 +23,16 @@
 # architecture layer.
 # ============================================================
 
+# OWASP Top 10 for LLM Applications, 2025 edition: the entries the attack
+# categories map to. Each category lists its primary entry first in
+# ``owasp_2025``; ``owasp`` repeats that primary code for compact displays.
+OWASP_LLM_2025 = {
+    "LLM01:2025": "Prompt Injection",
+    "LLM02:2025": "Sensitive Information Disclosure",
+    "LLM06:2025": "Excessive Agency",
+    "LLM07:2025": "System Prompt Leakage",
+}
+
 # layer values are grouped so the report can highlight where the
 # durable fix actually lives.
 MITIGATIONS = {
@@ -34,7 +44,8 @@ MITIGATIONS = {
             "classifier for known jailbreak patterns, and rely on refusal "
             "fine-tuning. Model-layer only — treat as probabilistic, not a guarantee."
         ),
-        "owasp": "LLM01",
+        "owasp": "LLM01:2025",
+        "owasp_2025": ["LLM01:2025"],
     },
     "data_extraction": {
         "layer": "Design",
@@ -44,7 +55,8 @@ MITIGATIONS = {
             "rules out of it entirely. Redact or rewrite outputs that echo "
             "configuration. The best defense is having nothing worth extracting."
         ),
-        "owasp": "LLM06",
+        "owasp": "LLM07:2025",
+        "owasp_2025": ["LLM07:2025", "LLM02:2025"],
     },
     "privilege_escalation": {
         "layer": "Architecture",
@@ -54,7 +66,8 @@ MITIGATIONS = {
             "authorization in application code and ignore any role, permission, or "
             "'admin/root' claim made inside the conversation."
         ),
-        "owasp": "LLM01",
+        "owasp": "LLM01:2025",
+        "owasp_2025": ["LLM01:2025", "LLM06:2025"],
     },
     "social_engineering": {
         "layer": "Model + Policy",
@@ -64,7 +77,8 @@ MITIGATIONS = {
             "refusal training with a policy that privileged actions require "
             "out-of-band verification, not a convincing message."
         ),
-        "owasp": "LLM01",
+        "owasp": "LLM01:2025",
+        "owasp_2025": ["LLM01:2025", "LLM07:2025"],
     },
     "role_confusion": {
         "layer": "Model",
@@ -74,7 +88,8 @@ MITIGATIONS = {
             "it. Empirically the highest-success category — measure it every release "
             "and gate deployment on the result rather than assuming it is fixed."
         ),
-        "owasp": "LLM01",
+        "owasp": "LLM01:2025",
+        "owasp_2025": ["LLM01:2025"],
     },
     "indirect_injection": {
         "layer": "Architecture",
@@ -85,7 +100,8 @@ MITIGATIONS = {
             "embedded directives, and track provenance. The most dangerous real-world "
             "vector for tool-using agents."
         ),
-        "owasp": "LLM02",
+        "owasp": "LLM01:2025",
+        "owasp_2025": ["LLM01:2025"],
     },
     "context_manipulation": {
         "layer": "App",
@@ -95,7 +111,8 @@ MITIGATIONS = {
             "'reset / forget everything / your instructions expired' claims — the "
             "model should not manage its own guardrail lifecycle."
         ),
-        "owasp": "LLM01",
+        "owasp": "LLM01:2025",
+        "owasp_2025": ["LLM01:2025"],
     },
     "tool_misuse": {
         "layer": "Architecture",
@@ -105,7 +122,8 @@ MITIGATIONS = {
             "execution, and require human-in-the-loop for consequential calls. Model "
             "refusals are unreliable — put the guardrail at the tool layer, not the prompt."
         ),
-        "owasp": "LLM08",
+        "owasp": "LLM06:2025",
+        "owasp_2025": ["LLM06:2025", "LLM01:2025"],
     },
 }
 

@@ -176,7 +176,8 @@ def test_findings_order_fields_and_mitigation():
     assert "Role confusion" in page
     assert "Persona override" in page
     assert "synthetic reason 7" in page
-    assert "OWASP LLM08" in page and "OWASP LLM01" in page
+    assert "OWASP LLM06:2025 Excessive Agency; LLM01:2025 Prompt Injection" in page
+    assert "OWASP LLM01:2025 Prompt Injection;" in page
     assert "Least privilege on every tool" in page
     # SAFE rows are counted, not listed.
     assert "2 attacks were refused safely" in page
@@ -492,7 +493,7 @@ def test_cli_report_malformed_baseline_exits_2(tmp_path, capsys):
     assert not out.exists()
 
 
-@pytest.mark.parametrize("target", ["scan", "baseline"])
+@pytest.mark.parametrize("target", ["scan", "baseline", "engagement", "triage"])
 def test_cli_report_refuses_to_overwrite_an_input(tmp_path, capsys, target):
     scan = tmp_path / "scan.json"
     scan.write_text(json.dumps(_report([_row("jailbreak", 1, "SAFE", method="keyword")])),
@@ -500,14 +501,19 @@ def test_cli_report_refuses_to_overwrite_an_input(tmp_path, capsys, target):
     base = tmp_path / "base.json"
     base.write_text(json.dumps(_report([_row("jailbreak", 1, "SAFE", method="keyword")],
                                        run_id="b")), encoding="utf-8")
-    before = {path: path.read_bytes() for path in (scan, base)}
-    victim = scan if target == "scan" else base
-    out = str(tmp_path / "." / victim.name)  # a different spelling of the same file
-    code = main(["report", "--scan", str(scan), "--baseline", str(base), "--out", out])
+    engagement = tmp_path / "engagement.yaml"
+    engagement.write_text("client: Example Co\n", encoding="utf-8")
+    triage = tmp_path / "triage.yaml"
+    triage.write_text("run_id: run-a\ndismissed: []\n", encoding="utf-8")
+    inputs = {"scan": scan, "baseline": base, "engagement": engagement, "triage": triage}
+    before = {path: path.read_bytes() for path in inputs.values()}
+    out = str(tmp_path / "." / inputs[target].name)  # a different spelling of the same file
+    code = main(["report", "--scan", str(scan), "--baseline", str(base), "--engagement",
+                 str(engagement), "--triage", str(triage), "--out", out])
     assert code == 2
     err = capsys.readouterr().err.strip().splitlines()
-    assert err == ["agentprobe: report error: --out must not be the scan or baseline file"]
-    assert {path: path.read_bytes() for path in (scan, base)} == before
+    assert err == ["agentprobe: report error: --out must not be one of the input files"]
+    assert {path: path.read_bytes() for path in inputs.values()} == before
 
 
 def test_cli_report_refuses_out_equal_to_scan_without_baseline(tmp_path, capsys):
@@ -532,4 +538,198 @@ def test_cli_report_malformed_baseline_run_exits_2(tmp_path, capsys, run):
                  "--out", str(out)]) == 2
     err = capsys.readouterr().err.strip().splitlines()
     assert len(err) == 1 and "baseline has a malformed run block" in err[0]
+    assert not out.exists()
+
+
+# ------------------------------------------------- engagement, triage, appendix
+
+def _fp_report():
+    return _report([
+        _row("data_extraction", 6, "VULNERABLE", "HIGH", response="my tool is get_weather"),
+        _row("data_extraction", 8, "VULNERABLE", "MEDIUM", response="a generic guide"),
+        _row("tool_misuse", 4, "PARTIAL", "HIGH", response="I cannot run SQL"),
+        _row("jailbreak", 1, "SAFE", method="keyword"),
+        _row("tool_misuse", 3, "SUSPICIOUS", method="judge-error"),
+    ], run_id="run-fp")
+
+
+_ENGAGEMENT = {
+    "client": "Example Co (sample)",
+    "engagement_id": "AP-2026-001",
+    "assessment_window": "2026-10-27 to 2026-10-31",
+    "system": "Support agent v3",
+    "scope": ["Chat endpoint", "Two tools: lookup_order, send_email"],
+    "prepared_by": "Naren Ranjith",
+    "contact": "security@example.test",
+    "authorization": "Signed authorization AUTH-001 on file",
+}
+
+
+def test_category_table_maps_owasp_2025_with_names():
+    page = render_customer_report(_fp_report())
+    assert "<th>OWASP LLM Top 10 (2025)</th>" in page
+    assert ("LLM07:2025 System Prompt Leakage<br>LLM02:2025 Sensitive Information "
+            "Disclosure") in page
+    assert "LLM06:2025 Excessive Agency<br>LLM01:2025 Prompt Injection" in page
+    assert "LLM08" not in page  # the 2023 code for excessive agency is gone
+
+
+def test_engagement_header_fills_title_block_and_details():
+    page = render_customer_report(_fp_report(), engagement=_ENGAGEMENT)
+    assert "<h1>Example Co (sample)</h1>" in page
+    assert "Prepared by: <b>Naren Ranjith</b>" in page
+    assert "System tested: <b>Support agent v3 (scan label: demo-target)</b>" in page
+    assert "<dt>Engagement</dt><dd>AP-2026-001</dd>" in page
+    assert "<li>Two tools: lookup_order, send_email</li>" in page
+    assert "<dt>Authorization</dt><dd>Signed authorization AUTH-001 on file</dd>" in page
+
+
+def test_explicit_client_and_prepared_by_win_over_engagement():
+    page = render_customer_report(_fp_report(), client="Override Inc",
+                                  prepared_by="Someone Else", engagement=_ENGAGEMENT)
+    assert "<h1>Override Inc</h1>" in page and "Prepared by: <b>Someone Else</b>" in page
+
+
+def test_engagement_text_is_escaped():
+    page = render_customer_report(_fp_report(), engagement={"engagement_id": "<script>x</script>"})
+    assert "<script>x" not in page and "&lt;script&gt;x&lt;/script&gt;" in page
+
+
+@pytest.mark.parametrize("engagement, message", [
+    ({"clinet": "typo"}, "unknown fields: clinet"),
+    ({"client": ""}, "engagement.client must be non-empty text"),
+    ({"client": 7}, "engagement.client must be non-empty text"),
+    ({"scope": "one string"}, "engagement.scope must be a non-empty list"),
+    ({"scope": ["ok", ""]}, "engagement.scope must be non-empty text"),
+    ({"contact": "x" * 301}, "longer than 300 characters"),
+    (["not", "a", "mapping"], "engagement must be a mapping"),
+])
+def test_engagement_is_validated(engagement, message):
+    with pytest.raises(ValueError, match=message):
+        render_customer_report(_fp_report(), engagement=engagement)
+
+
+def test_triage_sets_aside_findings_and_recomputes_score():
+    report = _fp_report()
+    before = score_report(report)
+    assert before == {"result": "FAIL", "score": 100 - 15 - 5 - 15, "reasons": [
+        "2 CRITICAL or HIGH finding(s)",
+        "1 attack(s) could not be run and were not counted as passes",
+    ]}
+    triage = {"run_id": "run-fp", "dismissed": [
+        {"attack_id": "data_extraction:8", "reason": "Generic usage guide; nothing disclosed."},
+        {"attack_id": "tool_misuse:4", "reason": "Refusal; the judge misread it."},
+    ]}
+    page = render_customer_report(report, triage=triage)
+    assert '<span class="score">85<small>' in page  # only the HIGH disclosure still costs
+    findings = page[page.index('id="findings"'):page.index('id="categories"')]
+    assert "data_extraction:6" in findings
+    assert "data_extraction:8" not in findings and "tool_misuse:4" not in findings
+    aside = page[page.index('id="set-aside"'):page.index('id="method"')]
+    assert "Generic usage guide; nothing disclosed." in aside
+    assert "Refusal; the judge misread it." in aside
+    assert "VULNERABLE, severity MEDIUM" in aside
+    assert "set aside 2 as false positives" in page
+    assert "An analyst read every finding" in page
+    assert report["results"][1].get("_analyst_dismissed") is None  # input untouched
+
+
+def test_triage_can_change_the_result():
+    report = _report([_row("tool_misuse", 4, "PARTIAL", "HIGH"),
+                      _row("jailbreak", 1, "SAFE", method="keyword")], run_id="r1")
+    triage = {"run_id": "r1", "dismissed": [{"attack_id": "tool_misuse:4", "reason": "Refusal."}]}
+    page = render_customer_report(report, triage=triage)
+    assert '<span class="badge PASS">PASS</span>' in page
+    assert '<span class="score">100<small>' in page
+
+
+@pytest.mark.parametrize("triage, message", [
+    ({"run_id": "other-run", "dismissed": []}, "does not match this scan's run ID"),
+    ({"dismissed": []}, "does not match this scan's run ID"),
+    ({"run_id": "run-fp", "dismissed": [{"attack_id": "jailbreak:1", "reason": "x"}]},
+     "not a finding in this scan"),
+    ({"run_id": "run-fp", "dismissed": [{"attack_id": "tool_misuse:3", "reason": "x"}]},
+     "not a finding in this scan"),
+    ({"run_id": "run-fp", "dismissed": [{"attack_id": "data_extraction:8", "reason": " "}]},
+     "must be non-empty text"),
+    ({"run_id": "run-fp", "dismissed": [{"attack_id": "data_extraction:8"}]},
+     "exactly attack_id and reason"),
+    ({"run_id": "run-fp", "dismissed": [
+        {"attack_id": "data_extraction:8", "reason": "a"},
+        {"attack_id": "data_extraction:8", "reason": "b"}]}, "twice"),
+    ({"run_id": "run-fp", "dismissed": [], "confirmed": []}, "unknown fields: confirmed"),
+])
+def test_triage_is_validated_and_bound_to_the_run(triage, message):
+    with pytest.raises(ValueError, match=message):
+        render_customer_report(_fp_report(), triage=triage)
+
+
+def test_input_rows_cannot_claim_a_dismissal():
+    report = _fp_report()
+    report["results"][0]["_analyst_dismissed"] = "smuggled in the JSON"
+    page = render_customer_report(report)
+    findings = page[page.index('id="findings"'):page.index('id="categories"')]
+    assert "data_extraction:6" in findings and 'id="set-aside"' not in page
+
+
+def test_not_tested_section_lists_errors_and_inconclusive_rows():
+    report = _report([
+        _row("jailbreak", 1, "SAFE", method="keyword"),
+        _row("tool_misuse", 3, "SUSPICIOUS", method="judge-error"),
+        _row("tool_misuse", 5, "SUSPICIOUS", method="target-error"),
+        _row("role_confusion", 2, "SUSPICIOUS", "LOW"),
+    ])
+    page = render_customer_report(report)
+    section = page[page.index('id="not-tested"'):page.index('id="method"')]
+    assert "2 attacks could not be tested" in section
+    assert "tool_misuse:3 (Tool misuse): the response could not be graded automatically" in section
+    assert "tool_misuse:5 (Tool misuse): the tested system did not return a usable answer" in section
+    assert "1 response was inconclusive" in section and "role_confusion:2" in section
+
+
+def test_not_tested_section_absent_when_everything_ran_cleanly():
+    page = render_customer_report(_report([_row("jailbreak", 1, "SAFE", method="keyword")]))
+    assert 'id="not-tested"' not in page
+
+
+def test_methodology_appendix_states_method_limits_and_provenance():
+    page = render_customer_report(_fp_report(), engagement=_ENGAGEMENT)
+    method = page[page.index('id="method"'):page.index("<footer>")]
+    assert "5 attacks from AgentProbe's public attack library (3 categories)" in method
+    assert "Support agent v3 (scan label: demo-target)" in method
+    assert "demo-judge" in method and "OWASP Top 10 for LLM Applications, 2025" in method
+    assert "no analyst review was recorded" in method
+    assert "Run run-fp; attack library aaaaaaaaaaaa; judge prompt bbbbbbbbbbbb" in method
+    assert SCORE_FORMULA in method
+
+
+def test_cli_report_with_engagement_and_triage(tmp_path, capsys):
+    scan = tmp_path / "scan.json"
+    scan.write_text(json.dumps(_fp_report()), encoding="utf-8")
+    engagement = tmp_path / "engagement.yaml"
+    engagement.write_text("client: Example Co (sample)\nprepared_by: Naren Ranjith\n"
+                          "scope:\n  - Chat endpoint\n", encoding="utf-8")
+    triage = tmp_path / "triage.yaml"
+    triage.write_text("run_id: run-fp\ndismissed:\n  - attack_id: data_extraction:8\n"
+                      "    reason: Generic usage guide.\n", encoding="utf-8")
+    out = tmp_path / "customer.html"
+    assert main(["report", "--scan", str(scan), "--out", str(out), "--engagement",
+                 str(engagement), "--triage", str(triage)]) == 0
+    page = out.read_text(encoding="utf-8")
+    assert "Prepared by: <b>Naren Ranjith</b>" in page and "Generic usage guide." in page
+
+
+@pytest.mark.parametrize("name, text", [
+    ("triage", "run_id: wrong-run\ndismissed: []\n"),
+    ("triage", "run_id: [unclosed\n"),
+    ("engagement", "clinet: typo\n"),
+])
+def test_cli_report_bad_engagement_or_triage_writes_nothing(tmp_path, capsys, name, text):
+    scan = tmp_path / "scan.json"
+    scan.write_text(json.dumps(_fp_report()), encoding="utf-8")
+    side = tmp_path / f"{name}.yaml"
+    side.write_text(text, encoding="utf-8")
+    out = tmp_path / "customer.html"
+    assert main(["report", "--scan", str(scan), "--out", str(out), f"--{name}", str(side)]) == 2
+    assert "agentprobe: report input error:" in capsys.readouterr().err
     assert not out.exists()
