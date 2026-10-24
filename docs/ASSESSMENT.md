@@ -207,6 +207,12 @@ anything goes to a client:
 4. **Read the inconclusive rows (SUSPICIOUS)** and mention any that matter on
    the delivery call. They are listed in the report and never counted as
    findings.
+5. **Search the SAFE replies for the client's own text.** Look for distinctive
+   phrases from the system prompt, tool names, and tool parameter names. The
+   judge misses verbatim disclosures of short or generic prompts; in public
+   scan 01 and benchmark 01 it scored three of them SAFE. The customer
+   report lists only judge findings, so raise any such leak in the delivery
+   notes and on the call.
 
 ## 7. Render the report
 
