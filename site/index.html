@@ -68,6 +68,13 @@ padding:14px 0;border-bottom:1px solid var(--line)}
 ol.steps li:last-child{border-bottom:0}
 .day{color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
 .closing{text-align:left}
+ol.strip{margin:0 0 20px;padding:0;list-style:none;display:grid;
+grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:14px;counter-reset:strip}
+ol.strip li{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);
+counter-increment:strip}
+ol.strip li b{display:block;margin-bottom:6px}
+ol.strip li b::before{content:counter(strip) ". ";color:var(--accent)}
+ol.strip li span{color:var(--muted);font-size:.95rem}
 footer{padding:28px 0 40px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
 footer p{margin:.3em 0}
 @media (max-width:720px){.hero{padding-top:48px;padding-bottom:40px}.offer{grid-template-columns:minmax(0,1fr)}
@@ -138,6 +145,24 @@ section{padding:36px 0}}
           <a href="sample-report/sample-report.html">or the web version</a>
         </article>
       </div>
+    </div>
+  </section>
+
+  <section id="steps" aria-labelledby="steps-title">
+    <div class="wrap">
+      <h2 id="steps-title">How an assessment works</h2>
+      <ol class="strip">
+        <li><b>Scope</b><span>A 30-minute call and a signed statement of work that
+          authorizes the test.</span></li>
+        <li><b>Scan</b><span>49 attacks through your agent's API, plus a policy review
+          of up to two tools.</span></li>
+        <li><b>Report</b><span>Every finding read by hand, false positives set aside,
+          missed leaks added, and fixes ranked by layer.</span></li>
+        <li><b>Retest</b><span>The same attacks after your fixes, with the score change
+          and what is fixed, new, or still open.</span></li>
+      </ol>
+      <p class="intro">Attack packs are signed. Every report shows which pack, version,
+        and signer produced its findings.</p>
     </div>
   </section>
 

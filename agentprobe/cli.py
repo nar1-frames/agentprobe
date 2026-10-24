@@ -74,7 +74,8 @@ def _load_yaml(path, label):
 
 def _report(args) -> int:
     """Render the customer HTML report; on any input problem write nothing, exit 2."""
-    inputs = [path for path in (args.scan, args.baseline, args.engagement, args.triage) if path]
+    inputs = [path for path in (args.scan, args.baseline, args.engagement, args.triage,
+                                args.baseline_triage) if path]
     if any(_same_file(args.out, path) for path in inputs):
         print("agentprobe: report error: --out must not be one of the input files",
               file=sys.stderr)
@@ -84,9 +85,11 @@ def _report(args) -> int:
         baseline = _load_report(args.baseline, "baseline") if args.baseline else None
         engagement = _load_yaml(args.engagement, "engagement") if args.engagement else None
         triage = _load_yaml(args.triage, "triage") if args.triage else None
+        baseline_triage = (_load_yaml(args.baseline_triage, "baseline triage")
+                           if args.baseline_triage else None)
         page = render_customer_report(
             scan, baseline, client=args.client, prepared_by=args.prepared_by,
-            engagement=engagement, triage=triage,
+            engagement=engagement, triage=triage, baseline_triage=baseline_triage,
         )
     except (OSError, ValueError) as exc:
         print(f"agentprobe: report input error: {_one_line(exc)}", file=sys.stderr)
@@ -431,7 +434,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report.add_argument(
         "--triage", metavar="PATH",
-        help="analyst triage YAML for this scan's run_id: findings set aside with reasons",
+        help="analyst triage YAML for this scan's run_id: findings set aside or added",
+    )
+    report.add_argument(
+        "--baseline-triage", metavar="PATH",
+        help="the baseline report's triage YAML, so a retest compares reviewed results",
     )
     report.add_argument(
         "--prepared-by", metavar="NAME", help="who prepared the report (default: AgentProbe)",

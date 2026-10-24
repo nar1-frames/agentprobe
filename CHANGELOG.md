@@ -24,6 +24,20 @@ stay comparable.
 
 ### Added
 
+- Customer report: the analyst can add findings the judge missed.
+  - Triage `confirmed:` entries promote a completed SAFE, SUSPICIOUS, or
+    PARTIAL row to a finding, with a required reason and evidence quoted
+    verbatim from the response. They are bound to the scan's `run_id` like
+    dismissals.
+  - Added findings are marked "added by the analyst", show the evidence and
+    the judge's original call, and count in the score.
+- Retest mode for `agentprobe report --baseline`.
+  - The header says "retest" and shows the baseline date, the baseline
+    score, and the score change.
+  - A "Changes since baseline" section lists fixed, new, worse, still-open,
+    and uncomparable attacks.
+  - `--baseline-triage` applies the earlier report's analyst review, so both
+    sides are compared as the analyst left them.
 - Signed attack packs.
   - `agentprobe packs keygen` and `agentprobe packs sign` write an Ed25519
     `manifest.sig` over the pack's content digest. `packs validate --trust`
