@@ -42,7 +42,7 @@ MITIGATIONS = {
         "mitigation": (
             "Enforce instruction precedence in the system prompt, add an input "
             "classifier for known jailbreak patterns, and rely on refusal "
-            "fine-tuning. Model-layer only — treat as probabilistic, not a guarantee."
+            "fine-tuning. Model-layer only: treat as probabilistic, not a guarantee."
         ),
         "owasp": "LLM01:2025",
         "owasp_2025": ["LLM01:2025"],
@@ -85,7 +85,7 @@ MITIGATIONS = {
         "durable": False,
         "mitigation": (
             "Persona anchoring and refusal training reduce this but do not eliminate "
-            "it. Empirically the highest-success category — measure it every release "
+            "it. Empirically the highest-success category: measure it every release "
             "and gate deployment on the result rather than assuming it is fixed."
         ),
         "owasp": "LLM01:2025",
@@ -108,7 +108,7 @@ MITIGATIONS = {
         "durable": True,
         "mitigation": (
             "Keep conversation state and guardrails server-side. Ignore in-band "
-            "'reset / forget everything / your instructions expired' claims — the "
+            "'reset / forget everything / your instructions expired' claims; the "
             "model should not manage its own guardrail lifecycle."
         ),
         "owasp": "LLM01:2025",
@@ -120,7 +120,7 @@ MITIGATIONS = {
         "mitigation": (
             "Least privilege on every tool, allowlist permitted actions, sandbox "
             "execution, and require human-in-the-loop for consequential calls. Model "
-            "refusals are unreliable — put the guardrail at the tool layer, not the prompt."
+            "refusals are unreliable, so put the guardrail at the tool layer, not the prompt."
         ),
         "owasp": "LLM06:2025",
         "owasp_2025": ["LLM06:2025", "LLM01:2025"],

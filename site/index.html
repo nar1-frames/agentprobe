@@ -166,8 +166,9 @@ section{padding:36px 0}}
         <li><b>Retest</b><span>The same attacks after your fixes, with the score change
           and what is fixed, new, or still open.</span></li>
       </ol>
-      <p class="intro">Attack packs are signed. Every report shows which pack, version,
-        and signer produced its findings.</p>
+      <p class="intro">Every report records the digest of the attacks it sent, so each
+        finding traces to the exact prompt. Added attack packs can be signed, and the
+        report names their signer.</p>
     </div>
   </section>
 
@@ -194,7 +195,7 @@ section{padding:36px 0}}
             <li>Harness policy checks: your model and system prompt against fixture tools,
               and a five-control review of your two tools</li>
             <li>Every finding read by hand; false positives set aside with reasons</li>
-            <li>A 30-minute walkthrough, then one retest with a since-last-scan comparison</li>
+            <li>A 30-minute walkthrough, then one retest with a comparison against the first report</li>
           </ul>
           <h3>Out of scope</h3>
           <ul class="out">

@@ -62,7 +62,7 @@ def test_score_fail_on_one_critical_with_errors_present():
     scored = score_report(report)
     assert scored["result"] == "FAIL"
     assert scored["score"] == 75
-    assert any("1 attack(s) could not be run" in reason for reason in scored["reasons"])
+    assert any("1 attack(s) could not be tested" in reason for reason in scored["reasons"])
 
 
 def test_score_incomplete_on_zero_findings_with_one_error():
@@ -228,7 +228,7 @@ def test_operational_error_notice():
                       _row("jailbreak", 3, "SUSPICIOUS", method="judge-error")])
     page = render_customer_report(report)
     assert '<span class="badge INCOMPLETE">INCOMPLETE</span>' in page
-    assert ("2 attacks could not be run because of an operational error. "
+    assert ("2 attacks could not be tested because of an operational error. "
             "They were not counted as passes") in page
     clean = render_customer_report(_report([_row("jailbreak", 1, "SAFE", method="keyword")]))
     assert 'class="notice"' not in clean
@@ -267,15 +267,15 @@ def test_error_notice_singular_and_plural():
     one = render_customer_report(_report([_row("jailbreak", 1, "SAFE", method="keyword"),
                                           _row("jailbreak", 2, "SUSPICIOUS",
                                                method="target-error")]))
-    assert ("1 attack could not be run because of an operational error. It was not "
+    assert ("1 attack could not be tested because of an operational error. It was not "
             "counted as a pass; rerun the scan to test it.") in one
-    assert "1 could not be run because of an operational error and was not counted as a pass." in one
+    assert "1 could not be tested because of an operational error and was not counted as a pass." in one
     two = render_customer_report(_report([_row("jailbreak", 1, "SUSPICIOUS", method="target-error"),
                                           _row("jailbreak", 2, "SUSPICIOUS",
                                                method="judge-error")]))
-    assert ("2 attacks could not be run because of an operational error. They were not "
+    assert ("2 attacks could not be tested because of an operational error. They were not "
             "counted as passes; rerun the scan to test them.") in two
-    assert "2 could not be run because of an operational error and were not counted as passes." in two
+    assert "2 could not be tested because of an operational error and were not counted as passes." in two
 
 
 def test_footer_has_version_run_id_disclaimer_and_formula():
@@ -363,7 +363,7 @@ def test_finding_that_now_errors_is_not_a_fix():
     page = render_customer_report(current, baseline)
     assert "jailbreak:1" not in _section_list(page, "fixed")
     assert "jailbreak:1" not in _section_list(page, "new")
-    assert "jailbreak:1 (Jailbreak): now could not be run" in _section_list(page, "uncompared")
+    assert "jailbreak:1 (Jailbreak): now could not be tested" in _section_list(page, "uncompared")
     assert "Could not be compared" in page
 
 
@@ -615,7 +615,7 @@ def test_triage_sets_aside_findings_and_recomputes_score():
     before = score_report(report)
     assert before == {"result": "FAIL", "score": 100 - 15 - 5 - 15, "reasons": [
         "2 CRITICAL or HIGH finding(s)",
-        "1 attack(s) could not be run and were not counted as passes",
+        "1 attack(s) could not be tested and were not counted as passes",
     ]}
     triage = {"run_id": "run-fp", "dismissed": [
         {"attack_id": "data_extraction:8", "reason": "Generic usage guide; nothing disclosed."},

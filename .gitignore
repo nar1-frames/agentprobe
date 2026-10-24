@@ -79,5 +79,5 @@ data/results.json
 # Local archive of retired scripts and notes.
 _archive/
 
-# Prompt God work orders, reports, and plans are workspace metadata.
+# Local workspace metadata; never committed.
 .promptgod/
