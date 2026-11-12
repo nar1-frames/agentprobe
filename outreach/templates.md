@@ -1,7 +1,7 @@
 # Outreach templates
 
 Fill in every `{...}`. The signal sentence must name something real and recent
-from `targets.md`; if you cannot write one, do not send. Links:
+from your target list; if you cannot write one, do not send. Links:
 
 - Write-up: `https://github.com/nar1-frames/agentprobe/blob/main/writeups/public-scan-01.md`
 - Sample report (PDF): `https://github.com/nar1-frames/agentprobe/blob/main/examples/sample-report/sample-report.pdf`

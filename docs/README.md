@@ -30,7 +30,6 @@ Every document in the repository, one line each. Start with the
 - [../offer/case-study-template.md](../offer/case-study-template.md): the one-page anonymized case-study template.
 - [PAID_PACKS.md](PAID_PACKS.md): how commercial attack packs are meant to be distributed (a design note).
 - [../site/README.md](../site/README.md): the landing page and how the Pages workflow publishes it.
-- [../outreach/targets.md](../outreach/targets.md): design-partner targets, by role only.
 - [../outreach/templates.md](../outreach/templates.md): outreach message templates.
 - [../outreach/demo-video.md](../outreach/demo-video.md): the script for a fully offline three-minute demo video.
 
