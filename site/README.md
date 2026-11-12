@@ -1,15 +1,20 @@
 # Landing page
 
-Static pages for ordering an AgentProbe scan. No build step: open any page
-directly from disk (`file://`) to preview it.
+Static pages for ordering an AgentProbe scan, published at
+<https://agentprobe.agency/>. No build step: open any page directly from disk
+(`file://`) to preview it.
 
 | File | What it is |
 |---|---|
 | `index.html` | The landing page: the $199 scan and report, the free open-source tool, and the $2,500 full assessment. CSS and script are inline; fonts load from Google Fonts. The sample-report image is embedded in the page. |
 | `model.webp` | The animated 3D model shown in the "49 probes, one agent" section of `index.html`. |
-| `privacy.html` | Privacy policy for the paid services. Marked as a draft until reviewed. |
-| `terms.html` | Terms of service for the paid services. Marked as a draft until reviewed. |
+| `privacy.html` | Privacy policy for the paid services. Effective November 11, 2026. |
+| `terms.html` | Terms of service for the paid services, governed by Washington law. Effective November 11, 2026. |
 | `order-received.html` | Where Stripe sends buyers after payment. It collects the agent details and the written authorization, and prepares them as an email to send. |
+
+Each page has a canonical link to its address on `https://agentprobe.agency/`,
+and `index.html` also has Open Graph title, description and URL tags for link
+previews. Update them if the domain changes.
 
 ## Checkout
 
@@ -36,8 +41,10 @@ beside the pages (`scripts/check_links.py` maps those paths to the repository
 copies).
 
 The deploy step runs only when GitHub Pages is enabled for the repository
-(Settings, then Pages, with "GitHub Actions" as the source). Until then the
-workflow builds the site and skips publishing.
+(Settings, then Pages, with "GitHub Actions" as the source); otherwise the
+workflow builds the site and skips publishing. The custom domain
+`agentprobe.agency` is set in Settings, then Pages, not by a `CNAME` file:
+workflow-published sites ignore that file.
 
 `tests/test_site.py` checks that every local link and file reference in the
 four pages resolves, that no contact placeholder is left, that `index.html` has
