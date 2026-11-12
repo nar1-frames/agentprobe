@@ -19,8 +19,8 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# site/index.html is published by .github/workflows/pages.yml, which copies the
-# samples next to it. Its links to those copies resolve to the repository files.
+# The pages in site/ are published by .github/workflows/pages.yml, which copies
+# the samples next to them. Links to those copies resolve to the repository files.
 SITE_PATHS = {
     "site/sample-report/": "examples/sample-report/",
     "site/sample-retest/": "examples/sample-retest/",

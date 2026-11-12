@@ -1,6 +1,7 @@
 name: Pages
 
-# Publishes site/ to GitHub Pages, with the sample report copied in at
+# Publishes every file in site/ except README.md to GitHub Pages, with the
+# sample report copied in at
 # sample-report/ and the sample retest at sample-retest/. Pages must be enabled
 # with "GitHub Actions" as the source (repository Settings, then Pages).
 # Until Pages is enabled, the deploy job is skipped, so nothing is published
@@ -33,8 +34,10 @@ jobs:
 
       - name: Assemble the site
         run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          rm -f _site/README.md
           mkdir -p _site/sample-report _site/sample-retest
-          cp site/index.html _site/
           cp examples/sample-report/sample-report.html examples/sample-report/sample-report.pdf \
             _site/sample-report/
           cp examples/sample-retest/sample-retest.html examples/sample-retest/sample-retest.pdf \
