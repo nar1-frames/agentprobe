@@ -64,5 +64,5 @@ Every document in the repository, one line each. Start with the
 - [../writeups/public-scan-01.md](../writeups/public-scan-01.md): a public scan of the LangChain quickstart agent, with its correction.
 - [../writeups/benchmark-01.md](../writeups/benchmark-01.md): does hardening the quickstart agent help?
 - [../writeups/README.md](../writeups/README.md): preserved drafts and working notes (not the supported product surface).
-- [../blog_post.md](../blog_post.md): draft blog post on one dated pilot scan.
-- [../blog_post_medium.md](../blog_post_medium.md): draft personal post on building the scanner.
+- [../writeups/blog_post.md](../writeups/blog_post.md): draft blog post on one dated pilot scan.
+- [../writeups/blog_post_medium.md](../writeups/blog_post_medium.md): draft personal post on building the scanner.

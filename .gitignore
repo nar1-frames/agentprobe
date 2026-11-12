@@ -84,3 +84,6 @@ _archive/
 
 # Private planning notes for Naren and AI agents; never committed.
 _context/
+
+# Old Llama pilot data (raw model output and labels); local only.
+data/v1_1_historical/
