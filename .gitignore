@@ -81,3 +81,6 @@ _archive/
 
 # Local workspace metadata; never committed.
 .promptgod/
+
+# Private planning notes for Naren and AI agents; never committed.
+_context/
