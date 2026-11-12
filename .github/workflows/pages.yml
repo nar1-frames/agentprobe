@@ -3,6 +3,8 @@ name: Pages
 # Publishes site/ to GitHub Pages, with the sample report copied in at
 # sample-report/ and the sample retest at sample-retest/. Pages must be enabled
 # with "GitHub Actions" as the source (repository Settings, then Pages).
+# Until Pages is enabled, the deploy job is skipped, so nothing is published
+# and the run stays green.
 on:
   push:
     branches: [main]
@@ -45,6 +47,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.event.repository.has_pages
     runs-on: ubuntu-latest
     permissions:
       pages: write     # publish the artifact
